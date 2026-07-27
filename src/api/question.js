@@ -1,4 +1,5 @@
 import request from '@/utils/request';
+//it is nothing,do not care about it
 
 export const getQuestions = (params = {}) => {
     return request.get('/questions', { params });
