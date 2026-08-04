@@ -1,4 +1,5 @@
 <template>
+<!-- 轻量级操作反馈 -->
   <Teleport to="body">
     <Transition name="toast-fade">
       <div v-if="visible" class="toast" :class="type">

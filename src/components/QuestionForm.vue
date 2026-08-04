@@ -1,4 +1,5 @@
 <template>
+<!-- 这是一个标准的UI组件，作用是新增题目，和编辑 -->
   <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content">
       <h2 class="modal-title">{{ isEdit ? '✏️ 编辑题目' : '📝 新增题目' }}</h2>

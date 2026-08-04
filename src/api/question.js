@@ -21,6 +21,20 @@ export const deleteQuestion = (id) => {
     return request.delete(`/questions/${id}`);
 };
 
+// 批量删除
+export const batchDeleteQuestions = (ids) => {
+    return request.post('/questions/batch-delete', { ids });
+};
+
+// 批量导入 Excel
+export const batchImportQuestions = (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request.post('/questions/batch-import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+    });
+};
+
 export const searchQuestions = (keyword) => {
     return request.get('/questions/search', { params: { keyword } });
 };

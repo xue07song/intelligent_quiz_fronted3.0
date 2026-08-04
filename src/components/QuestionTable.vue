@@ -5,6 +5,14 @@
       <table class="question-table">
         <thead>
           <tr>
+            <th v-if="canEdit" class="col-select">
+              <input
+                type="checkbox"
+                :checked="isAllSelected"
+                :indeterminate.prop="isIndeterminate"
+                @change="toggleAll"
+              />
+            </th>
             <th>ID</th>
             <th>章节</th>
             <th>题型</th>
@@ -22,6 +30,13 @@
         </thead>
         <tbody>
           <tr v-for="item in list" :key="item.id">
+            <td v-if="canEdit" class="col-select">
+              <input
+                type="checkbox"
+                :checked="isSelected(item.id)"
+                @change="toggleOne(item.id)"
+              />
+            </td>
             <td>{{ item.id }}</td>
             <td>{{ item.章节 }}</td>
             <td>{{ getTypeName(item.题型) }}</td>
@@ -36,12 +51,12 @@
             <td>{{ item.出题人 }}</td>
             <td class="col-actions">
               <button class="btn-view" @click="$emit('view', item)">查看</button>
-              <button class="btn-edit" @click="$emit('edit', item)">编辑</button>
-              <button class="btn-delete" @click="$emit('delete', item)">删除</button>
+              <button v-if="canEdit" class="btn-edit" @click="$emit('edit', item)">编辑</button>
+              <button v-if="canEdit" class="btn-delete" @click="$emit('delete', item)">删除</button>
             </td>
           </tr>
           <tr v-if="list.length === 0">
-            <td colspan="13" class="empty">📭 暂无数据</td>
+            <td :colspan="canEdit ? 14 : 13" class="empty">📭 暂无数据</td>
           </tr>
         </tbody>
       </table>
@@ -50,14 +65,56 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { getTypeName, getDifficultyLabel } from '@/utils/constants';
 
-defineProps({
+const props = defineProps({
   list: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
+  role: { type: String, default: '' },
+  modelValue: { type: Array, default: () => [] }, // 选中的 ID 数组（v-model:modelValue 或 v-model）
 });
 
-defineEmits(['view', 'edit', 'delete']);
+const emit = defineEmits(['view', 'edit', 'delete', 'update:modelValue', 'selection-change']);
+
+// admin 和 teacher 可以编辑/删除（含复选框）
+const canEdit = computed(() => props.role === 'admin' || props.role === 'teacher');
+
+const isAllSelected = computed(() => {
+  if (props.list.length === 0) return false;
+  return props.list.every((item) => props.modelValue.includes(item.id));
+});
+
+const isIndeterminate = computed(() => {
+  const selectedCount = props.list.filter((item) => props.modelValue.includes(item.id)).length;
+  return selectedCount > 0 && selectedCount < props.list.length;
+});
+
+const isSelected = (id) => props.modelValue.includes(id);
+
+const emitUpdate = (newList) => {
+  emit('update:modelValue', newList);
+  emit('selection-change', newList);
+};
+
+const toggleAll = (e) => {
+  if (e.target.checked) {
+    emitUpdate(props.list.map((item) => item.id));
+  } else {
+    emitUpdate([]);
+  }
+};
+
+const toggleOne = (id) => {
+  const idx = props.modelValue.indexOf(id);
+  let next;
+  if (idx === -1) {
+    next = [...props.modelValue, id];
+  } else {
+    next = props.modelValue.filter((x) => x !== id);
+  }
+  emitUpdate(next);
+};
 </script>
 
 <style scoped>
@@ -80,7 +137,7 @@ defineEmits(['view', 'edit', 'delete']);
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
-  min-width: 1200px;
+  min-width: 1250px;
 }
 .question-table th {
   padding: 12px 8px;
@@ -95,6 +152,10 @@ defineEmits(['view', 'edit', 'delete']);
   padding: 10px 8px;
   border-bottom: 1px solid #ebeef5;
   color: #606266;
+}
+.col-select {
+  width: 40px;
+  text-align: center;
 }
 .col-title {
   max-width: 250px;

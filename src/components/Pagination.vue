@@ -1,5 +1,6 @@
 <template>
   <div class="pagination">
+  <!-- 这是一个标准的UI组件，作用是分页器 -->
     <span class="info">共 {{ total }} 条</span>
     <button class="page-btn" :disabled="page <= 1" @click="changePage(page - 1)">‹ 上一页</button>
     <button

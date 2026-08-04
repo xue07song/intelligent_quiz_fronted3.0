@@ -16,4 +16,4 @@ Thumbs.db
 
 # Backup git repos
 .git-backend-backup
-.git-frontend-backup
+.git-frontend-baczkup

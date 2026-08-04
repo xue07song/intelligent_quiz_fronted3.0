@@ -1,4 +1,5 @@
 <template>
+<!-- 这是一个标准的UI组件，题目详情的弹窗 -->
   <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content">
       <h2 class="modal-title">📄 题目详情</h2>

@@ -31,7 +31,16 @@ instance.interceptors.response.use(
     const status = error.response?.status;
     const message = error.response?.data?.message || error.message || '网络错误';
 
-    if (status === 404) {
+    if (status === 401) {
+      // token 失效或未登录，清除本地存储，触发跳转登录
+      console.warn('🔐 登录已过期，请重新登录');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // 通过自定义事件通知 App.vue 跳转登录页
+      window.dispatchEvent(new CustomEvent('auth-expired'));
+    } else if (status === 403) {
+      console.warn('⛔ 权限不足:', message);
+    } else if (status === 404) {
       console.warn('📭 资源不存在:', message);
     } else if (status === 409) {
       console.warn('⚠️ 数据冲突:', message);

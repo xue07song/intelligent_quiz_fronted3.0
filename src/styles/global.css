@@ -3,13 +3,13 @@
   padding: 0;
   box-sizing: border-box;
 }
-
+/*不同的浏览器对于<h1><p><u1>等标签自带的边距不一样，这里统一设置为0*/
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: #f0f2f5;
   color: #303133;
   line-height: 1.6;
-}
+}/*统一字体背景颜色*/
 
 #app {
   min-height: 100vh;
@@ -29,6 +29,8 @@ a:hover {
   height: 8px;
 }
 
+/*滚动条轨道*/
+
 ::-webkit-scrollbar-thumb {
   background: #c0c4cc;
   border-radius: 4px;
@@ -37,3 +39,4 @@ a:hover {
 ::-webkit-scrollbar-track {
   background: #f1f1f1;
 }
+/*自定义滚动条格式*/
