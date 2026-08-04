@@ -1,5 +1,4 @@
 <template>
-<!-- 搜索筛选栏组件 -->
   <div class="search-bar">
     <div class="search-row">
       <input
@@ -33,23 +32,35 @@
       />
       <button class="btn-primary" @click="$emit('search', filters)">🔍 查询</button>
       <button class="btn-cancel" @click="handleReset">重置</button>
-      <button class="btn-primary btn-add" @click="$emit('add')">+ 新增题目</button>
+
+      <div class="batch-actions" v-if="canEdit">
+        <button
+          class="btn-danger"
+          :disabled="selectedCount === 0"
+          @click="$emit('batch-delete')"
+        >
+          🗑️ 批量删除{{ selectedCount ? `(${selectedCount})` : '' }}
+        </button>
+        <button class="btn-import" @click="$emit('batch-import')">📥 批量导入</button>
+        <button class="btn-primary btn-add" @click="$emit('add')">+ 新增题目</button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { reactive } from 'vue';
+import { reactive, computed } from 'vue';
 import { TYPE_OPTIONS, DIFFICULTY_OPTIONS } from '@/utils/constants';
 
 const props = defineProps({
-  initialFilters: {
-    type: Object,
-    default: () => ({}),
-  },
+  initialFilters: { type: Object, default: () => ({}) },
+  role: { type: String, default: '' },
+  selectedCount: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(['search', 'add', 'reset']);
+const emit = defineEmits(['search', 'add', 'reset', 'batch-delete', 'batch-import']);
+
+const canEdit = computed(() => props.role === 'admin' || props.role === 'teacher');
 
 const filters = reactive({
   关键词: props.initialFilters.关键词 || '',
@@ -82,7 +93,64 @@ const handleReset = () => {
   flex-wrap: wrap;
   align-items: center;
 }
-.btn-add {
+.batch-actions {
   margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+.btn-primary {
+  padding: 8px 16px;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #5568d3;
+}
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-cancel {
+  padding: 8px 16px;
+  background: #fff;
+  color: #606266;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.btn-danger {
+  padding: 8px 16px;
+  background: #ff4d4f;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+.btn-danger:hover:not(:disabled) { background: #e64547; }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-import {
+  padding: 8px 16px;
+  background: #52c41a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+.btn-import:hover { background: #49b018; }
+.btn-add {
+  margin-left: 0;
+}
+.input {
+  padding: 8px 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  font-size: 14px;
 }
 </style>
