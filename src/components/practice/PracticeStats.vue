@@ -89,8 +89,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getPracticeStats } from '@/api/practice';
+import { getPracticeStats, adminGetUserStats } from '@/api/practice';
 import { getTypeName } from '@/utils/constants';
+
+const props = defineProps({
+  userId: { type: [Number, String], default: null },
+});
 
 const emit = defineEmits(['toast']);
 
@@ -111,7 +115,9 @@ const accuracyClass = (acc) => {
 const loadStats = async () => {
   loading.value = true;
   try {
-    stats.value = await getPracticeStats();
+    stats.value = props.userId
+      ? await adminGetUserStats(props.userId)
+      : await getPracticeStats();
   } catch (err) {
     emit('toast', { message: err.message || '加载统计数据失败', type: 'error' });
   } finally {

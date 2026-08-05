@@ -36,3 +36,31 @@ export const getRecord = (id) => {
 export const getPracticeStats = () => {
   return request.get('/practice/statistics');
 };
+
+// ==================== 管理端接口（教师/管理员）====================
+// 教师只能查看学生数据；管理员可查看所有人并按角色筛选
+
+// 管理端：有做题记录的用户列表（按角色分组，含统计汇总）
+export const adminListUsers = (params = {}) => {
+  return request.get('/practice/admin/users', { params });
+};
+
+// 管理端：所有用户答题记录列表（可按角色筛选）
+export const adminListRecords = (params = {}) => {
+  return request.get('/practice/admin/records', { params });
+};
+
+// 管理端：查看任意答题记录详情
+export const adminGetRecord = (id) => {
+  return request.get(`/practice/admin/records/${id}`);
+};
+
+// 管理端：查看指定用户的答题记录列表
+export const adminListUserRecords = (userId, params = {}) => {
+  return request.get(`/practice/admin/users/${userId}/records`, { params });
+};
+
+// 管理端：查看指定用户的统计分析
+export const adminGetUserStats = (userId) => {
+  return request.get(`/practice/admin/users/${userId}/statistics`);
+};

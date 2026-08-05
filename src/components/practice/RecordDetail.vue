@@ -64,11 +64,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getRecord } from '@/api/practice';
+import { getRecord, adminGetRecord } from '@/api/practice';
 import { getTypeName } from '@/utils/constants';
 
 const props = defineProps({
   recordId: { type: [Number, String], required: true },
+  adminMode: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['back', 'toast']);
@@ -112,7 +113,9 @@ const statusText = (a) => {
 const loadRecord = async () => {
   loading.value = true;
   try {
-    record.value = await getRecord(props.recordId);
+    record.value = props.adminMode
+      ? await adminGetRecord(props.recordId)
+      : await getRecord(props.recordId);
   } catch (err) {
     emit('toast', { message: err.message || '加载记录失败', type: 'error' });
   } finally {

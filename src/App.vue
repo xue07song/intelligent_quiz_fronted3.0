@@ -72,6 +72,7 @@
         <button class="subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 随机组卷</button>
         <button class="subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 答题记录</button>
         <button class="subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 统计分析</button>
+        <button v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'" class="subnav-btn" :class="{ active: practiceView === 'admin-records' }" @click="practiceView = 'admin-records'">👥 做题管理</button>
       </div>
 
       <!-- 试卷列表 -->
@@ -116,6 +117,13 @@
       <!-- 统计分析 -->
       <PracticeStats
         v-if="practiceView === 'stats'"
+        @toast="handleToastFromChild"
+      />
+
+      <!-- 做题管理（教师/管理员） -->
+      <AdminRecords
+        v-if="practiceView === 'admin-records' && (currentUser.role === 'admin' || currentUser.role === 'teacher')"
+        :role="currentUser.role"
         @toast="handleToastFromChild"
       />
     </main>
@@ -176,6 +184,7 @@ import ExamPractice from '@/components/practice/ExamPractice.vue';
 import PracticeRecords from '@/components/practice/PracticeRecords.vue';
 import RecordDetail from '@/components/practice/RecordDetail.vue';
 import PracticeStats from '@/components/practice/PracticeStats.vue';
+import AdminRecords from '@/components/practice/AdminRecords.vue';
 
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
@@ -310,6 +319,7 @@ const handleImportSuccess = (result) => {
 };
 
 const filters = reactive({
+  id: '',
   关键词: '',
   题型: '',
   难度: '',
@@ -348,6 +358,7 @@ const loadData = async () => {
       page: page.value,
       pageSize: pageSize.value,
     };
+    if (filters.id) params.id = filters.id;
     if (filters.关键词) params.关键词 = filters.关键词;
     if (filters.题型) params.题型 = filters.题型;
     if (filters.难度) params.难度 = filters.难度;
@@ -379,6 +390,7 @@ const handleSearch = (newFilters) => {
 };
 
 const handleReset = () => {
+  filters.id = '';
   filters.关键词 = '';
   filters.题型 = '';
   filters.难度 = '';
