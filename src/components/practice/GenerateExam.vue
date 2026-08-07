@@ -36,11 +36,21 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" v-model="form.focusWeakPoints" />
+          侧重薄弱点（AI 根据近期答题表现调整题型分布）
+        </label>
+      </div>
+
       <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
 
       <div class="actions">
         <button class="btn-primary" :disabled="loading" @click="handleGenerate">
           {{ loading ? '组卷中...' : '🎯 生成试卷' }}
+        </button>
+        <button class="btn-ai" :disabled="aiLoading" @click="handleSmartExam">
+          {{ aiLoading ? 'AI 组卷中...' : '🤖 AI 智能组卷' }}
         </button>
       </div>
     </div>
@@ -48,10 +58,19 @@
     <!-- 组卷结果预览 -->
     <div v-if="result" class="result-card">
       <div class="result-header">
-        <h3>✅ 组卷成功</h3>
+        <h3>✅ {{ aiResult ? 'AI 智能组卷成功' : '组卷成功' }}</h3>
         <span class="result-meta">
           共 {{ result.total }} 题 · 客观题 {{ result.objectiveCount }} 题
         </span>
+      </div>
+      <div v-if="aiResult && result.strategy" class="ai-strategy">
+        <div class="strategy-title">📋 AI 组卷策略</div>
+        <div class="strategy-text">{{ result.strategy }}</div>
+        <div v-if="result.distribution?.length" class="strategy-dist">
+          <span v-for="d in result.distribution" :key="d.题型" class="dist-tag">
+            {{ getTypeName(d.题型) }} ×{{ d.数量 }}
+          </span>
+        </div>
       </div>
       <div class="result-actions">
         <button class="btn-primary" @click="$emit('start-exam', result.examId)">开始答题 →</button>
@@ -64,7 +83,8 @@
 <script setup>
 import { reactive, ref } from 'vue';
 import { generateExam } from '@/api/practice';
-import { TYPE_OPTIONS, DIFFICULTY_OPTIONS } from '@/utils/constants';
+import { smartExam } from '@/api/ai';
+import { TYPE_OPTIONS, DIFFICULTY_OPTIONS, getTypeName } from '@/utils/constants';
 
 const emit = defineEmits(['start-exam', 'toast']);
 
@@ -74,38 +94,62 @@ const form = reactive({
   题型: '',
   难度: '',
   count: 10,
+  focusWeakPoints: true,
 });
 
 const loading = ref(false);
+const aiLoading = ref(false);
 const errorMsg = ref('');
 const result = ref(null);
+const aiResult = ref(false);
 
 const typeOptions = TYPE_OPTIONS;
 const difficultyOptions = DIFFICULTY_OPTIONS;
 
-const handleGenerate = async () => {
-  errorMsg.value = '';
-
+const buildBody = () => {
   if (!form.count || form.count < 1 || form.count > 100) {
     errorMsg.value = '题目数量需在 1-100 之间';
-    return;
+    return null;
   }
+  errorMsg.value = '';
+  const body = { count: form.count };
+  if (form.title.trim()) body.title = form.title.trim();
+  if (form.章节 !== '' && form.章节 !== null) body.章节 = form.章节;
+  if (form.题型 !== '' && form.题型 !== null) body.题型 = form.题型;
+  if (form.难度 !== '' && form.难度 !== null) body.难度 = form.难度;
+  return body;
+};
 
+const handleGenerate = async () => {
+  const body = buildBody();
+  if (!body) return;
   loading.value = true;
   try {
-    const body = { count: form.count };
-    if (form.title.trim()) body.title = form.title.trim();
-    if (form.章节 !== '' && form.章节 !== null) body.章节 = form.章节;
-    if (form.题型 !== '' && form.题型 !== null) body.题型 = form.题型;
-    if (form.难度 !== '' && form.难度 !== null) body.难度 = form.难度;
-
     const data = await generateExam(body);
     result.value = data;
+    aiResult.value = false;
     emit('toast', { message: `组卷成功，共 ${data.total} 题`, type: 'success' });
   } catch (err) {
     errorMsg.value = err.message || '组卷失败，请检查条件后重试';
   } finally {
     loading.value = false;
+  }
+};
+
+const handleSmartExam = async () => {
+  const body = buildBody();
+  if (!body) return;
+  aiLoading.value = true;
+  try {
+    body.focusWeakPoints = form.focusWeakPoints;
+    const data = await smartExam(body);
+    result.value = data;
+    aiResult.value = true;
+    emit('toast', { message: `AI 智能组卷成功，共 ${data.total} 题`, type: 'success' });
+  } catch (err) {
+    errorMsg.value = err.message || 'AI 组卷失败，请稍后重试';
+  } finally {
+    aiLoading.value = false;
   }
 };
 </script>
@@ -166,7 +210,18 @@ const handleGenerate = async () => {
 }
 .actions {
   margin-top: 8px;
+  display: flex;
+  gap: 10px;
 }
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #606266;
+  cursor: pointer;
+}
+.checkbox-label input { cursor: pointer; }
 .btn-primary {
   padding: 10px 24px;
   background: #667eea;
@@ -179,6 +234,18 @@ const handleGenerate = async () => {
 }
 .btn-primary:hover:not(:disabled) { background: #5568d3; }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-ai {
+  padding: 10px 24px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 15px;
+  transition: opacity 0.2s;
+}
+.btn-ai:hover:not(:disabled) { opacity: 0.9; }
+.btn-ai:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-cancel {
   padding: 10px 24px;
   background: #fff;
@@ -214,5 +281,37 @@ const handleGenerate = async () => {
 .result-actions {
   display: flex;
   gap: 10px;
+}
+.ai-strategy {
+  background: linear-gradient(90deg, #f0f5ff, #f9f0ff);
+  border: 1px solid #d6e4ff;
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.strategy-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 6px;
+}
+.strategy-text {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.strategy-dist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.dist-tag {
+  background: #fff;
+  border: 1px solid #d6e4ff;
+  color: #667eea;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
 }
 </style>

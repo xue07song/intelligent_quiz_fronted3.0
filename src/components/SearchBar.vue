@@ -60,6 +60,7 @@
           🗑️ 批量删除{{ selectedCount ? `(${selectedCount})` : '' }}
         </button>
         <button class="btn-import" @click="$emit('batch-import')">📥 批量导入</button>
+        <button class="btn-ai" @click="$emit('ai-generate')">🤖 AI 出题</button>
         <button class="btn-primary btn-add" @click="$emit('add')">+ 新增题目</button>
       </div>
     </div>
@@ -76,7 +77,7 @@ const props = defineProps({
   selectedCount: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(['search', 'add', 'reset', 'batch-delete', 'batch-import']);
+const emit = defineEmits(['search', 'add', 'reset', 'batch-delete', 'batch-import', 'ai-generate']);
 
 const canEdit = computed(() => props.role === 'admin' || props.role === 'teacher');
 
@@ -214,6 +215,17 @@ const handleReset = () => {
   transition: background 0.2s;
 }
 .btn-import:hover { background: #49b018; }
+.btn-ai {
+  padding: 8px 16px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: opacity 0.2s;
+}
+.btn-ai:hover { opacity: 0.9; }
 .btn-add {
   margin-left: 0;
 }

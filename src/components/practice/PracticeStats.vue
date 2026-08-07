@@ -11,6 +11,50 @@
     </div>
 
     <div v-else>
+      <!-- AI 错题分析（仅本人统计时可用） -->
+      <div v-if="!userId" class="ai-section">
+        <button class="btn-ai" :disabled="aiLoading" @click="loadWeakness">
+          {{ aiLoading ? 'AI 分析中...' : '🤖 AI 错题分析' }}
+        </button>
+        <div v-if="aiReport" class="ai-report">
+          <div v-if="!aiReport.hasData" class="ai-empty">{{ aiReport.message }}</div>
+          <template v-else>
+            <div v-if="aiReport.analysis?.summary" class="report-block">
+              <div class="block-title">📋 总体评价</div>
+              <div class="block-text">{{ aiReport.analysis.summary }}</div>
+            </div>
+            <div v-if="aiReport.analysis?.weakTypes?.length" class="report-block">
+              <div class="block-title">⚠️ 薄弱题型</div>
+              <div v-for="(t, i) in aiReport.analysis.weakTypes" :key="i" class="weak-item">
+                <span class="weak-name">{{ t.题型 }}</span>
+                <span class="weak-acc">正确率 {{ t.正确率 }}%</span>
+                <span class="weak-advice">{{ t.建议 }}</span>
+              </div>
+            </div>
+            <div v-if="aiReport.analysis?.weakPoints?.length" class="report-block">
+              <div class="block-title">🎯 薄弱知识点</div>
+              <div v-for="(p, i) in aiReport.analysis.weakPoints" :key="i" class="point-item">
+                <div class="point-head">
+                  <span class="point-name">{{ p.知识点 }}</span>
+                  <span class="point-chapter">第{{ p.章节 }}章</span>
+                </div>
+                <div class="point-reason">原因：{{ p.原因 }}</div>
+                <div class="point-advice">建议：{{ p.建议 }}</div>
+              </div>
+            </div>
+            <div v-if="aiReport.analysis?.studyPlan?.length" class="report-block">
+              <div class="block-title">📚 学习建议</div>
+              <ul class="plan-list">
+                <li v-for="(s, i) in aiReport.analysis.studyPlan" :key="i">{{ s }}</li>
+              </ul>
+            </div>
+            <div v-if="aiReport.analysis?.encouragement" class="report-encourage">
+              💪 {{ aiReport.analysis.encouragement }}
+            </div>
+          </template>
+        </div>
+      </div>
+
       <!-- 总览卡片 -->
       <div class="overview-grid">
         <div class="stat-card">
@@ -90,6 +134,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { getPracticeStats, adminGetUserStats } from '@/api/practice';
+import { getWeakness } from '@/api/ai';
 import { getTypeName } from '@/utils/constants';
 
 const props = defineProps({
@@ -100,6 +145,25 @@ const emit = defineEmits(['toast']);
 
 const loading = ref(true);
 const stats = ref(null);
+
+// AI 错题分析（仅本人模式可用，管理端查看他人时不显示 AI 分析按钮）
+const aiLoading = ref(false);
+const aiReport = ref(null);
+
+const loadWeakness = async () => {
+  if (props.userId) {
+    emit('toast', { message: '查看他人统计时不支持 AI 错题分析', type: 'warning' });
+    return;
+  }
+  aiLoading.value = true;
+  try {
+    aiReport.value = await getWeakness();
+  } catch (err) {
+    emit('toast', { message: err.message || 'AI 分析失败', type: 'error' });
+  } finally {
+    aiLoading.value = false;
+  }
+};
 
 const barHeight = (accuracy) => {
   // 最小 5%，保证可见
@@ -144,6 +208,122 @@ defineExpose({ loadStats });
   margin: 0;
   font-size: 20px;
   color: #303133;
+}
+.ai-section {
+  margin-bottom: 24px;
+}
+.btn-ai {
+  padding: 8px 18px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: opacity 0.2s;
+}
+.btn-ai:hover:not(:disabled) { opacity: 0.9; }
+.btn-ai:disabled { opacity: 0.6; cursor: not-allowed; }
+.ai-report {
+  margin-top: 14px;
+  background: linear-gradient(135deg, #f0f5ff, #f9f0ff);
+  border: 1px solid #d6e4ff;
+  border-radius: 8px;
+  padding: 18px 22px;
+}
+.ai-empty {
+  text-align: center;
+  color: #909399;
+  font-size: 14px;
+  padding: 20px 0;
+}
+.report-block {
+  margin-bottom: 16px;
+}
+.report-block:last-child {
+  margin-bottom: 0;
+}
+.block-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #667eea;
+  margin-bottom: 8px;
+}
+.block-text {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.7;
+}
+.weak-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: #fff;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.weak-name {
+  font-weight: 600;
+  color: #303133;
+  min-width: 70px;
+}
+.weak-acc {
+  color: #ff4d4f;
+  min-width: 90px;
+}
+.weak-advice {
+  color: #606266;
+  flex: 1;
+}
+.point-item {
+  background: #fff;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.point-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.point-name {
+  font-weight: 600;
+  color: #303133;
+  font-size: 14px;
+}
+.point-chapter {
+  font-size: 12px;
+  color: #909399;
+  background: #f0f2f5;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.point-reason, .point-advice {
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.plan-list {
+  margin: 0;
+  padding-left: 20px;
+}
+.plan-list li {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.8;
+}
+.report-encourage {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #52c41a;
+  font-weight: 500;
+  text-align: center;
 }
 .loading, .empty {
   text-align: center;

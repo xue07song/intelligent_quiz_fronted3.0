@@ -39,6 +39,7 @@
         @add="openAddDialog"
         @batch-delete="handleBatchDelete"
         @batch-import="importVisible = true"
+        @ai-generate="aiVisible = true"
       />
 
       <QuestionTable
@@ -154,6 +155,12 @@
       @success="handleImportSuccess"
     />
 
+    <AiGenerate
+      :visible="aiVisible"
+      @close="aiVisible = false"
+      @success="handleAiSuccess"
+    />
+
     <Toast :message="toastMessage" :type="toastType" />
   </div>
 </template>
@@ -178,6 +185,7 @@ import Login from '@/components/Login.vue';
 import UserManagement from '@/components/UserManagement.vue';
 import ChangePassword from '@/components/ChangePassword.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
+import AiGenerate from '@/components/AiGenerate.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ExamList from '@/components/practice/ExamList.vue';
 import ExamPractice from '@/components/practice/ExamPractice.vue';
@@ -266,6 +274,7 @@ const handleAuthExpired = () => {
 // ===== 批量操作 =====
 const selectedIds = ref([]);
 const importVisible = ref(false);
+const aiVisible = ref(false);
 
 // ===== 题库管理（原有逻辑，先声明变量供 watch 使用） =====
 const list = ref([]);
@@ -316,6 +325,21 @@ const handleImportSuccess = (result) => {
   } else {
     showToast(msg, 'success');
   }
+};
+
+const handleAiSuccess = (result) => {
+  const { inserted = 0, skipped = 0 } = result || {};
+  const msg = `AI 出题入库完成：成功 ${inserted} 条，跳过 ${skipped} 条`;
+  if (inserted > 0) {
+    loadData();
+    loadStats();
+  }
+  if (skipped > 0) {
+    showToast(msg, 'warning');
+  } else {
+    showToast(msg, 'success');
+  }
+  aiVisible.value = false;
 };
 
 const filters = reactive({

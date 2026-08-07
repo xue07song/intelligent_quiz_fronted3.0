@@ -33,8 +33,8 @@
             <label>你的答案：</label>
             <!-- 判断题 -->
             <div v-if="Number(q.题型) === 1" class="radio-group">
-              <label><input type="radio" :name="`q-${q.id}`" value="对" v-model="answers[q.id]" /> 对</label>
-              <label><input type="radio" :name="`q-${q.id}`" value="错" v-model="answers[q.id]" /> 错</label>
+              <label><input type="radio" :name="`q-${q.id}`" value="T" v-model="answers[q.id]" /> 对</label>
+              <label><input type="radio" :name="`q-${q.id}`" value="F" v-model="answers[q.id]" /> 错</label>
             </div>
             <!-- 单选题 -->
             <div v-else-if="Number(q.题型) === 2" class="radio-group">
@@ -54,6 +54,35 @@
             <input v-else-if="Number(q.题型) === 4" v-model="answers[q.id]" class="input" placeholder="请输入答案" />
             <!-- 简答/程序题 -->
             <textarea v-else v-model="answers[q.id]" class="textarea" placeholder="请输入你的解答" rows="4"></textarea>
+          </div>
+
+          <!-- AI 答疑助手 -->
+          <div class="ai-tutor">
+            <button class="btn-ai" @click="toggleTutor(q.id)">
+              {{ tutorOpen[q.id] ? '收起' : '🤖 问 AI' }}
+            </button>
+            <div v-if="tutorOpen[q.id]" class="tutor-panel">
+              <div class="tutor-history">
+                <div v-if="tutorHistory[q.id]?.length === 0" class="tutor-empty">
+                  💡 遇到困难？向 AI 老师提问，获取解题思路提示。
+                </div>
+                <div v-for="(msg, mi) in tutorHistory[q.id] || []" :key="mi" class="tutor-msg" :class="msg.role">
+                  <div class="msg-role">{{ msg.role === 'user' ? '🙋 我' : '🤖 AI' }}</div>
+                  <div class="msg-content">{{ msg.content }}</div>
+                </div>
+                <div v-if="tutorLoading[q.id]" class="tutor-loading">AI 思考中...</div>
+              </div>
+              <div class="tutor-input">
+                <input
+                  v-model="tutorInput[q.id]"
+                  class="input"
+                  placeholder="输入你的问题，如：这道题该从哪个角度思考？"
+                  @keyup.enter="askTutor(q)"
+                  :disabled="tutorLoading[q.id]"
+                />
+                <button class="btn-send" :disabled="tutorLoading[q.id] || !tutorInput[q.id]?.trim()" @click="askTutor(q)">发送</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -123,6 +152,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { getExam, submitExam } from '@/api/practice';
+import { askTutor as askTutorApi } from '@/api/ai';
 import { getTypeName, getDifficultyLabel } from '@/utils/constants';
 
 const props = defineProps({
@@ -140,6 +170,43 @@ const exam = ref({ questions: [] });
 const answers = reactive({}); // 单选/判断/填空/简答: { [questionId]: string }
 const multiAnswers = reactive({}); // 多选: { [questionId]: ['A','B'] }
 const result = ref(null);
+
+// ===== AI 答疑助手状态 =====
+const tutorOpen = reactive({});      // { [questionId]: boolean }
+const tutorInput = reactive({});     // { [questionId]: string }
+const tutorHistory = reactive({});   // { [questionId]: [{role, content}] }
+const tutorLoading = reactive({});   // { [questionId]: boolean }
+
+const toggleTutor = (qid) => {
+  tutorOpen[qid] = !tutorOpen[qid];
+  if (!tutorHistory[qid]) tutorHistory[qid] = [];
+};
+
+const askTutor = async (q) => {
+  const qid = q.id;
+  const inputText = (tutorInput[qid] || '').trim();
+  if (!inputText || tutorLoading[qid]) return;
+
+  // 追加用户消息
+  tutorHistory[qid].push({ role: 'user', content: inputText });
+  tutorInput[qid] = '';
+  tutorLoading[qid] = true;
+
+  try {
+    const data = await askTutorApi({
+      question: q.题目,
+      options: q.选项 || '',
+      questionType: Number(q.题型),
+      userQuestion: inputText,
+      userAnswer: answers[qid] || '',
+    });
+    tutorHistory[qid].push({ role: 'ai', content: data.reply || '（AI 未返回内容）' });
+  } catch (err) {
+    tutorHistory[qid].push({ role: 'ai', content: `❌ ${err.message || 'AI 调用失败'}` });
+  } finally {
+    tutorLoading[qid] = false;
+  }
+};
 
 // 计时
 const startedAt = new Date();
@@ -390,6 +457,96 @@ onUnmounted(() => {
   gap: 6px;
   margin-top: 10px;
 }
+.ai-tutor {
+  margin-top: 12px;
+  border-top: 1px dashed #ebeef5;
+  padding-top: 10px;
+}
+.btn-ai {
+  padding: 4px 12px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: opacity 0.2s;
+}
+.btn-ai:hover { opacity: 0.9; }
+.tutor-panel {
+  margin-top: 10px;
+  background: #f9fafc;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 12px;
+}
+.tutor-history {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+.tutor-empty {
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+  padding: 16px 0;
+}
+.tutor-msg {
+  margin-bottom: 10px;
+}
+.tutor-msg:last-child { margin-bottom: 0; }
+.msg-role {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+.msg-content {
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tutor-msg.user .msg-content {
+  background: #e6f7ff;
+  color: #1890ff;
+  margin-left: 24px;
+}
+.tutor-msg.ai .msg-content {
+  background: #fff;
+  border: 1px solid #ebeef5;
+  color: #303133;
+  margin-right: 24px;
+}
+.tutor-loading {
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.tutor-input {
+  display: flex;
+  gap: 8px;
+}
+.tutor-input .input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.btn-send {
+  padding: 8px 16px;
+  background: #667eea;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-send:hover:not(:disabled) { background: #5568d3; }
 .q-answer > label {
   font-size: 14px;
   color: #606266;
