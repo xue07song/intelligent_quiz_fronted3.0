@@ -64,3 +64,8 @@ export const adminListUserRecords = (userId, params = {}) => {
 export const adminGetUserStats = (userId) => {
   return request.get(`/practice/admin/users/${userId}/statistics`);
 };
+
+// 管理端：以人为界的全局统计总览（每人含汇总 + 最近 N 次答题明细）
+export const adminGetAllStats = (params = {}) => {
+  return request.get('/practice/admin/stats/all', { params });
+};

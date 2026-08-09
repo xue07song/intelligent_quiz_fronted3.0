@@ -103,14 +103,16 @@
       <!-- 答题记录列表 -->
       <PracticeRecords
         v-if="practiceView === 'records'"
+        :role="currentUser.role"
         @view-record="viewRecord"
         @toast="handleToastFromChild"
       />
 
-      <!-- 答题记录详情 -->
+      <!-- 答题记录详情（教师/管理员可查看权限范围内任意记录） -->
       <RecordDetail
         v-if="practiceView === 'record-detail' && activeRecordId"
         :recordId="activeRecordId"
+        :adminMode="currentUser.role === 'admin' || currentUser.role === 'teacher'"
         @back="practiceView = 'records'"
         @toast="handleToastFromChild"
       />

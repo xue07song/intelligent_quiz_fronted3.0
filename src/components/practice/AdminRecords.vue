@@ -11,6 +11,10 @@
 
     <!-- 视图：用户列表 -->
     <template v-if="view === 'users'">
+      <div class="action-bar">
+        <button class="btn-allstats" @click="openAllStats">📊 全局统计总览（按人分类）</button>
+      </div>
+
       <!-- 角色筛选（仅管理员可见：区分教师/学生） -->
       <div v-if="role === 'admin'" class="role-tabs">
         <button
@@ -99,6 +103,7 @@
           <thead>
             <tr>
               <th>ID</th>
+              <th>提交人</th>
               <th>试卷</th>
               <th>得分</th>
               <th>准确率</th>
@@ -114,6 +119,10 @@
           <tbody>
             <tr v-for="r in records" :key="r.id">
               <td>{{ r.id }}</td>
+              <td>
+                <span>{{ r.nickname || r.username || '-' }}</span>
+                <span v-if="r.role" class="role-badge" :class="r.role" style="margin-left:4px;">{{ roleMap[r.role] || r.role }}</span>
+              </td>
               <td class="col-title">{{ r.exam_title || `试卷#${r.exam_id}` }}</td>
               <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
               <td>{{ r.accuracy }}%</td>
@@ -144,7 +153,7 @@
       <RecordDetail
         :recordId="activeRecordId"
         adminMode
-        @back="view = 'records'"
+        @back="backFromDetail"
         @toast="onToast"
       />
     </template>
@@ -161,12 +170,87 @@
       </div>
       <PracticeStats :userId="selectedUser.id" @toast="onToast" />
     </template>
+
+    <!-- 视图：全局统计总览（以人为界，按人分组展示每人每次明细） -->
+    <template v-if="view === 'allStats'">
+      <div class="sub-header">
+        <button class="btn-back" @click="backToUsers">← 返回用户列表</button>
+        <div class="sub-title">📊 全局统计总览（以人为界，共 {{ allStats?.total || 0 }} 人）</div>
+      </div>
+
+      <div v-if="allStatsLoading" class="loading">加载中...</div>
+
+      <div v-else-if="!allStats || allStats.users.length === 0" class="empty">
+        <p>📭 暂无做题数据</p>
+      </div>
+
+      <div v-else class="stats-groups">
+        <div v-for="u in allStats.users" :key="u.id" class="stats-group">
+          <div class="group-header">
+            <div class="group-user">
+              <strong>{{ u.nickname || u.username }}</strong>
+              <span class="role-badge" :class="u.role">{{ roleMap[u.role] || u.role }}</span>
+            </div>
+            <div class="group-summary">
+              <span>练习 <b>{{ u.overview.attempt_count }}</b> 次</span>
+              <span>平均 <b class="acc">{{ u.overview.avg_accuracy }}%</b></span>
+              <span>最佳 <b class="correct">{{ u.overview.max_accuracy }}%</b></span>
+              <span>最差 <b class="wrong">{{ u.overview.min_accuracy }}%</b></span>
+              <span>累计答题 <b>{{ u.overview.total_questions }}</b></span>
+              <span>累计正确 <b class="correct">{{ u.overview.total_correct }}</b></span>
+            </div>
+          </div>
+
+          <div class="table-wrapper" v-if="u.records.length > 0">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>提交人</th>
+                  <th>提交时间</th>
+                  <th>试卷</th>
+                  <th>得分</th>
+                  <th>准确率</th>
+                  <th>总题</th>
+                  <th>正确</th>
+                  <th>错误</th>
+                  <th>未答</th>
+                  <th>用时</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in u.records" :key="r.id">
+                  <td>
+                    <span>{{ u.nickname || u.username || '-' }}</span>
+                    <span v-if="u.role" class="role-badge" :class="u.role" style="margin-left:4px;">{{ roleMap[u.role] || u.role }}</span>
+                  </td>
+                  <td>{{ formatTime(r.submitted_at) }}</td>
+                  <td class="col-title">{{ r.exam_title || `试卷#${r.exam_id}` }}</td>
+                  <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
+                  <td>{{ r.accuracy }}%</td>
+                  <td>{{ r.total_count }}</td>
+                  <td class="correct">{{ r.correct_count }}</td>
+                  <td class="wrong">{{ r.wrong_count }}</td>
+                  <td>{{ r.skipped_count }}</td>
+                  <td>{{ formatDuration(r.duration_seconds) }}</td>
+                  <td>
+                    <button class="btn-op btn-records" @click="openRecordDetail(r.id, 'allStats')">查看详情</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="no-data-inline">该用户暂无答题明细</div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { adminListUsers, adminListUserRecords } from '@/api/practice';
+import { adminListUsers, adminListUserRecords, adminGetAllStats } from '@/api/practice';
+import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
 import RecordDetail from './RecordDetail.vue';
 import PracticeStats from './PracticeStats.vue';
@@ -179,7 +263,7 @@ const emit = defineEmits(['toast']);
 
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
-// 视图状态：users | records | detail | stats
+// 视图状态：users | records | detail | stats | allStats
 const view = ref('users');
 
 // ===== 用户列表 =====
@@ -218,6 +302,8 @@ const recordsPage = ref(1);
 const recordsPageSize = ref(20);
 const recordsLoading = ref(false);
 const activeRecordId = ref(null);
+// 详情返回目标视图（从 allStats 进入详情后返回 allStats，否则返回 records）
+const detailBackTarget = ref('records');
 
 const openUserRecords = (user) => {
   selectedUser.value = user;
@@ -242,15 +328,46 @@ const loadUserRecords = async () => {
   }
 };
 
-const openRecordDetail = (recordId) => {
+const openRecordDetail = (recordId, from = 'records') => {
   activeRecordId.value = recordId;
+  detailBackTarget.value = from;
   view.value = 'detail';
+};
+
+const backFromDetail = () => {
+  view.value = detailBackTarget.value;
 };
 
 // ===== 某用户统计 =====
 const openUserStats = (user) => {
   selectedUser.value = user;
   view.value = 'stats';
+};
+
+// ===== 全局统计总览（以人为界，按人分组）=====
+const allStats = ref(null);
+const allStatsLoading = ref(false);
+
+const openAllStats = () => {
+  view.value = 'allStats';
+  loadAllStats();
+};
+
+const loadAllStats = async () => {
+  allStatsLoading.value = true;
+  try {
+    const params = {};
+    if (props.role === 'teacher') {
+      params.role = 'student';
+    } else if (roleFilter.value) {
+      params.role = roleFilter.value;
+    }
+    allStats.value = await adminGetAllStats(params);
+  } catch (err) {
+    onToast({ message: err.message || '加载全局统计失败', type: 'error' });
+  } finally {
+    allStatsLoading.value = false;
+  }
 };
 
 // ===== 导航 =====
@@ -261,14 +378,6 @@ const backToUsers = () => {
 // ===== 工具函数 =====
 const onToast = ({ message, type }) => {
   emit('toast', { message, type });
-};
-
-const formatTime = (t) => {
-  if (!t) return '-';
-  const d = new Date(t);
-  if (isNaN(d)) return String(t).replace('T', ' ').substring(0, 16);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 const formatDuration = (sec) => {
@@ -309,6 +418,20 @@ defineExpose({ loadUsers });
   font-size: 13px;
   color: #909399;
 }
+.action-bar {
+  margin-bottom: 16px;
+}
+.btn-allstats {
+  padding: 8px 18px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: opacity 0.2s;
+}
+.btn-allstats:hover { opacity: 0.9; }
 .role-tabs {
   display: flex;
   gap: 8px;
@@ -437,4 +560,52 @@ defineExpose({ loadUsers });
   color: #303133;
 }
 .sub-title .role-badge { margin-left: 4px; }
+.stats-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.stats-group {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 14px 16px;
+}
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.group-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: #303133;
+}
+.group-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #606266;
+}
+.group-summary b {
+  color: #303133;
+  font-weight: 600;
+}
+.group-summary b.acc { color: #1890ff; }
+.group-summary b.correct { color: #52c41a; }
+.group-summary b.wrong { color: #ff4d4f; }
+.no-data-inline {
+  text-align: center;
+  color: #c0c4cc;
+  padding: 16px 0;
+  font-size: 13px;
+}
 </style>

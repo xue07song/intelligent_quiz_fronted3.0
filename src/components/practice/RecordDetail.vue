@@ -8,7 +8,14 @@
       <div class="detail-header">
         <div>
           <h2>📝 答题详情</h2>
-          <p class="meta">{{ record.exam_title || `试卷#${record.exam_id}` }} · 提交于 {{ formatTime(record.submitted_at) }}</p>
+          <p class="meta">
+            {{ record.exam_title || `试卷#${record.exam_id}` }}
+            <template v-if="record.username">
+              · 提交人：{{ record.nickname || record.username }}
+              <template v-if="record.user_role">（{{ roleMap[record.user_role] || record.user_role }}）</template>
+            </template>
+            · 提交于 {{ formatTime(record.submitted_at) }}
+          </p>
         </div>
         <button class="btn-back" @click="$emit('back')">← 返回</button>
       </div>
@@ -66,6 +73,9 @@
 import { ref, onMounted } from 'vue';
 import { getRecord, adminGetRecord } from '@/api/practice';
 import { getTypeName } from '@/utils/constants';
+import { formatTime } from '@/utils/format';
+
+const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
 const props = defineProps({
   recordId: { type: [Number, String], required: true },
@@ -76,14 +86,6 @@ const emit = defineEmits(['back', 'toast']);
 
 const loading = ref(true);
 const record = ref(null);
-
-const formatTime = (t) => {
-  if (!t) return '-';
-  const d = new Date(t);
-  if (isNaN(d)) return String(t).replace('T', ' ').substring(0, 16);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
 
 const formatDuration = (sec) => {
   if (!sec) return '-';

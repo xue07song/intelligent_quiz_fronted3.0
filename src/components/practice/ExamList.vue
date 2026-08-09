@@ -59,6 +59,7 @@
 import { ref, onMounted } from 'vue';
 import { getExams } from '@/api/practice';
 import { getTypeName, getDifficultyLabel } from '@/utils/constants';
+import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
 
 const emit = defineEmits(['generate', 'start-exam', 'toast']);
@@ -68,14 +69,6 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const loading = ref(false);
-
-const formatTime = (t) => {
-  if (!t) return '-';
-  const d = new Date(t);
-  if (isNaN(d)) return String(t).replace('T', ' ').substring(0, 16);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
 
 const loadExams = async () => {
   loading.value = true;

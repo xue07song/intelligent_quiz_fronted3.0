@@ -15,6 +15,7 @@
         <thead>
           <tr>
             <th>ID</th>
+            <th v-if="showSubmitter">提交人</th>
             <th>试卷</th>
             <th>得分</th>
             <th>准确率</th>
@@ -30,6 +31,10 @@
         <tbody>
           <tr v-for="r in list" :key="r.id">
             <td>{{ r.id }}</td>
+            <td v-if="showSubmitter">
+              <span>{{ r.nickname || r.username || '-' }}</span>
+              <span v-if="r.role" class="role-badge" :class="r.role" style="margin-left:4px;">{{ roleMap[r.role] || r.role }}</span>
+            </td>
             <td class="col-title">{{ r.exam_title || `试卷#${r.exam_id}` }}</td>
             <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
             <td>{{ r.accuracy }}%</td>
@@ -57,9 +62,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { getRecords } from '@/api/practice';
 import Pagination from '@/components/Pagination.vue';
+import { formatTime } from '@/utils/format';
+
+const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
+
+const props = defineProps({
+  role: { type: String, default: 'student' }, // 'admin' | 'teacher' | 'student'
+});
+
+// 学生只看本人记录，不需要提交人列；教师/管理员看多人记录，需要提交人列
+const showSubmitter = computed(() => props.role === 'admin' || props.role === 'teacher');
 
 const emit = defineEmits(['view-record', 'toast']);
 
@@ -68,14 +83,6 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const loading = ref(false);
-
-const formatTime = (t) => {
-  if (!t) return '-';
-  const d = new Date(t);
-  if (isNaN(d)) return String(t).replace('T', ' ').substring(0, 16);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
 
 const formatDuration = (sec) => {
   if (!sec) return '-';

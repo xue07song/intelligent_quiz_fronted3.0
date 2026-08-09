@@ -136,6 +136,8 @@
             <thead>
               <tr>
                 <th>#</th>
+                <th>提交人</th>
+                <th>试卷</th>
                 <th>提交时间</th>
                 <th>得分</th>
                 <th>准确率</th>
@@ -150,6 +152,11 @@
             <tbody>
               <tr v-for="(item, idx) in [...stats.trend].reverse()" :key="item.id">
                 <td>{{ idx + 1 }}</td>
+                <td>
+                  <span>{{ item.nickname || item.username || '-' }}</span>
+                  <span v-if="item.role" class="role-badge" :class="item.role" style="margin-left:4px;">{{ roleMap[item.role] || item.role }}</span>
+                </td>
+                <td class="col-title">{{ item.exam_title || `试卷#${item.exam_id}` }}</td>
                 <td class="col-time">{{ formatTime(item.submitted_at) }}</td>
                 <td><span class="score-tag" :class="scoreClass(item.score)">{{ item.score }}</span></td>
                 <td :class="accuracyClass(item.accuracy) + '-text'">{{ item.accuracy }}%</td>
@@ -174,6 +181,9 @@ import { ref, onMounted } from 'vue';
 import { getPracticeStats, adminGetUserStats } from '@/api/practice';
 import { getWeakness } from '@/api/ai';
 import { getTypeName } from '@/utils/constants';
+import { formatTime } from '@/utils/format';
+
+const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
 const props = defineProps({
   userId: { type: [Number, String], default: null },
@@ -225,14 +235,6 @@ const formatDuration = (sec) => {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}分${s}秒`;
-};
-
-const formatTime = (t) => {
-  if (!t) return '-';
-  const d = new Date(t);
-  if (isNaN(d.getTime())) return '-';
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 const loadStats = async () => {
