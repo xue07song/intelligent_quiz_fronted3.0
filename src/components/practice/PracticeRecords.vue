@@ -71,7 +71,10 @@ const loading = ref(false);
 
 const formatTime = (t) => {
   if (!t) return '-';
-  return String(t).replace('T', ' ').substring(0, 16);
+  const d = new Date(t);
+  if (isNaN(d)) return String(t).replace('T', ' ').substring(0, 16);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 const formatDuration = (sec) => {

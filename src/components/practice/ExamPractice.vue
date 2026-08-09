@@ -209,7 +209,7 @@ const askTutor = async (q) => {
 };
 
 // 计时
-const startedAt = new Date();
+const startedAt = ref(null);
 const elapsedSeconds = ref(0);
 let timer = null;
 
@@ -299,9 +299,10 @@ const loadExam = async () => {
         answers[q.id] = '';
       }
     });
-    // 启动计时器
+    // 启动计时器：记录开始时间，用时间差实时计算（避免 setInterval 累加不精确）
+    startedAt.value = new Date();
     timer = setInterval(() => {
-      elapsedSeconds.value++;
+      elapsedSeconds.value = Math.floor((Date.now() - startedAt.value.getTime()) / 1000);
     }, 1000);
   } catch (err) {
     emit('toast', { message: err.message || '加载试卷失败', type: 'error' });
@@ -328,7 +329,7 @@ const handleSubmit = async () => {
 
     const data = await submitExam(props.examId, {
       answers: answersArr,
-      startedAt: startedAt.toISOString(),
+      startedAt: startedAt.value.toISOString(),
     });
 
     result.value = data;

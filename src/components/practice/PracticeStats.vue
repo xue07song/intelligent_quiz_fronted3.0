@@ -127,6 +127,44 @@
         </div>
         <div v-else class="no-data">暂无题型数据</div>
       </div>
+
+      <!-- 每次答题明细 -->
+      <div class="chart-card">
+        <h3>📝 每次答题明细（最近 {{ stats.trend.length }} 次）</h3>
+        <div class="table-wrapper" v-if="stats.trend.length > 0">
+          <table class="detail-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>提交时间</th>
+                <th>得分</th>
+                <th>准确率</th>
+                <th>总题数</th>
+                <th>已答</th>
+                <th>正确</th>
+                <th>错误</th>
+                <th>未答</th>
+                <th>用时</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in [...stats.trend].reverse()" :key="item.id">
+                <td>{{ idx + 1 }}</td>
+                <td class="col-time">{{ formatTime(item.submitted_at) }}</td>
+                <td><span class="score-tag" :class="scoreClass(item.score)">{{ item.score }}</span></td>
+                <td :class="accuracyClass(item.accuracy) + '-text'">{{ item.accuracy }}%</td>
+                <td>{{ item.total_count }}</td>
+                <td>{{ item.answered_count }}</td>
+                <td class="correct">{{ item.correct_count }}</td>
+                <td class="wrong">{{ item.wrong_count }}</td>
+                <td>{{ item.skipped_count }}</td>
+                <td>{{ formatDuration(item.duration_seconds) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="no-data">暂无答题记录</div>
+      </div>
     </div>
   </div>
 </template>
@@ -174,6 +212,27 @@ const accuracyClass = (acc) => {
   if (acc >= 80) return 'bar-good';
   if (acc >= 60) return 'bar-mid';
   return 'bar-bad';
+};
+
+const scoreClass = (score) => {
+  if (score >= 80) return 'score-high';
+  if (score >= 60) return 'score-mid';
+  return 'score-low';
+};
+
+const formatDuration = (sec) => {
+  if (!sec) return '-';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}分${s}秒`;
+};
+
+const formatTime = (t) => {
+  if (!t) return '-';
+  const d = new Date(t);
+  if (isNaN(d.getTime())) return '-';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 const loadStats = async () => {
@@ -460,6 +519,52 @@ defineExpose({ loadStats });
   color: #c0c4cc;
   padding: 30px 0;
 }
+.table-wrapper {
+  overflow-x: auto;
+}
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 700px;
+}
+.detail-table th {
+  background: #f5f7fa;
+  padding: 10px 8px;
+  text-align: center;
+  color: #606266;
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 2px solid #ebeef5;
+}
+.detail-table td {
+  padding: 8px;
+  text-align: center;
+  border-bottom: 1px solid #f0f0f0;
+  color: #303133;
+}
+.detail-table tr:hover td {
+  background: #f9fafc;
+}
+.detail-table .col-time {
+  white-space: nowrap;
+  color: #606266;
+}
+.detail-table .correct { color: #52c41a; font-weight: 600; }
+.detail-table .wrong { color: #ff4d4f; font-weight: 600; }
+.bar-good-text { color: #52c41a; font-weight: 600; }
+.bar-mid-text { color: #faad14; font-weight: 600; }
+.bar-bad-text { color: #ff4d4f; font-weight: 600; }
+.score-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.score-high { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+.score-mid { background: #fffbe6; color: #faad14; border: 1px solid #ffe58f; }
+.score-low { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
 
 @media (max-width: 768px) {
   .overview-grid {

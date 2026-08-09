@@ -33,10 +33,6 @@
           {{ loading ? '登录中...' : '登 录' }}
         </button>
       </form>
-
-      <div class="login-hint">
-        <p>默认管理员：admin / admin123</p>
-      </div>
     </div>
   </div>
 </template>
@@ -150,14 +146,5 @@ const handleLogin = async () => {
 .login-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-.login-hint {
-  margin-top: 20px;
-  text-align: center;
-}
-.login-hint p {
-  font-size: 12px;
-  color: #c0c4cc;
-  margin: 0;
 }
 </style>
