@@ -70,7 +70,7 @@
             <thead>
               <tr>
                 <th>ID</th>
-                <th v-if="isAdmin">用户ID</th>
+                <th v-if="isAdmin">用户名</th>
                 <th>标题</th>
                 <th>分类</th>
                 <th>状态</th>
@@ -83,7 +83,7 @@
               <tr v-for="item in list" :key="item.id">
                 <td><span class="iq-id-chip">{{ item.id }}</span></td>
                 <td v-if="isAdmin">
-                  <span class="iq-id-chip">{{ item.user_id }}</span>
+                  <span class="iq-id-chip">{{ item.user_name || item.user_id }}</span>
                 </td>
                 <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ item.title }}</td>
                 <td><span class="iq-tag" :class="categoryTagClass(item.category)">{{ categoryLabel(item.category) }}</span></td>
@@ -143,7 +143,7 @@
             <div class="iq-detail-meta">
               <span class="iq-tag" :class="categoryTagClass(detail.category)">{{ categoryLabel(detail.category) }}</span>
               <span class="iq-text-sm iq-text-muted">反馈 #{{ detail.id }}</span>
-              <span v-if="isAdmin" class="iq-text-sm iq-text-muted">用户ID: {{ detail.user_id }}</span>
+              <span v-if="isAdmin" class="iq-text-sm iq-text-muted">用户名: {{ detail.user_name || detail.user_id }}</span>
               <span class="iq-text-sm iq-text-muted">提交于 {{ formatTime(detail.created_at) }}</span>
             </div>
           </div>
