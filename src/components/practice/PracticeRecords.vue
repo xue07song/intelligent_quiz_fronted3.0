@@ -1,55 +1,73 @@
 <template>
-  <div class="records-list">
-    <div class="page-header">
-      <h2>📊 答题记录</h2>
+  <div class="iq-records">
+    <div class="iq-page-header">
+      <div>
+        <h2 class="iq-text-xl iq-font-semibold" style="color: var(--iq-neutral-900); margin: 0;">答题记录</h2>
+        <p class="iq-text-sm iq-text-muted" style="margin: 4px 0 0;">查看过往答题的成绩与详细分析</p>
+      </div>
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
-
-    <div v-else-if="list.length === 0" class="empty">
-      <p>📭 暂无答题记录，去组卷练习吧</p>
+    <div v-if="loading" class="iq-table-loading">
+      <span class="iq-loading-spinner"></span>
+      <span class="iq-text-sm iq-text-muted">加载中...</span>
     </div>
 
-    <div v-else class="table-wrapper">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th v-if="showSubmitter">提交人</th>
-            <th>试卷</th>
-            <th>得分</th>
-            <th>准确率</th>
-            <th>总题数</th>
-            <th>正确</th>
-            <th>错误</th>
-            <th>未答</th>
-            <th>用时</th>
-            <th>提交时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in list" :key="r.id">
-            <td>{{ r.id }}</td>
-            <td v-if="showSubmitter">
-              <span>{{ r.nickname || r.username || '-' }}</span>
-              <span v-if="r.role" class="role-badge" :class="r.role" style="margin-left:4px;">{{ roleMap[r.role] || r.role }}</span>
-            </td>
-            <td class="col-title">{{ r.exam_title || `试卷#${r.exam_id}` }}</td>
-            <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
-            <td>{{ r.accuracy }}%</td>
-            <td>{{ r.total_count }}</td>
-            <td class="correct">{{ r.correct_count }}</td>
-            <td class="wrong">{{ r.wrong_count }}</td>
-            <td>{{ r.skipped_count }}</td>
-            <td>{{ formatDuration(r.duration_seconds) }}</td>
-            <td>{{ formatTime(r.submitted_at) }}</td>
-            <td>
-              <button class="btn-view" @click="$emit('view-record', r.id)">查看详情</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-else-if="list.length === 0" class="iq-card">
+      <div class="iq-empty-row">
+        <div class="iq-empty-box">
+          <div class="iq-empty-icon">📊</div>
+          <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">暂无答题记录</div>
+          <div class="iq-text-sm iq-text-muted">去组卷练习后回来查看记录</div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="iq-card">
+      <div class="iq-table-wrap">
+        <table class="iq-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th v-if="showSubmitter">提交人</th>
+              <th>试卷</th>
+              <th>得分</th>
+              <th>准确率</th>
+              <th>总题数</th>
+              <th>正确</th>
+              <th>错误</th>
+              <th>未答</th>
+              <th>用时</th>
+              <th>提交时间</th>
+              <th style="width: 110px;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in list" :key="r.id">
+              <td><span class="iq-id-chip">{{ r.id }}</span></td>
+              <td v-if="showSubmitter">
+                <div class="user-cell">
+                  <span class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ r.nickname || r.username || '-' }}</span>
+                  <span v-if="r.role" class="iq-tag u-role" :class="r.role">{{ roleMap[r.role] || r.role }}</span>
+                </div>
+              </td>
+              <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ r.exam_title || `试卷#${r.exam_id}` }}</td>
+              <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
+              <td>{{ r.accuracy }}%</td>
+              <td>{{ r.total_count }}</td>
+              <td class="text-success iq-font-semibold">{{ r.correct_count }}</td>
+              <td class="text-error iq-font-semibold">{{ r.wrong_count }}</td>
+              <td>{{ r.skipped_count }}</td>
+              <td>{{ formatDuration(r.duration_seconds) }}</td>
+              <td class="iq-text-sm iq-text-muted">{{ formatTime(r.submitted_at) }}</td>
+              <td>
+                <button class="iq-btn iq-btn-primary iq-btn-sm" @click="$emit('view-record', r.id)">
+                  📋 详情
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <Pagination
         v-model:page="page"
@@ -70,10 +88,9 @@ import { formatTime } from '@/utils/format';
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
 const props = defineProps({
-  role: { type: String, default: 'student' }, // 'admin' | 'teacher' | 'student'
+  role: { type: String, default: 'student' },
 });
 
-// 学生只看本人记录，不需要提交人列；教师/管理员看多人记录，需要提交人列
 const showSubmitter = computed(() => props.role === 'admin' || props.role === 'teacher');
 
 const emit = defineEmits(['view-record', 'toast']);
@@ -92,9 +109,9 @@ const formatDuration = (sec) => {
 };
 
 const scoreClass = (score) => {
-  if (score >= 90) return 'excellent';
-  if (score >= 60) return 'pass';
-  return 'fail';
+  if (score >= 90) return 'score-excellent';
+  if (score >= 60) return 'score-pass';
+  return 'score-fail';
 };
 
 const loadRecords = async () => {
@@ -118,74 +135,77 @@ defineExpose({ loadRecords });
 </script>
 
 <style scoped>
-.records-list {
-  max-width: 1100px;
-  margin: 0 auto;
+.iq-records {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-.page-header {
-  margin-bottom: 20px;
+.iq-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
 }
-.page-header h2 {
-  margin: 0;
-  font-size: 20px;
-  color: #303133;
+.iq-table-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 0;
+  background: var(--iq-card);
+  border-radius: var(--iq-radius-card);
 }
-.loading, .empty {
-  text-align: center;
+.iq-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--iq-neutral-200);
+  border-top-color: var(--iq-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.iq-empty-row { padding: 0 !important; }
+.iq-empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   padding: 60px 0;
-  color: #909399;
-  font-size: 15px;
 }
-.table-wrapper {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  padding: 10px;
+.iq-empty-icon { font-size: 48px; opacity: 0.5; }
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
+.iq-id-chip {
+  display: inline-block;
+  font-family: var(--iq-font-mono);
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--iq-neutral-100);
+  color: var(--iq-neutral-700);
+  border-radius: 4px;
+  font-weight: 500;
 }
-.data-table th {
-  padding: 12px 8px;
-  text-align: left;
-  background: #f5f7fa;
-  border-bottom: 2px solid #e4e7ed;
-  font-weight: 600;
-  color: #303133;
-  white-space: nowrap;
-}
-.data-table td {
-  padding: 10px 8px;
-  border-bottom: 1px solid #ebeef5;
-  color: #606266;
-}
-.col-title {
-  max-width: 200px;
-  word-break: break-word;
-}
-.correct { color: #52c41a; }
-.wrong { color: #ff4d4f; }
+.u-role.iq-tag.admin { background: #fef2f2; color: #b91c1c; }
+.u-role.iq-tag.teacher { background: #eff6ff; color: #1d4ed8; }
+.u-role.iq-tag.student { background: #ecfdf5; color: #047857; }
+.text-success { color: var(--iq-state-success); }
+.text-error { color: var(--iq-state-error); }
 .score-tag {
   display: inline-block;
-  padding: 2px 10px;
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 14px;
+  padding: 3px 10px;
+  border-radius: var(--iq-radius-full);
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 44px;
+  text-align: center;
 }
-.score-tag.excellent { background: #f0f9eb; color: #52c41a; }
-.score-tag.pass { background: #e6f7ff; color: #1890ff; }
-.score-tag.fail { background: #fef0f0; color: #ff4d4f; }
-.btn-view {
-  background: #e6f7ff;
-  color: #1890ff;
-  border: 1px solid #91d5ff;
-  padding: 4px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.btn-view:hover { background: #bae7ff; }
+.score-excellent { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+.score-pass { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.score-fail { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 </style>

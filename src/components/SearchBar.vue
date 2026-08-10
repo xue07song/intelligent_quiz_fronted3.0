@@ -1,67 +1,96 @@
 <template>
-  <div class="search-bar">
-    <div class="search-row">
-      <input
-        v-model="filters.id"
-        class="input"
-        placeholder="🔖 题目ID"
-        style="width: 120px;"
-        @keyup.enter="$emit('search', filters)"
-      />
-      <div class="keyword-wrapper">
+  <div class="iq-card iq-search-card">
+    <div class="iq-search-grid">
+      <div class="iq-search-field">
+        <label class="iq-search-label">题目ID</label>
         <input
-          v-model="filters.关键词"
-          class="input"
-          placeholder="🔍 搜索题目内容、选项、知识点..."
+          v-model="filters.id"
+          class="iq-input"
+          placeholder="如 Q001"
           @keyup.enter="$emit('search', filters)"
         />
-        <div class="search-hint">
-          <div class="hint-title">💡 关键词可辅助搜索单条题目的字段</div>
-          <ul class="hint-list">
-            <li><strong>题目内容</strong> · 按题干文字片段匹配</li>
-            <li><strong>选项</strong> · 按 A/B/C/D 选项文字匹配</li>
-            <li><strong>知识点</strong> · 按知识点关键词匹配</li>
-          </ul>
-          <div class="hint-tip">提示：可结合左侧 ID、章节、题型、难度、出题人等条件精准定位单条题目</div>
+      </div>
+
+      <div class="iq-search-field" style="grid-column: span 2;">
+        <label class="iq-search-label">关键词</label>
+        <div class="iq-kw-wrap">
+          <input
+            v-model="filters.关键词"
+            class="iq-input"
+            placeholder="搜索题目内容、选项、知识点..."
+            @keyup.enter="$emit('search', filters)"
+          />
+          <div class="iq-kw-hint">
+            <div class="hint-title iq-font-medium">关键词匹配范围</div>
+            <ul class="hint-list">
+              <li><strong>题目内容</strong> · 按题干文字片段匹配</li>
+              <li><strong>选项</strong> · 按 A/B/C/D 选项文字匹配</li>
+              <li><strong>知识点</strong> · 按知识点关键词匹配</li>
+            </ul>
+            <div class="hint-tip">可结合其他条件精准定位题目</div>
+          </div>
         </div>
       </div>
-      <select v-model="filters.题型" class="input" @change="$emit('search', filters)">
-        <option value="">全部题型</option>
-        <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
-      <select v-model="filters.难度" class="input" @change="$emit('search', filters)">
-        <option value="">全部难度</option>
-        <option v-for="opt in difficultyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-      </select>
-      <input
-        v-model="filters.章节"
-        type="number"
-        class="input"
-        placeholder="章节号"
-        style="width: 100px;"
-        @keyup.enter="$emit('search', filters)"
-      />
-      <input
-        v-model="filters.出题人"
-        class="input"
-        placeholder="出题人"
-        style="width: 120px;"
-        @keyup.enter="$emit('search', filters)"
-      />
-      <button class="btn-primary" @click="$emit('search', filters)">🔍 查询</button>
-      <button class="btn-cancel" @click="handleReset">重置</button>
 
-      <div class="batch-actions" v-if="canEdit">
+      <div class="iq-search-field">
+        <label class="iq-search-label">题型</label>
+        <select v-model="filters.题型" class="iq-select" @change="$emit('search', filters)">
+          <option value="">全部题型</option>
+          <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
+
+      <div class="iq-search-field">
+        <label class="iq-search-label">难度</label>
+        <select v-model="filters.难度" class="iq-select" @change="$emit('search', filters)">
+          <option value="">全部难度</option>
+          <option v-for="opt in difficultyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
+
+      <div class="iq-search-field">
+        <label class="iq-search-label">章节</label>
+        <input
+          v-model="filters.章节"
+          type="number"
+          class="iq-input"
+          placeholder="章节号"
+          @keyup.enter="$emit('search', filters)"
+        />
+      </div>
+
+      <div class="iq-search-field">
+        <label class="iq-search-label">出题人</label>
+        <input
+          v-model="filters.出题人"
+          class="iq-input"
+          placeholder="出题人"
+          @keyup.enter="$emit('search', filters)"
+        />
+      </div>
+
+      <div class="iq-search-actions">
+        <button class="iq-btn iq-btn-primary" @click="$emit('search', filters)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          查询
+        </button>
+        <button class="iq-btn iq-btn-secondary" @click="handleReset">重置</button>
+      </div>
+
+      <div v-if="canEdit" class="iq-search-batch">
         <button
-          class="btn-danger"
+          class="iq-btn iq-btn-danger iq-btn-sm"
           :disabled="selectedCount === 0"
           @click="$emit('batch-delete')"
         >
-          🗑️ 批量删除{{ selectedCount ? `(${selectedCount})` : '' }}
+          🗑️ 批量删除{{ selectedCount ? ` (${selectedCount})` : '' }}
         </button>
-        <button class="btn-import" @click="$emit('batch-import')">📥 批量导入</button>
-        <button class="btn-ai" @click="$emit('ai-generate')">🤖 AI 出题</button>
-        <button class="btn-primary btn-add" @click="$emit('add')">+ 新增题目</button>
+        <button class="iq-btn iq-btn-secondary iq-btn-sm" @click="$emit('batch-import')">📥 批量导入</button>
+        <button class="iq-btn iq-btn-secondary iq-btn-sm" @click="$emit('ai-generate')">🤖 AI 出题</button>
+        <button class="iq-btn iq-btn-primary iq-btn-sm" @click="$emit('add')">+ 新增题目</button>
       </div>
     </div>
   </div>
@@ -105,134 +134,85 @@ const handleReset = () => {
 </script>
 
 <style scoped>
-.search-bar {
-  margin-bottom: 20px;
+.iq-search-card {
+  padding: 20px;
 }
-.search-row {
+.iq-search-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px 16px;
+  align-items: end;
+}
+.iq-search-field {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
 }
-.keyword-wrapper {
+.iq-search-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--iq-neutral-600);
+}
+.iq-kw-wrap {
   position: relative;
 }
-.search-hint {
+.iq-kw-hint {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
   z-index: 20;
-  min-width: 280px;
-  background: #fff;
-  border: 1px solid #dcdfe6;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  padding: 12px 14px;
+  min-width: 300px;
+  background: var(--iq-popover);
+  border: 1px solid var(--iq-border);
+  border-radius: var(--iq-radius-medium);
+  box-shadow: var(--iq-shadow-float);
+  padding: 14px 16px;
   font-size: 12px;
-  color: #606266;
-  line-height: 1.6;
+  color: var(--iq-neutral-600);
+  line-height: 1.7;
   opacity: 0;
   visibility: hidden;
   transform: translateY(-4px);
   transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
   pointer-events: none;
 }
-.keyword-wrapper:hover .search-hint {
+.iq-kw-wrap:hover .iq-kw-hint {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
 .hint-title {
   font-size: 13px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 6px;
+  color: var(--iq-neutral-900);
+  margin-bottom: 8px;
 }
 .hint-list {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   padding-left: 18px;
 }
 .hint-list li {
   margin-bottom: 2px;
 }
 .hint-list strong {
-  color: #1890ff;
+  color: var(--iq-primary-600);
 }
 .hint-tip {
-  padding-top: 6px;
-  border-top: 1px dashed #ebeef5;
-  color: #909399;
+  padding-top: 8px;
+  border-top: 1px dashed var(--iq-border);
+  color: var(--iq-neutral-500);
   font-size: 11px;
 }
-.batch-actions {
-  margin-left: auto;
+.iq-search-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  align-items: center;
 }
-.btn-primary {
-  padding: 8px 16px;
-  background: #667eea;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-.btn-primary:hover:not(:disabled) {
-  background: #5568d3;
-}
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-cancel {
-  padding: 8px 16px;
-  background: #fff;
-  color: #606266;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn-danger {
-  padding: 8px 16px;
-  background: #ff4d4f;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-.btn-danger:hover:not(:disabled) { background: #e64547; }
-.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-import {
-  padding: 8px 16px;
-  background: #52c41a;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-.btn-import:hover { background: #49b018; }
-.btn-ai {
-  padding: 8px 16px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: opacity 0.2s;
-}
-.btn-ai:hover { opacity: 0.9; }
-.btn-add {
-  margin-left: 0;
-}
-.input {
-  padding: 8px 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  font-size: 14px;
+.iq-search-batch {
+  grid-column: span 6;
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--iq-border);
+  margin-top: 2px;
 }
 </style>

@@ -1,21 +1,48 @@
 <template>
-  <div class="practice-stats">
-    <div class="page-header">
-      <h2>📈 统计分析</h2>
+  <div class="iq-stats">
+    <div class="iq-page-header">
+      <div>
+        <h2 class="iq-text-xl iq-font-semibold" style="color: var(--iq-neutral-900); margin: 0;">📈 统计分析</h2>
+        <p class="iq-text-sm iq-text-muted" style="margin: 4px 0 0;">全面分析你的答题表现和学习趋势</p>
+      </div>
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
+    <div v-if="loading" class="iq-table-loading">
+      <span class="iq-loading-spinner"></span>
+      <span class="iq-text-sm iq-text-muted">加载中...</span>
+    </div>
 
-    <div v-else-if="!stats || stats.overview.total_attempts === 0" class="empty">
-      <p>📭 暂无练习数据，完成一次答题练习后即可查看统计</p>
+    <div v-else-if="!stats || stats.overview.total_attempts === 0" class="iq-card">
+      <div class="iq-empty-row">
+        <div class="iq-empty-box">
+          <div class="iq-empty-icon">📊</div>
+          <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">暂无练习数据</div>
+          <div class="iq-text-sm iq-text-muted">完成一次答题练习后即可查看统计</div>
+        </div>
+      </div>
     </div>
 
     <div v-else>
-      <!-- AI 错题分析（仅本人统计时可用） -->
-      <div v-if="!userId" class="ai-section">
-        <button class="btn-ai" :disabled="aiLoading" @click="loadWeakness">
-          {{ aiLoading ? 'AI 分析中...' : '🤖 AI 错题分析' }}
-        </button>
+      <!-- AI 错题分析 -->
+      <div v-if="!userId" class="iq-card ai-section">
+        <div class="ai-header">
+          <div class="ai-header-title">
+            <div class="ai-icon-wrap">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0-3 3v2H3v4h1v2a3 3 0 0 0 3 3h2v1a3 3 0 0 0 6 0v-1h2a3 3 0 0 0 3-3v-2h1V9h-1V7a3 3 0 0 0-3-3h-2V5a3 3 0 0 0-3-3z"></path>
+              </svg>
+            </div>
+            <div>
+              <div class="iq-font-semibold iq-text-base" style="color: var(--iq-neutral-900);">AI 智能错题分析</div>
+              <div class="iq-text-xs iq-text-muted" style="margin-top: 2px;">深度分析薄弱点，定制学习建议</div>
+            </div>
+          </div>
+          <button class="iq-btn ai-btn" :disabled="aiLoading" @click="loadWeakness">
+            <span v-if="aiLoading" class="iq-btn-spinner"></span>
+            {{ aiLoading ? 'AI 分析中...' : '🤖 开始分析' }}
+          </button>
+        </div>
+
         <div v-if="aiReport" class="ai-report">
           <div v-if="!aiReport.hasData" class="ai-empty">{{ aiReport.message }}</div>
           <template v-else>
@@ -57,36 +84,36 @@
 
       <!-- 总览卡片 -->
       <div class="overview-grid">
-        <div class="stat-card">
-          <div class="stat-icon">📝</div>
+        <div class="iq-card stat-card">
+          <div class="stat-icon" style="background: #eff6ff; color: #3b82f6;">📝</div>
           <div class="stat-info">
             <div class="stat-value">{{ stats.overview.total_attempts }}</div>
             <div class="stat-label">练习次数</div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon">🎯</div>
+        <div class="iq-card stat-card">
+          <div class="stat-icon" style="background: #fef3c7; color: #d97706;">🎯</div>
           <div class="stat-info">
-            <div class="stat-value">{{ stats.overview.avg_accuracy }}%</div>
+            <div class="stat-value">{{ stats.overview.avg_accuracy }}<span class="stat-unit">%</span></div>
             <div class="stat-label">平均准确率</div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon">🏆</div>
+        <div class="iq-card stat-card">
+          <div class="stat-icon" style="background: #ecfdf5; color: #059669;">🏆</div>
           <div class="stat-info">
-            <div class="stat-value">{{ stats.overview.max_accuracy }}%</div>
+            <div class="stat-value">{{ stats.overview.max_accuracy }}<span class="stat-unit">%</span></div>
             <div class="stat-label">最佳成绩</div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon">📚</div>
+        <div class="iq-card stat-card">
+          <div class="stat-icon" style="background: #faf5ff; color: #7c3aed;">📚</div>
           <div class="stat-info">
             <div class="stat-value">{{ stats.overview.total_questions }}</div>
             <div class="stat-label">累计答题</div>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon">✅</div>
+        <div class="iq-card stat-card">
+          <div class="stat-icon" style="background: #fef2f2; color: #dc2626;">✅</div>
           <div class="stat-info">
             <div class="stat-value">{{ stats.overview.total_correct }}</div>
             <div class="stat-label">累计正确</div>
@@ -95,12 +122,12 @@
       </div>
 
       <!-- 趋势图 -->
-      <div class="chart-card">
-        <h3>📊 近期练习趋势（最近 {{ stats.trend.length }} 次）</h3>
+      <div class="iq-card chart-card">
+        <h3 class="chart-title">📊 近期练习趋势（最近 {{ stats.trend.length }} 次）</h3>
         <div class="trend-chart" v-if="stats.trend.length > 0">
           <div class="trend-bars">
             <div v-for="(item, idx) in stats.trend" :key="item.id" class="trend-bar-wrapper">
-              <div class="trend-bar" :style="{ height: barHeight(item.accuracy) + '%' }">
+              <div class="trend-bar" :style="{ height: barHeight(item.accuracy) + '%' }" :class="accuracyClass(item.accuracy)">
                 <span class="bar-value">{{ item.accuracy }}%</span>
               </div>
               <span class="bar-label">#{{ idx + 1 }}</span>
@@ -111,8 +138,8 @@
       </div>
 
       <!-- 按题型正确率 -->
-      <div class="chart-card">
-        <h3>📋 按题型正确率</h3>
+      <div class="iq-card chart-card">
+        <h3 class="chart-title">📋 按题型正确率</h3>
         <div class="type-list" v-if="stats.byType.length > 0">
           <div v-for="item in stats.byType" :key="item.question_type" class="type-row">
             <div class="type-name">{{ getTypeName(item.question_type) }}</div>
@@ -120,7 +147,7 @@
               <div class="type-bar" :style="{ width: item.accuracy + '%' }" :class="accuracyClass(item.accuracy)"></div>
             </div>
             <div class="type-detail">
-              <span class="type-accuracy">{{ item.accuracy }}%</span>
+              <span class="type-accuracy" :class="`${accuracyClass(item.accuracy)}-text`">{{ item.accuracy }}%</span>
               <span class="type-count">({{ item.correct }}/{{ item.total }})</span>
             </div>
           </div>
@@ -129,14 +156,14 @@
       </div>
 
       <!-- 每次答题明细 -->
-      <div class="chart-card">
-        <h3>📝 每次答题明细（最近 {{ stats.trend.length }} 次）</h3>
-        <div class="table-wrapper" v-if="stats.trend.length > 0">
-          <table class="detail-table">
+      <div class="iq-card chart-card">
+        <h3 class="chart-title">📝 每次答题明细（最近 {{ stats.trend.length }} 次）</h3>
+        <div class="iq-table-wrap" v-if="stats.trend.length > 0">
+          <table class="iq-table detail-table">
             <thead>
               <tr>
                 <th>#</th>
-                <th>提交人</th>
+                <th v-if="showSubmitter">提交人</th>
                 <th>试卷</th>
                 <th>提交时间</th>
                 <th>得分</th>
@@ -152,18 +179,20 @@
             <tbody>
               <tr v-for="(item, idx) in [...stats.trend].reverse()" :key="item.id">
                 <td>{{ idx + 1 }}</td>
-                <td>
-                  <span>{{ item.nickname || item.username || '-' }}</span>
-                  <span v-if="item.role" class="role-badge" :class="item.role" style="margin-left:4px;">{{ roleMap[item.role] || item.role }}</span>
+                <td v-if="showSubmitter">
+                  <div class="user-cell">
+                    <span>{{ item.nickname || item.username || '-' }}</span>
+                    <span v-if="item.role" class="iq-tag u-role" :class="item.role">{{ roleMap[item.role] || item.role }}</span>
+                  </div>
                 </td>
-                <td class="col-title">{{ item.exam_title || `试卷#${item.exam_id}` }}</td>
-                <td class="col-time">{{ formatTime(item.submitted_at) }}</td>
+                <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ item.exam_title || `试卷#${item.exam_id}` }}</td>
+                <td class="iq-text-sm iq-text-muted">{{ formatTime(item.submitted_at) }}</td>
                 <td><span class="score-tag" :class="scoreClass(item.score)">{{ item.score }}</span></td>
-                <td :class="accuracyClass(item.accuracy) + '-text'">{{ item.accuracy }}%</td>
+                <td><span class="iq-font-semibold" :class="`${accuracyClass(item.accuracy)}-text`">{{ item.accuracy }}%</span></td>
                 <td>{{ item.total_count }}</td>
                 <td>{{ item.answered_count }}</td>
-                <td class="correct">{{ item.correct_count }}</td>
-                <td class="wrong">{{ item.wrong_count }}</td>
+                <td class="bar-good-text iq-font-semibold">{{ item.correct_count }}</td>
+                <td class="bar-bad-text iq-font-semibold">{{ item.wrong_count }}</td>
                 <td>{{ item.skipped_count }}</td>
                 <td>{{ formatDuration(item.duration_seconds) }}</td>
               </tr>
@@ -177,7 +206,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { getPracticeStats, adminGetUserStats } from '@/api/practice';
 import { getWeakness } from '@/api/ai';
 import { getTypeName } from '@/utils/constants';
@@ -189,12 +218,13 @@ const props = defineProps({
   userId: { type: [Number, String], default: null },
 });
 
+const showSubmitter = computed(() => !!props.userId);
+
 const emit = defineEmits(['toast']);
 
 const loading = ref(true);
 const stats = ref(null);
 
-// AI 错题分析（仅本人模式可用，管理端查看他人时不显示 AI 分析按钮）
 const aiLoading = ref(false);
 const aiReport = ref(null);
 
@@ -213,10 +243,7 @@ const loadWeakness = async () => {
   }
 };
 
-const barHeight = (accuracy) => {
-  // 最小 5%，保证可见
-  return Math.max(5, accuracy);
-};
+const barHeight = (accuracy) => Math.max(5, accuracy);
 
 const accuracyClass = (acc) => {
   if (acc >= 80) return 'bar-good';
@@ -225,9 +252,9 @@ const accuracyClass = (acc) => {
 };
 
 const scoreClass = (score) => {
-  if (score >= 80) return 'score-high';
-  if (score >= 60) return 'score-mid';
-  return 'score-low';
+  if (score >= 80) return 'score-excellent';
+  if (score >= 60) return 'score-pass';
+  return 'score-fail';
 };
 
 const formatDuration = (sec) => {
@@ -258,91 +285,154 @@ defineExpose({ loadStats });
 </script>
 
 <style scoped>
-.practice-stats {
-  max-width: 900px;
-  margin: 0 auto;
+.iq-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-.page-header {
-  margin-bottom: 20px;
+.iq-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
 }
-.page-header h2 {
-  margin: 0;
-  font-size: 20px;
-  color: #303133;
+.iq-table-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 0;
+  background: var(--iq-card);
+  border-radius: var(--iq-radius-card);
 }
+.iq-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--iq-neutral-200);
+  border-top-color: var(--iq-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.iq-empty-row { padding: 0 !important; }
+.iq-empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 60px 0;
+}
+.iq-empty-icon { font-size: 48px; opacity: 0.5; }
+
 .ai-section {
-  margin-bottom: 24px;
+  padding: 20px 24px;
 }
-.btn-ai {
-  padding: 8px 18px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+.ai-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.ai-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ai-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--iq-radius-medium);
+  background: linear-gradient(135deg, var(--iq-primary-500), #8b5cf6);
   color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: opacity 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.4);
 }
-.btn-ai:hover:not(:disabled) { opacity: 0.9; }
-.btn-ai:disabled { opacity: 0.6; cursor: not-allowed; }
+.ai-btn {
+  background: linear-gradient(135deg, var(--iq-primary-500), #8b5cf6);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 14px -4px rgba(99, 102, 241, 0.5);
+}
+.ai-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--iq-primary-600), #7c3aed);
+  border-color: transparent;
+}
+.iq-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 6px;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
 .ai-report {
-  margin-top: 14px;
-  background: linear-gradient(135deg, #f0f5ff, #f9f0ff);
-  border: 1px solid #d6e4ff;
-  border-radius: 8px;
+  margin-top: 18px;
+  background: linear-gradient(135deg, var(--iq-primary-50), #faf5ff);
+  border: 1px solid var(--iq-primary-100);
+  border-radius: var(--iq-radius-card);
   padding: 18px 22px;
 }
 .ai-empty {
   text-align: center;
-  color: #909399;
+  color: var(--iq-neutral-500);
   font-size: 14px;
   padding: 20px 0;
 }
 .report-block {
   margin-bottom: 16px;
 }
-.report-block:last-child {
-  margin-bottom: 0;
-}
+.report-block:last-child { margin-bottom: 0; }
 .block-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #667eea;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--iq-primary-700);
   margin-bottom: 8px;
 }
 .block-text {
   font-size: 14px;
-  color: #303133;
-  line-height: 1.7;
+  color: var(--iq-neutral-800);
+  line-height: 1.8;
 }
 .weak-item {
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 8px 12px;
-  background: #fff;
-  border-radius: 6px;
+  padding: 10px 14px;
+  background: var(--iq-neutral-0);
+  border-radius: var(--iq-radius-medium);
   margin-bottom: 6px;
   font-size: 13px;
+  border: 1px solid var(--iq-neutral-100);
 }
 .weak-name {
-  font-weight: 600;
-  color: #303133;
-  min-width: 70px;
+  font-weight: 700;
+  color: var(--iq-neutral-900);
+  min-width: 80px;
 }
 .weak-acc {
-  color: #ff4d4f;
+  color: var(--iq-state-error);
   min-width: 90px;
+  font-weight: 600;
 }
 .weak-advice {
-  color: #606266;
+  color: var(--iq-neutral-600);
   flex: 1;
 }
 .point-item {
-  background: #fff;
-  border-radius: 6px;
-  padding: 10px 12px;
+  background: var(--iq-neutral-0);
+  border-radius: var(--iq-radius-medium);
+  padding: 12px 14px;
   margin-bottom: 8px;
+  border: 1px solid var(--iq-neutral-100);
 }
 .point-head {
   display: flex;
@@ -351,21 +441,22 @@ defineExpose({ loadStats });
   margin-bottom: 4px;
 }
 .point-name {
-  font-weight: 600;
-  color: #303133;
+  font-weight: 700;
+  color: var(--iq-neutral-900);
   font-size: 14px;
 }
 .point-chapter {
   font-size: 12px;
-  color: #909399;
-  background: #f0f2f5;
-  padding: 1px 8px;
-  border-radius: 10px;
+  color: var(--iq-neutral-500);
+  background: var(--iq-neutral-100);
+  padding: 2px 10px;
+  border-radius: var(--iq-radius-full);
+  font-weight: 500;
 }
 .point-reason, .point-advice {
   font-size: 13px;
-  color: #606266;
-  line-height: 1.6;
+  color: var(--iq-neutral-600);
+  line-height: 1.7;
 }
 .plan-list {
   margin: 0;
@@ -373,200 +464,192 @@ defineExpose({ loadStats });
 }
 .plan-list li {
   font-size: 14px;
-  color: #303133;
-  line-height: 1.8;
+  color: var(--iq-neutral-800);
+  line-height: 1.9;
 }
 .report-encourage {
   margin-top: 12px;
-  padding: 10px 14px;
-  background: #fff;
-  border-radius: 6px;
+  padding: 12px 16px;
+  background: var(--iq-neutral-0);
+  border-radius: var(--iq-radius-medium);
   font-size: 14px;
-  color: #52c41a;
-  font-weight: 500;
+  color: var(--iq-state-success);
+  font-weight: 600;
   text-align: center;
+  border: 1px solid #a7f3d0;
 }
-.loading, .empty {
-  text-align: center;
-  padding: 60px 0;
-  color: #909399;
-  font-size: 15px;
-}
+
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 12px;
-  margin-bottom: 24px;
 }
 .stat-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 16px;
+  padding: 16px 18px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  gap: 12px;
 }
 .stat-icon {
-  font-size: 28px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--iq-radius-medium);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
 }
 .stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: #303133;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--iq-neutral-900);
   line-height: 1.2;
+}
+.stat-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--iq-neutral-500);
 }
 .stat-label {
   font-size: 12px;
-  color: #909399;
+  color: var(--iq-neutral-500);
+  margin-top: 2px;
+  font-weight: 500;
 }
+
 .chart-card {
-  background: #fff;
-  border-radius: 8px;
   padding: 20px 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  margin-bottom: 20px;
 }
-.chart-card h3 {
-  margin: 0 0 16px;
+.chart-title {
   font-size: 16px;
-  color: #303133;
+  font-weight: 700;
+  color: var(--iq-neutral-900);
+  margin: 0 0 18px;
 }
+
 .trend-chart {
   overflow-x: auto;
-  padding: 10px 0;
+  padding: 10px 4px 0;
 }
 .trend-bars {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  min-height: 200px;
-  padding-bottom: 24px;
+  gap: 10px;
+  min-height: 220px;
+  padding-bottom: 28px;
 }
 .trend-bar-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  min-width: 36px;
-  height: 100%;
+  gap: 6px;
+  min-width: 40px;
+  height: 220px;
   justify-content: flex-end;
 }
 .trend-bar {
-  width: 28px;
-  background: linear-gradient(180deg, #667eea, #764ba2);
-  border-radius: 4px 4px 0 0;
+  width: 30px;
+  border-radius: 6px 6px 0 0;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 4px;
-  min-height: 10px;
-  transition: height 0.3s;
+  padding-top: 6px;
+  min-height: 12px;
+  transition: height 0.4s ease;
 }
+.trend-bar.bar-good { background: linear-gradient(180deg, #10b981, #059669); }
+.trend-bar.bar-mid { background: linear-gradient(180deg, #f59e0b, #d97706); }
+.trend-bar.bar-bad { background: linear-gradient(180deg, #ef4444, #dc2626); }
 .bar-value {
   font-size: 10px;
   color: #fff;
-  font-weight: 600;
+  font-weight: 700;
 }
 .bar-label {
   font-size: 11px;
-  color: #909399;
+  color: var(--iq-neutral-500);
+  font-weight: 500;
 }
+
 .type-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .type-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 .type-name {
-  width: 80px;
+  width: 90px;
   font-size: 14px;
-  color: #303133;
+  color: var(--iq-neutral-800);
+  font-weight: 600;
   flex-shrink: 0;
 }
 .type-bar-bg {
   flex: 1;
-  height: 20px;
-  background: #f0f2f5;
-  border-radius: 10px;
+  height: 22px;
+  background: var(--iq-neutral-100);
+  border-radius: var(--iq-radius-full);
   overflow: hidden;
 }
 .type-bar {
   height: 100%;
-  border-radius: 10px;
-  transition: width 0.3s;
+  border-radius: var(--iq-radius-full);
+  transition: width 0.4s ease;
 }
-.type-bar.bar-good { background: linear-gradient(90deg, #52c41a, #73d13d); }
-.type-bar.bar-mid { background: linear-gradient(90deg, #faad14, #ffc53d); }
-.type-bar.bar-bad { background: linear-gradient(90deg, #ff4d4f, #ff7875); }
+.type-bar.bar-good { background: linear-gradient(90deg, #34d399, #10b981); }
+.type-bar.bar-mid { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.type-bar.bar-bad { background: linear-gradient(90deg, #f87171, #ef4444); }
 .type-detail {
   display: flex;
   gap: 4px;
   font-size: 13px;
   white-space: nowrap;
+  min-width: 110px;
+  justify-content: flex-end;
 }
 .type-accuracy {
-  font-weight: 600;
-  color: #303133;
+  font-weight: 700;
+  color: var(--iq-neutral-900);
 }
 .type-count {
-  color: #909399;
+  color: var(--iq-neutral-500);
 }
+.bar-good-text { color: #059669 !important; }
+.bar-mid-text { color: #d97706 !important; }
+.bar-bad-text { color: #dc2626 !important; }
+
 .no-data {
   text-align: center;
-  color: #c0c4cc;
-  padding: 30px 0;
+  color: var(--iq-neutral-400);
+  padding: 40px 0;
+  font-size: 14px;
 }
-.table-wrapper {
-  overflow-x: auto;
+
+.user-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.detail-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  min-width: 700px;
-}
-.detail-table th {
-  background: #f5f7fa;
-  padding: 10px 8px;
-  text-align: center;
-  color: #606266;
-  font-weight: 600;
-  white-space: nowrap;
-  border-bottom: 2px solid #ebeef5;
-}
-.detail-table td {
-  padding: 8px;
-  text-align: center;
-  border-bottom: 1px solid #f0f0f0;
-  color: #303133;
-}
-.detail-table tr:hover td {
-  background: #f9fafc;
-}
-.detail-table .col-time {
-  white-space: nowrap;
-  color: #606266;
-}
-.detail-table .correct { color: #52c41a; font-weight: 600; }
-.detail-table .wrong { color: #ff4d4f; font-weight: 600; }
-.bar-good-text { color: #52c41a; font-weight: 600; }
-.bar-mid-text { color: #faad14; font-weight: 600; }
-.bar-bad-text { color: #ff4d4f; font-weight: 600; }
+.u-role.iq-tag.admin { background: #fef2f2; color: #b91c1c; }
+.u-role.iq-tag.teacher { background: #eff6ff; color: #1d4ed8; }
+.u-role.iq-tag.student { background: #ecfdf5; color: #047857; }
 .score-tag {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: var(--iq-radius-full);
+  font-weight: 700;
   font-size: 12px;
+  min-width: 40px;
+  text-align: center;
 }
-.score-high { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
-.score-mid { background: #fffbe6; color: #faad14; border: 1px solid #ffe58f; }
-.score-low { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+.score-excellent { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+.score-pass { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.score-fail { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 
 @media (max-width: 768px) {
   .overview-grid {

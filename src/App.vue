@@ -2,135 +2,266 @@
   <!-- 未登录：显示登录页 -->
   <Login v-if="!currentUser" @success="handleLoginSuccess" />
 
-  <!-- 已登录：显示主应用 -->
-  <div v-else id="app" class="app-container">
-    <header class="app-header">
-      <h1 class="app-title">📚 智能题库管理系统</h1>
-
-      <div class="app-stats" v-if="currentView === 'main' && stats">
-        <span>题库总量: <strong>{{ stats.total }}</strong></span>
-        <span v-if="stats.byChapter?.length">章节数: <strong>{{ stats.byChapter.length }}</strong></span>
+  <!-- 已登录：Sidebar + Header + Main 三栏布局 -->
+  <div v-else id="app">
+    <!-- 左侧 Sidebar -->
+    <aside class="iq-layout-sidebar">
+      <div class="iq-sidebar-brand">
+        <div class="iq-sidebar-logo">智</div>
+        <span class="iq-font-semibold iq-text-lg" style="color: var(--iq-neutral-900);">智能题库</span>
       </div>
-
-      <nav class="app-nav">
-        <button class="nav-btn" :class="{ active: currentView === 'main' }" @click="currentView = 'main'">📚 题库管理</button>
-        <button class="nav-btn" :class="{ active: currentView === 'practice' }" @click="goPractice">✍️ 答题练习</button>
-        <button v-if="currentUser.role === 'admin'" class="nav-btn" :class="{ active: currentView === 'users' }" @click="currentView = 'users'">👥 用户管理</button>
+      <nav class="iq-sidebar-nav">
+        <button
+          class="iq-nav-item"
+          :class="{ active: currentView === 'main' }"
+          @click="currentView = 'main'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          题库管理
+        </button>
+        <button
+          class="iq-nav-item"
+          :class="{ active: currentView === 'practice' && practiceView === 'exams' }"
+          @click="practiceView = 'exams'; currentView = 'practice'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          试卷列表
+        </button>
+        <button
+          class="iq-nav-item"
+          :class="{ active: currentView === 'practice' && practiceView === 'generate' }"
+          @click="practiceView = 'generate'; currentView = 'practice'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+          答题练习
+        </button>
+        <button
+          class="iq-nav-item"
+          :class="{ active: currentView === 'practice' && practiceView === 'records' }"
+          @click="practiceView = 'records'; currentView = 'practice'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          答题记录
+        </button>
+        <button
+          class="iq-nav-item"
+          :class="{ active: currentView === 'practice' && practiceView === 'stats' }"
+          @click="practiceView = 'stats'; currentView = 'practice'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          统计分析
+        </button>
+        <button
+          v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
+          class="iq-nav-item"
+          :class="{ active: currentView === 'practice' && practiceView === 'admin-records' }"
+          @click="practiceView = 'admin-records'; currentView = 'practice'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          做题管理
+        </button>
+        <button
+          v-if="currentUser.role === 'admin'"
+          class="iq-nav-item"
+          :class="{ active: currentView === 'users' }"
+          @click="currentView = 'users'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          用户管理
+        </button>
       </nav>
+    </aside>
 
-      <div class="user-area">
-        <span class="user-info">
-          {{ currentUser.nickname || currentUser.username }}
-          <span class="role-badge" :class="currentUser.role">{{ roleMap[currentUser.role] }}</span>
-        </span>
-        <button class="btn-link" @click="pwdVisible = true">改密码</button>
-        <button class="btn-link btn-logout" @click="handleLogout">退出</button>
+    <!-- 顶部 Header -->
+    <header class="iq-layout-header">
+      <div>
+        <nav class="iq-breadcrumb">
+          <a @click="currentView = 'main'">首页</a>
+          <span class="crumb-sep">/</span>
+          <span>{{ currentBreadcrumb }}</span>
+        </nav>
+      </div>
+      <div class="iq-header-right">
+        <button class="iq-header-link" @click="pwdVisible = true">改密码</button>
+        <button class="iq-header-link" @click="handleLogout">退出</button>
+        <div class="iq-avatar-wrap">
+          <div class="iq-avatar">{{ avatarChar }}</div>
+          <div class="iq-avatar-info">
+            <div class="iq-avatar-name">{{ currentUser.nickname || currentUser.username }}</div>
+            <div class="iq-avatar-role">
+              <span class="role-badge" :class="currentUser.role">{{ roleMap[currentUser.role] }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
-    <!-- 题库管理视图 -->
-    <main v-if="currentView === 'main'" class="app-main">
-      <SearchBar
-        :initialFilters="filters"
-        :role="currentUser.role"
-        :selectedCount="selectedIds.length"
-        @search="handleSearch"
-        @reset="handleReset"
-        @add="openAddDialog"
-        @batch-delete="handleBatchDelete"
-        @batch-import="importVisible = true"
-        @ai-generate="aiVisible = true"
-      />
+    <!-- 主内容区 -->
+    <main class="iq-layout-main">
+      <!-- 题库管理视图 -->
+      <template v-if="currentView === 'main'">
+        <div class="iq-page-titlebar">
+          <h1>题库管理</h1>
+          <div v-if="canEdit" class="iq-page-actions">
+            <button class="iq-btn iq-btn-secondary" @click="aiVisible = true">🤖 AI 出题</button>
+            <button class="iq-btn iq-btn-secondary" @click="importVisible = true">📥 批量导入</button>
+            <button class="iq-btn iq-btn-primary" @click="openAddDialog">+ 新增题目</button>
+          </div>
+        </div>
 
-      <QuestionTable
-        :list="list"
-        :loading="loading"
-        :role="currentUser.role"
-        v-model="selectedIds"
-        @view="openViewDialog"
-        @edit="openEditDialog"
-        @delete="handleDelete"
-      />
+        <div v-if="stats" class="iq-stat-grid">
+          <div class="iq-card iq-stat-card">
+            <div class="iq-stat-label">题库总量</div>
+            <div class="iq-stat-value">{{ stats.total }}</div>
+          </div>
+          <div class="iq-card iq-stat-card">
+            <div class="iq-stat-label">章节数</div>
+            <div class="iq-stat-value">{{ stats.byChapter?.length || 0 }}</div>
+          </div>
+        </div>
 
-      <Pagination
-        v-model:page="page"
-        v-model:pageSize="pageSize"
-        :total="total"
-        @change="handlePageChange"
-      />
+        <SearchBar
+          :initialFilters="filters"
+          :role="currentUser.role"
+          :selectedCount="selectedIds.length"
+          @search="handleSearch"
+          @reset="handleReset"
+          @add="openAddDialog"
+          @batch-delete="handleBatchDelete"
+          @batch-import="importVisible = true"
+          @ai-generate="aiVisible = true"
+        />
+
+        <div style="margin-top: 16px;"></div>
+        <QuestionTable
+          :list="list"
+          :loading="loading"
+          :role="currentUser.role"
+          v-model="selectedIds"
+          @view="openViewDialog"
+          @edit="openEditDialog"
+          @delete="handleDelete"
+        />
+
+        <Pagination
+          v-model:page="page"
+          v-model:pageSize="pageSize"
+          :total="total"
+          @change="handlePageChange"
+        />
+      </template>
+
+      <!-- 用户管理视图 -->
+      <template v-if="currentView === 'users' && currentUser.role === 'admin'">
+        <div class="iq-page-titlebar">
+          <h1>用户管理</h1>
+        </div>
+        <UserManagement @toast="handleToastFromChild" />
+      </template>
+
+      <!-- 答题练习视图 -->
+      <template v-if="currentView === 'practice'">
+        <div class="iq-page-titlebar">
+          <h1>{{ pageTitle }}</h1>
+        </div>
+
+        <!-- 练习子导航 -->
+        <div class="iq-practice-subnav">
+          <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
+          <button class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 随机组卷</button>
+          <button class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 答题记录</button>
+          <button class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 统计分析</button>
+          <button
+            v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
+            class="iq-subnav-btn"
+            :class="{ active: practiceView === 'admin-records' }"
+            @click="practiceView = 'admin-records'"
+          >👥 做题管理</button>
+        </div>
+
+        <!-- 试卷列表 -->
+        <ExamList
+          v-if="practiceView === 'exams'"
+          @generate="practiceView = 'generate'"
+          @start-exam="startExam"
+          @toast="handleToastFromChild"
+        />
+
+        <!-- 随机组卷 -->
+        <GenerateExam
+          v-if="practiceView === 'generate'"
+          @start-exam="startExam"
+          @toast="handleToastFromChild"
+        />
+
+        <!-- 答题页面 -->
+        <ExamPractice
+          v-if="practiceView === 'practice' && activeExamId"
+          :examId="activeExamId"
+          @exit="exitExam"
+          @view-record="viewRecord"
+          @toast="handleToastFromChild"
+        />
+
+        <!-- 答题记录列表 -->
+        <PracticeRecords
+          v-if="practiceView === 'records'"
+          @view-record="viewRecord"
+          @toast="handleToastFromChild"
+        />
+
+        <!-- 答题记录详情 -->
+        <RecordDetail
+          v-if="practiceView === 'record-detail' && activeRecordId"
+          :recordId="activeRecordId"
+          @back="practiceView = 'records'"
+          @toast="handleToastFromChild"
+        />
+
+        <!-- 统计分析 -->
+        <PracticeStats
+          v-if="practiceView === 'stats'"
+          @toast="handleToastFromChild"
+        />
+
+        <!-- 做题管理 -->
+        <AdminRecords
+          v-if="practiceView === 'admin-records' && (currentUser.role === 'admin' || currentUser.role === 'teacher')"
+          :role="currentUser.role"
+          @toast="handleToastFromChild"
+        />
+      </template>
     </main>
 
-    <!-- 用户管理视图 -->
-    <main v-if="currentView === 'users' && currentUser.role === 'admin'">
-      <UserManagement @toast="handleToastFromChild" />
-    </main>
-
-    <!-- 答题练习视图 -->
-    <main v-if="currentView === 'practice'" class="app-main">
-      <!-- 练习子导航 -->
-      <div class="practice-subnav">
-        <button class="subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-        <button class="subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 随机组卷</button>
-        <button class="subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 答题记录</button>
-        <button class="subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 统计分析</button>
-        <button v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'" class="subnav-btn" :class="{ active: practiceView === 'admin-records' }" @click="practiceView = 'admin-records'">👥 做题管理</button>
-      </div>
-
-      <!-- 试卷列表 -->
-      <ExamList
-        v-if="practiceView === 'exams'"
-        @generate="practiceView = 'generate'"
-        @start-exam="startExam"
-        @toast="handleToastFromChild"
-      />
-
-      <!-- 随机组卷 -->
-      <GenerateExam
-        v-if="practiceView === 'generate'"
-        @start-exam="startExam"
-        @toast="handleToastFromChild"
-      />
-
-      <!-- 答题页面 -->
-      <ExamPractice
-        v-if="practiceView === 'practice' && activeExamId"
-        :examId="activeExamId"
-        @exit="exitExam"
-        @view-record="viewRecord"
-        @toast="handleToastFromChild"
-      />
-
-      <!-- 答题记录列表 -->
-      <PracticeRecords
-        v-if="practiceView === 'records'"
-        :role="currentUser.role"
-        @view-record="viewRecord"
-        @toast="handleToastFromChild"
-      />
-
-      <!-- 答题记录详情（教师/管理员可查看权限范围内任意记录） -->
-      <RecordDetail
-        v-if="practiceView === 'record-detail' && activeRecordId"
-        :recordId="activeRecordId"
-        :adminMode="currentUser.role === 'admin' || currentUser.role === 'teacher'"
-        @back="practiceView = 'records'"
-        @toast="handleToastFromChild"
-      />
-
-      <!-- 统计分析 -->
-      <PracticeStats
-        v-if="practiceView === 'stats'"
-        @toast="handleToastFromChild"
-      />
-
-      <!-- 做题管理（教师/管理员） -->
-      <AdminRecords
-        v-if="practiceView === 'admin-records' && (currentUser.role === 'admin' || currentUser.role === 'teacher')"
-        :role="currentUser.role"
-        @toast="handleToastFromChild"
-      />
-    </main>
-
+    <!-- 弹窗层 -->
     <QuestionForm
       :visible="dialogVisible"
       :data="formData"
@@ -168,7 +299,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
 import {
   getQuestions,
   addQuestion,
@@ -200,18 +331,51 @@ const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
 // ===== 登录态管理 =====
 const currentUser = ref(null);
-const currentView = ref('main'); // 'main' | 'users' | 'practice'
+const currentView = ref('main');
 const pwdVisible = ref(false);
 
 // ===== 答题练习 =====
-const practiceView = ref('exams'); // 'exams' | 'generate' | 'practice' | 'records' | 'record-detail' | 'stats'
+const practiceView = ref('exams');
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
 
-const goPractice = () => {
-  currentView.value = 'practice';
-  practiceView.value = 'exams';
-};
+const canEdit = computed(() => currentUser.value?.role === 'admin' || currentUser.value?.role === 'teacher');
+
+const avatarChar = computed(() => {
+  const name = currentUser.value?.nickname || currentUser.value?.username || 'U';
+  return name.charAt(0).toUpperCase();
+});
+
+const currentBreadcrumb = computed(() => {
+  if (currentView.value === 'main') return '题库管理';
+  if (currentView.value === 'users') return '用户管理';
+  if (currentView.value === 'practice') {
+    const map = {
+      exams: '试卷列表',
+      generate: '随机组卷',
+      practice: '答题中',
+      records: '答题记录',
+      'record-detail': '记录详情',
+      stats: '统计分析',
+      'admin-records': '做题管理',
+    };
+    return '答题练习 / ' + (map[practiceView.value] || '');
+  }
+  return '';
+});
+
+const pageTitle = computed(() => {
+  const map = {
+    exams: '📋 试卷列表',
+    generate: '📝 随机组卷',
+    practice: '✍️ 答题中',
+    records: '📊 答题记录',
+    'record-detail': '📝 答题详情',
+    stats: '📈 统计分析',
+    'admin-records': '👥 做题管理',
+  };
+  return map[practiceView.value] || '';
+});
 
 const startExam = (examId) => {
   activeExamId.value = examId;
@@ -278,14 +442,13 @@ const selectedIds = ref([]);
 const importVisible = ref(false);
 const aiVisible = ref(false);
 
-// ===== 题库管理（原有逻辑，先声明变量供 watch 使用） =====
+// ===== 题库管理 =====
 const list = ref([]);
 const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const loading = ref(false);
 
-// 切换分页/翻页后清空选中
 watch(page, () => {
   selectedIds.value = [];
 });
@@ -300,8 +463,6 @@ const handleBatchDelete = async () => {
     const deleted = result?.deleted ?? selectedIds.value.length;
     showToast(`✅ 批量删除成功，共删除 ${deleted} 条`, 'success');
     selectedIds.value = [];
-
-    // 处理分页边界：如果当前页数据全部被删完且不是第 1 页，回退一页
     const remainingInPage = list.value.length - deleted;
     if (remainingInPage <= 0 && page.value > 1) {
       page.value--;
@@ -520,139 +681,23 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.app-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px;
-}
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-.app-title {
-  color: #2c3e50;
-  margin: 0;
-  font-size: 24px;
-}
-.app-stats {
-  display: flex;
-  gap: 20px;
-  color: #606266;
-  font-size: 14px;
-}
-.app-stats strong {
-  color: #409eff;
-  font-size: 18px;
-}
-.app-main {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.user-area {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: #606266;
-}
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 .role-badge {
-  padding: 2px 8px;
+  display: inline-block;
+  padding: 1px 6px;
   border-radius: 4px;
-  font-size: 12px;
-  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
 }
-.role-badge.admin { background: #f56c6c; }
-.role-badge.teacher { background: #e6a23c; }
-.role-badge.student { background: #409eff; }
-.btn-link {
-  background: none;
-  border: 1px solid #dcdfe6;
-  padding: 4px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #606266;
-  transition: all 0.2s;
+.role-badge.admin {
+  background: var(--iq-state-error-bg);
+  color: var(--iq-state-error);
 }
-.btn-link:hover {
-  border-color: #667eea;
-  color: #667eea;
+.role-badge.teacher {
+  background: var(--iq-state-info-bg);
+  color: var(--iq-state-info);
 }
-.btn-logout {
-  color: #ff4d4f;
-  border-color: #ffcdd2;
-}
-.btn-logout:hover {
-  border-color: #ff4d4f;
-  color: #ff4d4f;
-}
-
-/* 导航 */
-.app-nav {
-  display: flex;
-  gap: 8px;
-}
-.nav-btn {
-  padding: 6px 16px;
-  background: #fff;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #606266;
-  transition: all 0.2s;
-}
-.nav-btn:hover {
-  border-color: #667eea;
-  color: #667eea;
-}
-.nav-btn.active {
-  background: #667eea;
-  border-color: #667eea;
-  color: #fff;
-}
-
-/* 练习子导航 */
-.practice-subnav {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-.subnav-btn {
-  padding: 8px 16px;
-  background: #fff;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  color: #606266;
-  transition: all 0.2s;
-}
-.subnav-btn:hover {
-  border-color: #667eea;
-  color: #667eea;
-}
-.subnav-btn.active {
-  background: #667eea;
-  border-color: #667eea;
-  color: #fff;
-}
-
-@media (max-width: 768px) {
-  .app-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+.role-badge.student {
+  background: var(--iq-state-success-bg);
+  color: var(--iq-state-success);
 }
 </style>

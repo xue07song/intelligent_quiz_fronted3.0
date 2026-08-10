@@ -1,34 +1,51 @@
 <template>
-  <div class="user-mgmt">
+  <div class="iq-user-mgmt">
     <!-- 搜索栏 -->
-    <div class="toolbar">
-      <input
-        v-model="keyword"
-        class="input"
-        placeholder="搜索用户名/昵称"
-        @keyup.enter="loadUsers"
-      />
-      <select v-model="roleFilter" class="input" @change="loadUsers">
-        <option value="">全部角色</option>
-        <option value="admin">管理员</option>
-        <option value="teacher">教师</option>
-        <option value="student">学生</option>
-      </select>
-      <select v-model="statusFilter" class="input" @change="loadUsers">
-        <option value="">全部状态</option>
-        <option value="1">启用</option>
-        <option value="0">禁用</option>
-      </select>
-      <button class="btn-primary" @click="loadUsers">查询</button>
-      <button class="btn-cancel" @click="resetFilter">重置</button>
-      <button class="btn-primary btn-add" @click="openCreate">+ 新增用户</button>
+    <div class="iq-card iq-filter-card">
+      <div class="iq-filter-grid">
+        <div class="iq-filter-field">
+          <label class="iq-filter-label">搜索</label>
+          <input v-model="keyword" class="iq-input" placeholder="搜索用户名/昵称" @keyup.enter="loadUsers" />
+        </div>
+        <div class="iq-filter-field">
+          <label class="iq-filter-label">角色</label>
+          <select v-model="roleFilter" class="iq-select" @change="loadUsers">
+            <option value="">全部角色</option>
+            <option value="admin">管理员</option>
+            <option value="teacher">教师</option>
+            <option value="student">学生</option>
+          </select>
+        </div>
+        <div class="iq-filter-field">
+          <label class="iq-filter-label">状态</label>
+          <select v-model="statusFilter" class="iq-select" @change="loadUsers">
+            <option value="">全部状态</option>
+            <option value="1">启用</option>
+            <option value="0">禁用</option>
+          </select>
+        </div>
+        <div class="iq-filter-actions">
+          <button class="iq-btn iq-btn-primary" @click="loadUsers">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            查询
+          </button>
+          <button class="iq-btn iq-btn-secondary" @click="resetFilter">重置</button>
+          <button class="iq-btn iq-btn-primary" style="margin-left: auto;" @click="openCreate">+ 新增用户</button>
+        </div>
+      </div>
     </div>
 
     <!-- 用户表格 -->
-    <div class="table-container">
-      <div v-if="loading" class="loading">加载中...</div>
-      <div v-else class="table-wrapper">
-        <table class="user-table">
+    <div class="iq-card">
+      <div v-if="loading" class="iq-table-loading">
+        <span class="iq-loading-spinner"></span>
+        <span class="iq-text-sm iq-text-muted">加载中...</span>
+      </div>
+      <div v-else class="iq-table-wrap">
+        <table class="iq-table">
           <thead>
             <tr>
               <th>ID</th>
@@ -37,97 +54,125 @@
               <th>角色</th>
               <th>状态</th>
               <th>创建时间</th>
-              <th>操作</th>
+              <th style="width: 240px;">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="user in list" :key="user.id">
-              <td>{{ user.id }}</td>
-              <td>{{ user.username }}</td>
-              <td>{{ user.nickname || '-' }}</td>
+              <td><span class="iq-id-chip">{{ user.id }}</span></td>
+              <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ user.username }}</td>
+              <td>{{ user.nickname || '--' }}</td>
               <td>
-                <span class="role-tag" :class="user.role">{{ roleMap[user.role] }}</span>
+                <span class="iq-tag u-role" :class="user.role">{{ roleMap[user.role] }}</span>
               </td>
               <td>
-                <span class="status-tag" :class="user.status === 1 ? 'active' : 'disabled'">
+                <span class="iq-tag" :class="user.status === 1 ? 'iq-tag-success' : 'iq-tag-neutral'">
+                  <span class="status-dot" :class="{ active: user.status === 1 }"></span>
                   {{ user.status === 1 ? '启用' : '禁用' }}
                 </span>
               </td>
-              <td>{{ user.created_at }}</td>
-              <td class="col-actions">
-                <button class="btn-edit" @click="openEdit(user)">编辑</button>
-                <button class="btn-view" @click="handleResetPwd(user)">重置密码</button>
-                <button
-                  v-if="user.status === 1"
-                  class="btn-warn"
-                  @click="handleToggleStatus(user, 0)"
-                >禁用</button>
-                <button
-                  v-else
-                  class="btn-success"
-                  @click="handleToggleStatus(user, 1)"
-                >启用</button>
-                <button
-                  class="btn-delete"
-                  :disabled="user.username === 'admin'"
-                  @click="handleDelete(user)"
-                >删除</button>
+              <td class="iq-text-sm iq-text-muted">{{ user.created_at }}</td>
+              <td>
+                <div class="iq-table-action">
+                  <button class="iq-btn iq-btn-ghost iq-btn-sm act-edit" @click="openEdit(user)">编辑</button>
+                  <button class="iq-btn iq-btn-ghost iq-btn-sm act-pwd" @click="handleResetPwd(user)">重置密码</button>
+                  <button v-if="user.status === 1" class="iq-btn iq-btn-ghost iq-btn-sm act-warn" @click="handleToggleStatus(user, 0)">禁用</button>
+                  <button v-else class="iq-btn iq-btn-ghost iq-btn-sm act-enable" @click="handleToggleStatus(user, 1)">启用</button>
+                  <button class="iq-btn iq-btn-ghost iq-btn-sm act-del" :disabled="user.username === 'admin'" @click="handleDelete(user)">删除</button>
+                </div>
               </td>
             </tr>
             <tr v-if="list.length === 0">
-              <td colspan="7" class="empty">暂无数据</td>
+              <td colspan="7" class="iq-empty-row">
+                <div class="iq-empty-box">
+                  <div class="iq-empty-icon">📭</div>
+                  <div class="iq-empty-text iq-text-sm iq-text-muted">暂无数据</div>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-    </div>
 
-    <!-- 分页 -->
-    <div class="pagination" v-if="total > 0">
-      <button :disabled="page === 1" @click="changePage(page - 1)">上一页</button>
-      <span>第 {{ page }} / {{ totalPages }} 页（共 {{ total }} 条）</span>
-      <button :disabled="page === totalPages" @click="changePage(page + 1)">下一页</button>
+      <!-- 分页 -->
+      <div class="iq-pagination" v-if="total > 0">
+        <span class="iq-page-info">共 {{ total }} 条</span>
+        <button class="iq-page-btn" :disabled="page === 1" @click="changePage(page - 1)">‹ 上一页</button>
+        <span class="iq-page-info" style="margin: 0;">第 {{ page }} / {{ totalPages }} 页</span>
+        <button class="iq-page-btn" :disabled="page === totalPages" @click="changePage(page + 1)">下一页 ›</button>
+      </div>
     </div>
 
     <!-- 新增/编辑弹窗 -->
-    <div v-if="dialogVisible" class="modal-overlay" @click.self="dialogVisible = false">
-      <div class="modal-card">
-        <h2 class="modal-title">{{ isEdit ? '编辑用户' : '新增用户' }}</h2>
-        <form @submit.prevent="handleSubmit">
-          <div class="form-group">
-            <label>用户名 *</label>
-            <input v-model="form.username" class="form-input" :disabled="isEdit" placeholder="登录用户名" />
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="dialogVisible" class="iq-modal-overlay" @click.self="dialogVisible = false">
+          <div class="iq-modal iq-modal-md">
+            <div class="iq-modal-header">
+              <div class="iq-modal-title-wrap">
+                <div class="iq-modal-icon" :style="{ background: isEdit ? 'var(--iq-state-warning-bg)' : 'var(--iq-primary-50)', color: isEdit ? 'var(--iq-state-warning)' : 'var(--iq-primary-600)' }">
+                  <svg v-if="!isEdit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                    <line x1="12" y1="11" x2="12" y2="17"></line>
+                    <line x1="9" y1="14" x2="15" y2="14"></line>
+                  </svg>
+                  <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="iq-modal-title">{{ isEdit ? '编辑用户' : '新增用户' }}</h3>
+                  <p class="iq-modal-subtitle">{{ isEdit ? '修改用户信息' : '填写用户账号信息' }}</p>
+                </div>
+              </div>
+              <button class="iq-modal-close" @click="dialogVisible = false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <form class="iq-modal-body" @submit.prevent="handleSubmit">
+              <div class="iq-form-field">
+                <label class="iq-form-label">用户名 <span class="iq-req">*</span></label>
+                <input v-model="form.username" class="iq-input" :disabled="isEdit" placeholder="登录用户名" />
+              </div>
+              <div class="iq-form-field" v-if="!isEdit">
+                <label class="iq-form-label">密码 <span class="iq-req">*</span></label>
+                <input v-model="form.password" type="password" class="iq-input" placeholder="至少6位" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">昵称</label>
+                <input v-model="form.nickname" class="iq-input" placeholder="显示昵称" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">角色 <span class="iq-req">*</span></label>
+                <select v-model="form.role" class="iq-select">
+                  <option value="admin">管理员</option>
+                  <option value="teacher">教师</option>
+                  <option value="student">学生</option>
+                </select>
+              </div>
+              <div class="iq-form-field" v-if="!isEdit">
+                <label class="iq-form-label">状态</label>
+                <select v-model="form.status" class="iq-select">
+                  <option :value="1">启用</option>
+                  <option :value="0">禁用</option>
+                </select>
+              </div>
+
+              <div class="iq-modal-footer">
+                <button type="button" class="iq-btn iq-btn-secondary" @click="dialogVisible = false">取消</button>
+                <button type="submit" class="iq-btn iq-btn-primary">确定</button>
+              </div>
+            </form>
           </div>
-          <div class="form-group" v-if="!isEdit">
-            <label>密码 *</label>
-            <input v-model="form.password" type="password" class="form-input" placeholder="至少6位" />
-          </div>
-          <div class="form-group">
-            <label>昵称</label>
-            <input v-model="form.nickname" class="form-input" placeholder="显示昵称" />
-          </div>
-          <div class="form-group">
-            <label>角色 *</label>
-            <select v-model="form.role" class="form-input">
-              <option value="admin">管理员</option>
-              <option value="teacher">教师</option>
-              <option value="student">学生</option>
-            </select>
-          </div>
-          <div class="form-group" v-if="!isEdit">
-            <label>状态</label>
-            <select v-model="form.status" class="form-input">
-              <option :value="1">启用</option>
-              <option :value="0">禁用</option>
-            </select>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="btn-cancel" @click="dialogVisible = false">取消</button>
-            <button type="submit" class="btn-primary">确定</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -285,225 +330,198 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.user-mgmt {
+.iq-user-mgmt {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.toolbar {
+.iq-filter-card {
+  padding: 18px 20px;
+}
+.iq-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px 16px;
+  align-items: end;
+}
+.iq-filter-field {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 6px;
+}
+.iq-filter-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--iq-neutral-600);
+}
+.iq-filter-actions {
+  grid-column: span 3;
+  display: flex;
+  gap: 8px;
   align-items: center;
 }
-.input {
-  padding: 8px 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  font-size: 14px;
-}
-.btn-add {
-  margin-left: auto;
-}
-.table-container {
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+
+.iq-table-wrap {
   overflow-x: auto;
 }
-.loading {
-  text-align: center;
+.iq-table-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 0;
+}
+.iq-loading-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--iq-neutral-200);
+  border-top-color: var(--iq-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.iq-id-chip {
+  display: inline-block;
+  font-family: var(--iq-font-mono);
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--iq-neutral-100);
+  color: var(--iq-neutral-700);
+  border-radius: 4px;
+  font-weight: 500;
+}
+.u-role.iq-tag.admin { background: var(--iq-state-error-bg); color: #b91c1c; }
+.u-role.iq-tag.teacher { background: var(--iq-state-info-bg); color: #1d4ed8; }
+.u-role.iq-tag.student { background: var(--iq-state-success-bg); color: #047857; }
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--iq-neutral-400);
+}
+.status-dot.active {
+  background: var(--iq-state-success);
+}
+
+.act-edit { color: var(--iq-state-warning) !important; }
+.act-edit:hover:not(:disabled) { background: var(--iq-state-warning-bg) !important; color: #b45309 !important; }
+.act-pwd { color: var(--iq-state-info) !important; }
+.act-pwd:hover:not(:disabled) { background: var(--iq-state-info-bg) !important; color: #1d4ed8 !important; }
+.act-warn { color: #ea580c !important; }
+.act-warn:hover:not(:disabled) { background: #fff7ed !important; color: #c2410c !important; }
+.act-enable { color: var(--iq-state-success) !important; }
+.act-enable:hover:not(:disabled) { background: var(--iq-state-success-bg) !important; color: #047857 !important; }
+.act-del { color: var(--iq-state-error) !important; }
+.act-del:hover:not(:disabled) { background: var(--iq-state-error-bg) !important; color: #b91c1c !important; }
+
+.iq-empty-row { padding: 0 !important; }
+.iq-empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   padding: 60px 0;
-  color: #909399;
 }
-.table-wrapper {
-  padding: 10px;
+.iq-empty-icon { font-size: 40px; opacity: 0.5; }
+
+/* 弹窗通用样式 */
+.iq-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--iq-border);
 }
-.user-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-  min-width: 800px;
-}
-.user-table th {
-  padding: 12px 8px;
-  text-align: left;
-  white-space: nowrap;
-  background: #f5f7fa;
-  border-bottom: 2px solid #e4e7ed;
-  font-weight: 600;
-  color: #303133;
-}
-.user-table td {
-  padding: 10px 8px;
-  border-bottom: 1px solid #ebeef5;
-  color: #606266;
-}
-.col-actions {
-  white-space: nowrap;
-}
-.empty {
-  text-align: center;
-  padding: 40px 0;
-  color: #909399;
-}
-.role-tag {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-.role-tag.admin { background: #f56c6c; color: #fff; }
-.role-tag.teacher { background: #e6a23c; color: #fff; }
-.role-tag.student { background: #409eff; color: #fff; }
-.status-tag {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-.status-tag.active { background: #f0f9eb; color: #67c23a; }
-.status-tag.disabled { background: #fef0f0; color: #f56c6c; }
-.pagination {
+.iq-modal-title-wrap {
   display: flex;
   align-items: center;
   gap: 12px;
-  justify-content: center;
-  font-size: 14px;
-  color: #606266;
 }
-.pagination button {
-  padding: 6px 14px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  background: #fff;
-  cursor: pointer;
-}
-.pagination button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.btn-primary {
-  padding: 8px 16px;
-  background: #667eea;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn-primary:disabled {
-  opacity: 0.5;
-}
-.btn-cancel {
-  padding: 8px 16px;
-  background: #fff;
-  color: #606266;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn-edit {
-  background: #fff7e6;
-  color: #fa8c16;
-  border: 1px solid #ffd591;
-  padding: 4px 10px;
-  border-radius: 4px;
-  margin-right: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-view {
-  background: #e6f7ff;
-  color: #1890ff;
-  border: 1px solid #91d5ff;
-  padding: 4px 10px;
-  border-radius: 4px;
-  margin-right: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-warn {
-  background: #fff7e6;
-  color: #fa8c16;
-  border: 1px solid #ffd591;
-  padding: 4px 10px;
-  border-radius: 4px;
-  margin-right: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-success {
-  background: #f0f9eb;
-  color: #67c23a;
-  border: 1px solid #c2e7b0;
-  padding: 4px 10px;
-  border-radius: 4px;
-  margin-right: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-delete {
-  background: #fff1f0;
-  color: #ff4d4f;
-  border: 1px solid #ffa39e;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.btn-delete:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-/* 弹窗 */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  justify-content: center;
+.iq-modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--iq-radius-medium);
+  display: inline-flex;
   align-items: center;
-  z-index: 1000;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.modal-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 30px;
-  width: 420px;
-  max-height: 90vh;
-  overflow-y: auto;
+.iq-modal-icon svg { width: 20px; height: 20px; }
+.iq-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--iq-neutral-900);
+  margin: 0;
 }
-.modal-title {
-  margin: 0 0 20px;
-  font-size: 18px;
-  color: #303133;
+.iq-modal-subtitle {
+  font-size: 12px;
+  color: var(--iq-muted-foreground);
+  margin: 2px 0 0;
 }
-.form-group {
+.iq-modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--iq-neutral-400);
+  cursor: pointer;
+  border-radius: var(--iq-radius-medium);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.iq-modal-close:hover {
+  background: var(--iq-neutral-100);
+  color: var(--iq-neutral-700);
+}
+.iq-modal-close svg { width: 18px; height: 18px; }
+
+.iq-modal-body {
+  padding: 24px;
+}
+.iq-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-bottom: 16px;
 }
-.form-group label {
-  display: block;
-  font-size: 14px;
-  color: #606266;
-  margin-bottom: 6px;
+.iq-form-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--iq-neutral-700);
 }
-.form-input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  font-size: 14px;
-  box-sizing: border-box;
+.iq-req {
+  color: var(--iq-state-error);
+  margin-left: 2px;
 }
-.form-input:disabled {
-  background: #f5f7fa;
-  color: #c0c4cc;
-}
-.modal-actions {
+.iq-modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 20px;
+  padding-top: 8px;
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-active .iq-modal,
+.modal-fade-leave-active .iq-modal {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+.modal-fade-enter-from .iq-modal,
+.modal-fade-leave-to .iq-modal {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
 }
 </style>

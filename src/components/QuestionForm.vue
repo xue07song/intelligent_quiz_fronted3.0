@@ -1,81 +1,106 @@
 <template>
-<!-- 这是一个标准的UI组件，作用是新增题目，和编辑 -->
-  <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-content">
-      <h2 class="modal-title">{{ isEdit ? '✏️ 编辑题目' : '📝 新增题目' }}</h2>
-      <form @submit.prevent="handleSubmit">
-        <div class="form-row">
-          <div class="form-group">
-            <label>ID <span class="required">*</span></label>
-            <input v-model="form.id" class="input" placeholder="如 Q001" :disabled="isEdit" />
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div v-if="visible" class="iq-modal-overlay" @click.self="$emit('close')">
+        <div class="iq-modal iq-modal-xl">
+          <div class="iq-modal-header">
+            <div class="iq-modal-title-wrap">
+              <div class="iq-modal-icon" :style="{ background: isEdit ? 'var(--iq-state-warning-bg)' : 'var(--iq-primary-50)', color: isEdit ? 'var(--iq-state-warning)' : 'var(--iq-primary-600)' }">
+                <svg v-if="!isEdit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 5v14M5 12h14"></path>
+                </svg>
+                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="iq-modal-title">{{ isEdit ? '编辑题目' : '新增题目' }}</h3>
+                <p class="iq-modal-subtitle">{{ isEdit ? '修改题目信息后点击确认保存' : '填写题目信息后点击确认创建' }}</p>
+              </div>
+            </div>
+            <button class="iq-modal-close" @click="$emit('close')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
           </div>
-          <div class="form-group">
-            <label>章节</label>
-            <input v-model.number="form.章节" type="number" class="input" placeholder="章节编号" />
-          </div>
+
+          <form class="iq-modal-body" @submit.prevent="handleSubmit">
+            <div class="iq-form-grid">
+              <div class="iq-form-field">
+                <label class="iq-form-label">ID <span class="iq-req">*</span></label>
+                <input v-model="form.id" class="iq-input" placeholder="如 Q001" :disabled="isEdit" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">章节</label>
+                <input v-model.number="form.章节" type="number" class="iq-input" placeholder="章节编号" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">题型 <span class="iq-req">*</span></label>
+                <select v-model="form.题型" class="iq-select">
+                  <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">序号</label>
+                <input v-model.number="form.序号" type="number" class="iq-input" placeholder="章节内排序" />
+              </div>
+            </div>
+
+            <div class="iq-form-field">
+              <label class="iq-form-label">题目内容 <span class="iq-req">*</span></label>
+              <textarea v-model="form.题目" rows="4" class="iq-textarea" placeholder="请输入题目内容"></textarea>
+            </div>
+
+            <div class="iq-form-field">
+              <label class="iq-form-label">选项</label>
+              <textarea v-model="form.选项" rows="3" class="iq-textarea" placeholder="例如：A.北京 B.上海 C.广州 D.深圳"></textarea>
+            </div>
+
+            <div class="iq-form-grid">
+              <div class="iq-form-field">
+                <label class="iq-form-label">答案</label>
+                <input v-model="form.答案" class="iq-input" placeholder="如 A" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">解析</label>
+                <input v-model="form.解析" class="iq-input" placeholder="答案解析" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">难度</label>
+                <select v-model="form.难度" class="iq-select">
+                  <option value="">请选择难度</option>
+                  <option v-for="opt in difficultyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">知识点</label>
+                <input v-model="form.知识点" class="iq-input" placeholder="关联知识点" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">使用频率</label>
+                <input v-model="form.使用频率" class="iq-input" placeholder="如 0" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">出题人</label>
+                <input v-model="form.出题人" class="iq-input" placeholder="出题人姓名" />
+              </div>
+            </div>
+
+            <div class="iq-modal-footer">
+              <button type="button" class="iq-btn iq-btn-secondary" @click="$emit('close')">取消</button>
+              <button type="submit" class="iq-btn iq-btn-primary" :disabled="submitting.value">
+                <span v-if="submitting.value" class="iq-btn-spinner"></span>
+                {{ submitting.value ? '提交中...' : (isEdit ? '确认修改' : '确认新增') }}
+              </button>
+            </div>
+          </form>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>题型 <span class="required">*</span></label>
-            <select v-model="form.题型" class="input">
-              <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>序号</label>
-            <input v-model.number="form.序号" type="number" class="input" placeholder="章节内排序" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label>题目内容 <span class="required">*</span></label>
-          <textarea v-model="form.题目" rows="3" class="input" placeholder="请输入题目内容"></textarea>
-        </div>
-        <div class="form-group">
-          <label>选项</label>
-          <textarea v-model="form.选项" rows="3" class="input" placeholder="例如：A.北京 B.上海 C.广州 D.深圳"></textarea>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>答案</label>
-            <input v-model="form.答案" class="input" placeholder="如 A" />
-          </div>
-          <div class="form-group">
-            <label>解析</label>
-            <input v-model="form.解析" class="input" placeholder="答案解析" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>难度</label>
-            <select v-model="form.难度" class="input">
-              <option value="">请选择难度</option>
-              <option v-for="opt in difficultyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>知识点</label>
-            <input v-model="form.知识点" class="input" placeholder="关联知识点" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>使用频率</label>
-            <input v-model="form.使用频率" class="input" placeholder="如 0" />
-          </div>
-          <div class="form-group">
-            <label>出题人</label>
-            <input v-model="form.出题人" class="input" placeholder="出题人姓名" />
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn-cancel" @click="$emit('close')">取消</button>
-          <button type="submit" class="btn-primary" :disabled="submitting.value">
-            {{ submitting.value ? '提交中...' : (isEdit ? '确认修改' : '确认新增') }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup>
@@ -144,100 +169,122 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.45);
+.iq-modal-header {
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 1000;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--iq-border);
 }
-.modal-content {
-  background: white;
-  padding: 30px 35px;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  width: 100%;
-  max-width: 700px;
-  max-height: 90vh;
-  overflow-y: auto;
+.iq-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
-.modal-title {
-  margin: 0 0 20px;
-  color: #2c3e50;
+.iq-modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--iq-radius-medium);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.required {
-  color: #ff4d4f;
+.iq-modal-icon svg { width: 20px; height: 20px; }
+.iq-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--iq-neutral-900);
+  margin: 0;
 }
-.form-row {
+.iq-modal-subtitle {
+  font-size: 12px;
+  color: var(--iq-muted-foreground);
+  margin: 2px 0 0;
+}
+.iq-modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--iq-neutral-400);
+  cursor: pointer;
+  border-radius: var(--iq-radius-medium);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.iq-modal-close:hover {
+  background: var(--iq-neutral-100);
+  color: var(--iq-neutral-700);
+}
+.iq-modal-close svg { width: 18px; height: 18px; }
+
+.iq-modal-body {
+  padding: 24px;
+}
+
+.iq-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
-.form-group {
+.iq-form-field {
   display: flex;
   flex-direction: column;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 16px;
 }
-.form-group label {
-  font-weight: 500;
-  margin-bottom: 4px;
+.iq-form-grid .iq-form-field {
+  margin-bottom: 0;
+}
+.iq-form-label {
   font-size: 13px;
-  color: #606266;
+  font-weight: 500;
+  color: var(--iq-neutral-700);
 }
-.input {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  font-size: 14px;
-  box-sizing: border-box;
-  background: white;
-  font-family: inherit;
+.iq-req {
+  color: var(--iq-state-error);
+  margin-left: 2px;
 }
-.input:focus {
-  outline: none;
-  border-color: #409eff;
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
-}
-select.input {
-  appearance: auto;
-  height: 38px;
-}
-textarea.input {
-  resize: vertical;
-}
-.form-actions {
+
+.iq-modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 20px;
+  padding-top: 8px;
 }
-.btn-primary {
-  background: #409eff;
-  color: white;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
+.iq-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin-right: 6px;
+  flex-shrink: 0;
 }
-.btn-primary:hover { background: #66b1ff; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-cancel {
-  background: #f5f5f5;
-  color: #333;
-  border: 1px solid #d9d9d9;
-  padding: 8px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
-.btn-cancel:hover { background: #e8e8e8; }
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-active .iq-modal,
+.modal-fade-leave-active .iq-modal {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+.modal-fade-enter-from .iq-modal,
+.modal-fade-leave-to .iq-modal {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+}
 </style>

@@ -1,95 +1,151 @@
 <template>
-  <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-card">
-      <h2 class="modal-title">🤖 AI 自动出题</h2>
+  <Teleport to="body">
+    <Transition name="modal-fade">
+      <div v-if="visible" class="iq-modal-overlay" @click.self="$emit('close')">
+        <div class="iq-modal iq-modal-lg">
+          <div class="iq-modal-header">
+            <div class="iq-modal-title-wrap">
+              <div class="iq-modal-icon ai-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0-3 3v2H3v4h1v2a3 3 0 0 0 3 3h2v1a3 3 0 0 0 6 0v-1h2a3 3 0 0 0 3-3v-2h1V9h-1V7a3 3 0 0 0-3-3h-2V5a3 3 0 0 0-3-3z"></path>
+                  <path d="M9 12h.01"></path>
+                  <path d="M15 12h.01"></path>
+                  <path d="M10 16s1.5 2 2 2 2-2 2-2"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="iq-modal-title">AI 自动出题</h3>
+                <p class="iq-modal-subtitle">智能生成高质量题目草稿，一键入库</p>
+              </div>
+            </div>
+            <button class="iq-modal-close" @click="$emit('close')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
 
-      <!-- 配置表单 -->
-      <div v-if="!drafts.length" class="form-section">
-        <div class="form-row">
-          <div class="form-group">
-            <label>章节</label>
-            <input v-model="form.章节" type="number" class="input" placeholder="不限留空" />
-          </div>
-          <div class="form-group">
-            <label>题型</label>
-            <select v-model="form.题型" class="input">
-              <option value="">不限</option>
-              <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>难度</label>
-            <select v-model="form.难度" class="input">
-              <option value="">不限</option>
-              <option v-for="opt in difficultyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>数量 *</label>
-            <input v-model.number="form.数量" type="number" min="1" max="10" class="input" placeholder="1-10" />
-          </div>
-        </div>
-        <div class="form-group">
-          <label>知识点</label>
-          <input v-model="form.知识点" class="input" placeholder="如：循环结构、进程调度" />
-        </div>
-        <div class="form-group">
-          <label>补充说明</label>
-          <textarea v-model="form.补充说明" class="textarea" rows="2" placeholder="可选：对题目的额外要求"></textarea>
-        </div>
+          <!-- 配置表单 -->
+          <div v-if="!drafts.length" class="iq-modal-body">
+            <div class="iq-form-grid ai-grid">
+              <div class="iq-form-field">
+                <label class="iq-form-label">章节</label>
+                <input v-model="form.章节" type="number" class="iq-input" placeholder="不限留空" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">题型</label>
+                <select v-model="form.题型" class="iq-select">
+                  <option value="">不限</option>
+                  <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">难度</label>
+                <select v-model="form.难度" class="iq-select">
+                  <option value="">不限</option>
+                  <option v-for="opt in difficultyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">数量 <span class="iq-req">*</span></label>
+                <input v-model.number="form.数量" type="number" min="1" max="10" class="iq-input" placeholder="1-10" />
+              </div>
+            </div>
+            <div class="iq-form-field">
+              <label class="iq-form-label">知识点</label>
+              <input v-model="form.知识点" class="iq-input" placeholder="如：循环结构、进程调度" />
+            </div>
+            <div class="iq-form-field">
+              <label class="iq-form-label">补充说明</label>
+              <textarea v-model="form.补充说明" class="iq-textarea" rows="2" placeholder="可选：对题目的额外要求"></textarea>
+            </div>
 
-        <div v-if="errorMsg" class="error-msg">❌ {{ errorMsg }}</div>
+            <div v-if="errorMsg" class="iq-alert-error">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              {{ errorMsg }}
+            </div>
 
-        <div class="modal-actions">
-          <button class="btn-cancel" @click="$emit('close')">取消</button>
-          <button class="btn-primary" :disabled="loading" @click="handleGenerate">
-            {{ loading ? 'AI 生成中...' : '🤖 生成题目草稿' }}
-          </button>
+            <div class="iq-modal-footer">
+              <button type="button" class="iq-btn iq-btn-secondary" @click="$emit('close')">取消</button>
+              <button class="iq-btn ai-gen-btn" :disabled="loading" @click="handleGenerate">
+                <span v-if="loading" class="iq-btn-spinner"></span>
+                {{ loading ? 'AI 生成中...' : '🤖 生成题目草稿' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 草稿审核列表 -->
+          <div v-else class="iq-modal-body">
+            <div class="ai-draft-header">
+              <div class="ai-draft-info">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--iq-primary);">
+                  <path d="M9 11l3 3L22 4"></path>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                共生成 <strong>{{ drafts.length }}</strong> 道草稿，勾选后入库（重复 ID 将自动跳过）
+              </div>
+              <div class="ai-draft-ops">
+                <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="selectAll">全选</button>
+                <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="drafts.forEach((d) => (d._checked = false))">清空</button>
+              </div>
+            </div>
+
+            <div class="ai-draft-list">
+              <div v-for="(d, idx) in drafts" :key="idx" class="ai-draft-card" :class="{ checked: d._checked }">
+                <div class="ai-draft-head">
+                  <label class="ai-check-label">
+                    <input type="checkbox" class="iq-checkbox" v-model="d._checked" />
+                    <span class="iq-id-chip">{{ d.id }}</span>
+                    <span class="iq-type-tag" :class="`type-${d.题型}`">{{ getTypeName(d.题型) }}</span>
+                  </label>
+                  <button class="ai-draft-remove" @click="drafts.splice(idx, 1)" title="移除">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+                <div class="ai-draft-title">{{ d.题目 }}</div>
+                <div v-if="d.选项" class="ai-draft-options">{{ d.选项 }}</div>
+                <div class="ai-draft-footer">
+                  <div class="ai-draft-answer">
+                    <span class="ans-label">答案</span>
+                    <span class="ans-value">{{ d.答案 }}</span>
+                  </div>
+                  <div v-if="d.解析" class="ai-draft-analysis">
+                    <span class="ans-label">解析</span>
+                    <span>{{ d.解析 }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="errorMsg" class="iq-alert-error">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              {{ errorMsg }}
+            </div>
+
+            <div class="iq-modal-footer">
+              <button class="iq-btn iq-btn-secondary" @click="resetDrafts">重新生成</button>
+              <button class="iq-btn iq-btn-primary" :disabled="saving || selectedCount === 0" @click="handleSave">
+                <span v-if="saving" class="iq-btn-spinner"></span>
+                {{ saving ? '入库中...' : `📥 入库选中（${selectedCount}）` }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
-
-      <!-- 草稿审核列表 -->
-      <div v-else class="draft-section">
-        <div class="draft-header">
-          <span class="draft-info">
-            共生成 {{ drafts.length }} 道草稿，勾选后入库（重复 ID 将自动跳过）
-          </span>
-          <div class="draft-ops">
-            <button class="btn-link" @click="selectAll">全选</button>
-            <button class="btn-link" @click="drafts.forEach((d) => (d._checked = false))">清空</button>
-          </div>
-        </div>
-
-        <div class="draft-list">
-          <div v-for="(d, idx) in drafts" :key="idx" class="draft-card" :class="{ checked: d._checked }">
-            <div class="draft-card-head">
-              <label class="check-label">
-                <input type="checkbox" v-model="d._checked" />
-                <span class="draft-id">{{ d.id }}</span>
-                <span class="draft-type">{{ getTypeName(d.题型) }}</span>
-              </label>
-              <button class="btn-remove" @click="drafts.splice(idx, 1)" title="移除">✕</button>
-            </div>
-            <div class="draft-title">{{ d.题目 }}</div>
-            <div v-if="d.选项" class="draft-options">{{ d.选项 }}</div>
-            <div class="draft-answer">
-              <span class="ans-label">答案：</span><span class="ans-value">{{ d.答案 }}</span>
-            </div>
-            <div v-if="d.解析" class="draft-analysis">解析：{{ d.解析 }}</div>
-          </div>
-        </div>
-
-        <div v-if="errorMsg" class="error-msg">❌ {{ errorMsg }}</div>
-
-        <div class="modal-actions">
-          <button class="btn-cancel" @click="resetDrafts">重新生成</button>
-          <button class="btn-primary" :disabled="saving || selectedCount === 0" @click="handleSave">
-            {{ saving ? '入库中...' : `📥 入库选中（${selectedCount}）` }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup>
@@ -165,7 +221,6 @@ const handleSave = async () => {
   saving.value = true;
   errorMsg.value = '';
   try {
-    // 去掉内部字段 _checked
     const questions = selected.map(({ _checked, ...rest }) => rest);
     const result = await saveGenerated(questions);
     emit('success', result);
@@ -176,7 +231,6 @@ const handleSave = async () => {
   }
 };
 
-// 弹窗关闭时重置
 watch(() => props.visible, (val) => {
   if (!val) {
     setTimeout(() => {
@@ -193,195 +247,310 @@ watch(() => props.visible, (val) => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+.iq-modal-header {
   display: flex;
-  justify-content: center;
   align-items: center;
-  z-index: 1000;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--iq-border);
 }
-.modal-card {
-  background: #fff;
-  border-radius: 8px;
-  padding: 28px;
-  width: 720px;
-  max-width: 92vw;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-.modal-title {
-  margin: 0 0 20px;
-  font-size: 18px;
-  color: #303133;
-}
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+.iq-modal-title-wrap {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
-.form-group {
-  margin-bottom: 14px;
-}
-.form-group label {
-  display: block;
-  font-size: 13px;
-  color: #606266;
-  margin-bottom: 6px;
-}
-.input, .textarea {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  font-size: 14px;
-  box-sizing: border-box;
-  font-family: inherit;
-}
-.textarea {
-  resize: vertical;
-}
-.error-msg {
-  background: #fff1f0;
-  color: #ff4d4f;
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 13px;
-  margin-bottom: 14px;
-}
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 8px;
-}
-.btn-primary {
-  padding: 8px 16px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn-primary:hover:not(:disabled) { opacity: 0.9; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-cancel {
-  padding: 8px 16px;
-  background: #fff;
-  color: #606266;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.draft-header {
-  display: flex;
-  justify-content: space-between;
+.iq-modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--iq-radius-medium);
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #ebeef5;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.draft-info {
-  font-size: 13px;
-  color: #606266;
+.iq-modal-icon svg { width: 20px; height: 20px; }
+.ai-icon {
+  background: linear-gradient(135deg, var(--iq-primary-500), #8b5cf6);
+  color: #fff;
+  box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.4);
 }
-.draft-ops {
-  display: flex;
-  gap: 10px;
+.iq-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--iq-neutral-900);
+  margin: 0;
 }
-.btn-link {
-  background: none;
+.iq-modal-subtitle {
+  font-size: 12px;
+  color: var(--iq-muted-foreground);
+  margin: 2px 0 0;
+}
+.iq-modal-close {
+  width: 32px;
+  height: 32px;
   border: none;
-  color: #667eea;
+  background: transparent;
+  color: var(--iq-neutral-400);
   cursor: pointer;
-  font-size: 13px;
-  padding: 0;
+  border-radius: var(--iq-radius-medium);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
 }
-.btn-link:hover { text-decoration: underline; }
-.draft-list {
+.iq-modal-close:hover {
+  background: var(--iq-neutral-100);
+  color: var(--iq-neutral-700);
+}
+.iq-modal-close svg { width: 18px; height: 18px; }
+
+.iq-modal-body {
+  padding: 24px;
+}
+
+.ai-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.iq-form-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.iq-form-field {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 16px;
 }
-.draft-card {
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  padding: 12px 14px;
-  transition: border-color 0.2s;
+.iq-form-grid .iq-form-field { margin-bottom: 0; }
+.iq-form-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--iq-neutral-700);
 }
-.draft-card.checked {
-  border-color: #667eea;
-  background: #fafbff;
+.iq-req {
+  color: var(--iq-state-error);
+  margin-left: 2px;
 }
-.draft-card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
+
+.ai-gen-btn {
+  background: linear-gradient(135deg, var(--iq-primary-500), #8b5cf6);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 14px -4px rgba(99, 102, 241, 0.5);
 }
-.check-label {
+.ai-gen-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--iq-primary-600), #7c3aed);
+  border-color: transparent;
+  opacity: 0.95;
+}
+
+.iq-alert-error {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
+  background: var(--iq-state-error-bg);
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 10px 14px;
+  border-radius: var(--iq-radius-medium);
+  font-size: 13px;
+  margin-bottom: 16px;
 }
-.draft-id {
-  font-weight: 600;
-  color: #303133;
-  font-size: 14px;
+
+.iq-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
 }
-.draft-type {
-  font-size: 11px;
-  color: #667eea;
-  background: #f0f5ff;
-  padding: 1px 8px;
-  border-radius: 10px;
-}
-.btn-remove {
-  background: #fff;
-  border: 1px solid #dcdfe6;
+.iq-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  color: #909399;
-  cursor: pointer;
+  animation: spin 0.7s linear infinite;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 草稿审核区 */
+.ai-draft-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--iq-primary-50);
+  border: 1px solid var(--iq-primary-100);
+  border-radius: var(--iq-radius-medium);
+  margin-bottom: 16px;
+}
+.ai-draft-info {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 11px;
-}
-.btn-remove:hover {
-  border-color: #ff4d4f;
-  color: #ff4d4f;
-}
-.draft-title {
-  font-size: 14px;
-  color: #303133;
-  line-height: 1.6;
-  margin-bottom: 6px;
-}
-.draft-options {
+  gap: 8px;
   font-size: 13px;
-  color: #606266;
-  white-space: pre-wrap;
-  background: #f9fafc;
+  color: var(--iq-neutral-700);
+}
+.ai-draft-info strong {
+  color: var(--iq-primary-700);
+}
+.ai-draft-ops {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-draft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.ai-draft-card {
+  border: 1px solid var(--iq-border);
+  border-radius: var(--iq-radius-medium);
+  padding: 14px 16px;
+  transition: all 0.2s;
+  background: var(--iq-neutral-0);
+}
+.ai-draft-card.checked {
+  border-color: var(--iq-primary);
+  background: var(--iq-primary-50);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08);
+}
+.ai-draft-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.ai-check-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.iq-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--iq-primary);
+  cursor: pointer;
+}
+.iq-id-chip {
+  display: inline-block;
+  font-family: var(--iq-font-mono);
+  font-size: 12px;
+  padding: 2px 8px;
+  background: var(--iq-neutral-100);
+  color: var(--iq-neutral-700);
   border-radius: 4px;
-  padding: 6px 10px;
-  margin-bottom: 6px;
+  font-weight: 500;
 }
-.draft-answer {
-  font-size: 13px;
-  margin-bottom: 4px;
+.iq-type-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--iq-radius-full);
+  font-size: 12px;
+  font-weight: 500;
 }
-.ans-label { color: #909399; }
-.ans-value { color: #52c41a; font-weight: 600; }
-.draft-analysis {
+.type-1 { background: #ede9fe; color: #6d28d9; }
+.type-2 { background: #dbeafe; color: #1d4ed8; }
+.type-3 { background: #fce7f3; color: #be185d; }
+.type-4 { background: #d1fae5; color: #047857; }
+.type-5 { background: #fef3c7; color: #b45309; }
+.type-6 { background: #ffedd5; color: #c2410c; }
+
+.ai-draft-remove {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--iq-border);
+  background: var(--iq-neutral-0);
+  color: var(--iq-neutral-500);
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.ai-draft-remove:hover {
+  border-color: var(--iq-state-error);
+  color: var(--iq-state-error);
+  background: var(--iq-state-error-bg);
+}
+.ai-draft-remove svg { width: 14px; height: 14px; }
+
+.ai-draft-title {
+  font-size: 14px;
+  color: var(--iq-neutral-900);
+  line-height: 1.7;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.ai-draft-options {
   font-size: 13px;
-  color: #606266;
+  color: var(--iq-neutral-600);
+  white-space: pre-wrap;
+  background: var(--iq-neutral-50);
+  border-radius: var(--iq-radius-small);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  line-height: 1.7;
+}
+.ai-draft-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-draft-answer,
+.ai-draft-analysis {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
   line-height: 1.6;
+}
+.ans-label {
+  color: var(--iq-neutral-500);
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 1px 6px;
+  background: var(--iq-neutral-100);
+  border-radius: 4px;
+}
+.ans-value {
+  color: var(--iq-state-success);
+  font-weight: 600;
+}
+.ai-draft-analysis {
+  color: var(--iq-neutral-600);
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.modal-fade-enter-active .iq-modal,
+.modal-fade-leave-active .iq-modal {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+.modal-fade-enter-from .iq-modal,
+.modal-fade-leave-to .iq-modal {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
 }
 </style>

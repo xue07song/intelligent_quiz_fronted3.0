@@ -1,17 +1,16 @@
 <template>
-  <div class="pagination">
-  <!-- 这是一个标准的UI组件，作用是分页器 -->
-    <span class="info">共 {{ total }} 条</span>
-    <button class="page-btn" :disabled="page <= 1" @click="changePage(page - 1)">‹ 上一页</button>
+  <div class="iq-pagination">
+    <span class="iq-page-info">共 {{ total }} 条</span>
+    <button class="iq-page-btn" :disabled="page <= 1" @click="changePage(page - 1)">‹ 上一页</button>
     <button
       v-for="p in pageNumbers"
       :key="p"
-      class="page-btn"
+      class="iq-page-btn"
       :class="{ active: p === page }"
       @click="changePage(p)"
     >{{ p }}</button>
-    <button class="page-btn" :disabled="page >= totalPages" @click="changePage(page + 1)">下一页 ›</button>
-    <select :value="pageSize" class="page-size" @change="changePageSize">
+    <button class="iq-page-btn" :disabled="page >= totalPages" @click="changePage(page + 1)">下一页 ›</button>
+    <select :value="pageSize" class="iq-select" style="width: auto; height: 32px; padding: 0 8px;" @change="changePageSize">
       <option v-for="s in [10, 20, 50, 100]" :key="s" :value="s">{{ s }}条/页</option>
     </select>
   </div>
@@ -54,50 +53,3 @@ const changePageSize = (e) => {
   emit('change', { page: 1, pageSize: newSize });
 };
 </script>
-
-<style scoped>
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 16px 0;
-}
-.info {
-  color: #606266;
-  font-size: 14px;
-  margin-right: 12px;
-}
-.page-btn {
-  min-width: 32px;
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid #dcdfe6;
-  background: #fff;
-  color: #606266;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-}
-.page-btn:hover:not(:disabled) {
-  border-color: #409eff;
-  color: #409eff;
-}
-.page-btn.active {
-  background: #409eff;
-  border-color: #409eff;
-  color: #fff;
-}
-.page-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-.page-size {
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  margin-left: 12px;
-}
-</style>
