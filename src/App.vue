@@ -97,6 +97,16 @@
           </svg>
           用户管理
         </button>
+        <button
+          class="iq-nav-item"
+          :class="{ active: currentView === 'feedback' }"
+          @click="currentView = 'feedback'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          用户反馈
+        </button>
       </nav>
     </aside>
 
@@ -185,6 +195,14 @@
           <h1>用户管理</h1>
         </div>
         <UserManagement @toast="handleToastFromChild" />
+      </template>
+
+      <!-- 用户反馈视图 -->
+      <template v-if="currentView === 'feedback'">
+        <div class="iq-page-titlebar">
+          <h1>用户反馈</h1>
+        </div>
+        <Feedback :role="currentUser.role" @toast="handleToastFromChild" />
       </template>
 
       <!-- 答题练习视图 -->
@@ -319,6 +337,7 @@ import UserManagement from '@/components/UserManagement.vue';
 import ChangePassword from '@/components/ChangePassword.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
 import AiGenerate from '@/components/AiGenerate.vue';
+import Feedback from '@/components/Feedback.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ExamList from '@/components/practice/ExamList.vue';
 import ExamPractice from '@/components/practice/ExamPractice.vue';
@@ -349,6 +368,7 @@ const avatarChar = computed(() => {
 const currentBreadcrumb = computed(() => {
   if (currentView.value === 'main') return '题库管理';
   if (currentView.value === 'users') return '用户管理';
+  if (currentView.value === 'feedback') return '用户反馈';
   if (currentView.value === 'practice') {
     const map = {
       exams: '试卷列表',
