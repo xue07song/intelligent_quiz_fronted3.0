@@ -214,7 +214,7 @@
         <!-- 练习子导航 -->
         <div class="iq-practice-subnav">
           <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-          <button class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 随机组卷</button>
+          <button class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
           <button class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 答题记录</button>
           <button class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 统计分析</button>
           <button
@@ -233,7 +233,7 @@
           @toast="handleToastFromChild"
         />
 
-        <!-- 随机组卷 -->
+        <!-- 智能组卷 -->
         <GenerateExam
           v-if="practiceView === 'generate'"
           @start-exam="startExam"
@@ -372,7 +372,7 @@ const currentBreadcrumb = computed(() => {
   if (currentView.value === 'practice') {
     const map = {
       exams: '试卷列表',
-      generate: '随机组卷',
+      generate: '智能组卷',
       practice: '答题中',
       records: '答题记录',
       'record-detail': '记录详情',
@@ -387,7 +387,7 @@ const currentBreadcrumb = computed(() => {
 const pageTitle = computed(() => {
   const map = {
     exams: '📋 试卷列表',
-    generate: '📝 随机组卷',
+    generate: '📝 智能组卷',
     practice: '✍️ 答题中',
     records: '📊 答题记录',
     'record-detail': '📝 答题详情',
