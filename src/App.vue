@@ -80,6 +80,17 @@
           </svg>
           用户反馈
         </button>
+        <button
+          class="iq-nav-item"
+          :class="{ active: currentView === 'profile' }"
+          @click="currentView = 'profile'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="4"></circle>
+            <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path>
+          </svg>
+          个人中心
+        </button>
       </nav>
     </aside>
 
@@ -186,6 +197,9 @@
         </div>
         <Feedback :role="currentUser.role" @toast="handleToastFromChild" />
       </template>
+
+      <!-- 个人中心视图 -->
+      <Profile v-if="currentView === 'profile'" />
 
       <!-- 答题练习视图 -->
       <template v-if="currentView === 'practice'">
@@ -323,6 +337,7 @@ import ChangePassword from '@/components/ChangePassword.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
 import AiGenerate from '@/components/AiGenerate.vue';
 import Feedback from '@/components/Feedback.vue';
+import Profile from '@/components/Profile.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ExamList from '@/components/practice/ExamList.vue';
 import ExamPractice from '@/components/practice/ExamPractice.vue';
@@ -374,6 +389,7 @@ const currentBreadcrumb = computed(() => {
   if (currentView.value === 'users') return '用户管理';
   if (currentView.value === 'audit') return '注册审核';
   if (currentView.value === 'feedback') return '用户反馈';
+  if (currentView.value === 'profile') return '个人中心';
   if (currentView.value === 'practice') {
     const map = {
       exams: '试卷列表',
