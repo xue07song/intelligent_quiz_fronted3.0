@@ -1,6 +1,13 @@
 <template>
   <!-- 未登录：显示登录页 -->
-  <Login v-if="!currentUser" @success="handleLoginSuccess" />
+  <Login v-if="!currentUser" @success="handleLoginSuccess" @open-register="registerVisible = true" />
+
+  <RegistrationDialog
+    v-if="!currentUser"
+    :visible="registerVisible"
+    @close="registerVisible = false"
+    @success="registerSuccess"
+  />
 
   <!-- 已登录：Sidebar + Header + Main 三栏布局 -->
   <div v-else id="app">
@@ -12,6 +19,7 @@
       </div>
       <nav class="iq-sidebar-nav">
         <button
+          v-if="currentUser.role !== 'student'"
           class="iq-nav-item"
           :class="{ active: currentView === 'main' }"
           @click="currentView = 'main'"
@@ -26,62 +34,14 @@
         </button>
         <button
           class="iq-nav-item"
-          :class="{ active: currentView === 'practice' && practiceView === 'exams' }"
+          :class="{ active: currentView === 'practice' }"
           @click="practiceView = 'exams'; currentView = 'practice'"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-          试卷列表
-        </button>
-        <button
-          class="iq-nav-item"
-          :class="{ active: currentView === 'practice' && practiceView === 'generate' }"
-          @click="practiceView = 'generate'; currentView = 'practice'"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"></path>
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
           </svg>
           答题练习
-        </button>
-        <button
-          class="iq-nav-item"
-          :class="{ active: currentView === 'practice' && practiceView === 'records' }"
-          @click="practiceView = 'records'; currentView = 'practice'"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="12 6 12 12 16 14"></polyline>
-          </svg>
-          答题记录
-        </button>
-        <button
-          class="iq-nav-item"
-          :class="{ active: currentView === 'practice' && practiceView === 'stats' }"
-          @click="practiceView = 'stats'; currentView = 'practice'"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-          </svg>
-          统计分析
-        </button>
-        <button
-          v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
-          class="iq-nav-item"
-          :class="{ active: currentView === 'practice' && practiceView === 'admin-records' }"
-          @click="practiceView = 'admin-records'; currentView = 'practice'"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          做题管理
         </button>
         <button
           v-if="currentUser.role === 'admin'"
@@ -96,6 +56,19 @@
             <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
           </svg>
           用户管理
+        </button>
+        <button
+          v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
+          class="iq-nav-item"
+          :class="{ active: currentView === 'audit' }"
+          @click="currentView = 'audit'"
+        >
+          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          注册审核
+          <span v-if="pendingCount > 0" class="iq-nav-badge">{{ pendingCount }}</span>
         </button>
         <button
           class="iq-nav-item"
@@ -137,7 +110,7 @@
     <!-- 主内容区 -->
     <main class="iq-layout-main">
       <!-- 题库管理视图 -->
-      <template v-if="currentView === 'main'">
+      <template v-if="currentView === 'main' && currentUser.role !== 'student'">
         <div class="iq-page-titlebar">
           <h1>题库管理</h1>
           <div v-if="canEdit" class="iq-page-actions">
@@ -175,6 +148,7 @@
           :list="list"
           :loading="loading"
           :role="currentUser.role"
+          :compact="currentUser.role === 'admin' || currentUser.role === 'teacher'"
           v-model="selectedIds"
           @view="openViewDialog"
           @edit="openEditDialog"
@@ -195,6 +169,14 @@
           <h1>用户管理</h1>
         </div>
         <UserManagement @toast="handleToastFromChild" />
+      </template>
+
+      <!-- 注册审核视图 -->
+      <template v-if="currentView === 'audit' && (currentUser.role === 'admin' || currentUser.role === 'teacher')">
+        <div class="iq-page-titlebar">
+          <h1>注册审核</h1>
+        </div>
+        <RegistrationAudit @toast="handleToastFromChild" @update:pending="loadPendingCount" />
       </template>
 
       <!-- 用户反馈视图 -->
@@ -326,6 +308,7 @@ import {
   getStatistics,
   batchDeleteQuestions,
 } from '@/api/question';
+import { getRegistrations } from '@/api/auth';
 import SearchBar from '@/components/SearchBar.vue';
 import QuestionTable from '@/components/QuestionTable.vue';
 import QuestionForm from '@/components/QuestionForm.vue';
@@ -333,7 +316,9 @@ import QuestionDetail from '@/components/QuestionDetail.vue';
 import Pagination from '@/components/Pagination.vue';
 import Toast from '@/components/Toast.vue';
 import Login from '@/components/Login.vue';
+import RegistrationDialog from '@/components/RegistrationDialog.vue';
 import UserManagement from '@/components/UserManagement.vue';
+import RegistrationAudit from '@/components/RegistrationAudit.vue';
 import ChangePassword from '@/components/ChangePassword.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
 import AiGenerate from '@/components/AiGenerate.vue';
@@ -360,6 +345,25 @@ const activeRecordId = ref(null);
 
 const canEdit = computed(() => currentUser.value?.role === 'admin' || currentUser.value?.role === 'teacher');
 
+// ===== 注册审核 =====
+const registerVisible = ref(false);
+const pendingCount = ref(0);
+
+const loadPendingCount = async () => {
+  if (!currentUser.value || currentUser.value.role === 'student') return;
+  try {
+    const data = await getRegistrations({ status: 'pending', pageSize: 1 });
+    pendingCount.value = data.total;
+  } catch (e) {
+    pendingCount.value = 0;
+  }
+};
+
+const registerSuccess = () => {
+  registerVisible.value = false;
+  showToast('✅ 注册申请已提交，请等待管理员审核', 'success');
+};
+
 const avatarChar = computed(() => {
   const name = currentUser.value?.nickname || currentUser.value?.username || 'U';
   return name.charAt(0).toUpperCase();
@@ -368,6 +372,7 @@ const avatarChar = computed(() => {
 const currentBreadcrumb = computed(() => {
   if (currentView.value === 'main') return '题库管理';
   if (currentView.value === 'users') return '用户管理';
+  if (currentView.value === 'audit') return '注册审核';
   if (currentView.value === 'feedback') return '用户反馈';
   if (currentView.value === 'practice') {
     const map = {
@@ -418,7 +423,12 @@ const restoreSession = () => {
   const userStr = localStorage.getItem('user');
   if (token && userStr) {
     try {
-      currentUser.value = JSON.parse(userStr);
+      const user = JSON.parse(userStr);
+      currentUser.value = user;
+      if (user.role === 'student') {
+        currentView.value = 'practice';
+        practiceView.value = 'exams';
+      }
     } catch {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -428,9 +438,15 @@ const restoreSession = () => {
 
 const handleLoginSuccess = (user) => {
   currentUser.value = user;
-  currentView.value = 'main';
+  if (user.role === 'student') {
+    currentView.value = 'practice';
+    practiceView.value = 'exams';
+  } else {
+    currentView.value = 'main';
+  }
   loadData();
   loadStats();
+  loadPendingCount();
 };
 
 const handleLogout = () => {
@@ -439,6 +455,7 @@ const handleLogout = () => {
   localStorage.removeItem('user');
   currentUser.value = null;
   currentView.value = 'main';
+  pendingCount.value = 0;
 };
 
 const handlePwdChanged = () => {
@@ -471,6 +488,13 @@ const loading = ref(false);
 
 watch(page, () => {
   selectedIds.value = [];
+});
+
+watch(currentView, (val) => {
+  if (val === 'main' && currentUser.value?.role === 'student') {
+    currentView.value = 'practice';
+    practiceView.value = 'exams';
+  }
 });
 
 const handleBatchDelete = async () => {
@@ -691,6 +715,7 @@ onMounted(() => {
   if (currentUser.value) {
     loadData();
     loadStats();
+    loadPendingCount();
   }
   window.addEventListener('auth-expired', handleAuthExpired);
 });
@@ -719,5 +744,20 @@ onUnmounted(() => {
 .role-badge.student {
   background: var(--iq-state-success-bg);
   color: var(--iq-state-success);
+}
+
+.iq-nav-badge {
+  display: inline-block;
+  min-width: 20px;
+  height: 20px;
+  line-height: 20px;
+  padding: 0 6px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  border-radius: 10px;
+  margin-left: 4px;
 }
 </style>

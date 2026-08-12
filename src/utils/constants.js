@@ -13,6 +13,15 @@ const DIFFICULTY_MAP = {
   '3': '⭐⭐⭐',
   '4': '⭐⭐⭐⭐',
   '5': '⭐⭐⭐⭐⭐',
+  '入门': '⭐',
+  '简单': '⭐⭐',
+  '中等': '⭐⭐⭐',
+  '困难': '⭐⭐⭐⭐',
+  '挑战': '⭐⭐⭐⭐⭐',
+  '容易': '⭐⭐',
+  '一般': '⭐⭐⭐',
+  '较难': '⭐⭐⭐⭐',
+  '困难': '⭐⭐⭐⭐⭐',
 };
 
 const CHAPTER_MAP = {};
@@ -28,6 +37,9 @@ const DIFFICULTY_OPTIONS = [
 ];
 
 export const getTypeName = (type) => TYPE_MAP[type] || '未知';
-export const getDifficultyLabel = (d) => DIFFICULTY_MAP[String(d)] || String(d);
+export const getDifficultyLabel = (d) => {
+  const s = String(d || '');
+  return DIFFICULTY_MAP[s] || s;
+};
 
 export { TYPE_MAP, DIFFICULTY_MAP, CHAPTER_MAP, TYPE_OPTIONS, DIFFICULTY_OPTIONS };

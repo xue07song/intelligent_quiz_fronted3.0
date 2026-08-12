@@ -60,8 +60,12 @@
         </button>
       </form>
 
-      <div class="login-footer iq-text-xs iq-text-muted">
-        © 2025 智能题库系统 · 高效出题 · 智能练习
+      <div class="login-footer-bar">
+        <div class="login-footer-links">
+          <span>还没有账号？</span>
+          <button class="login-register-link" @click="$emit('open-register')">点击注册</button>
+        </div>
+        <div class="login-footer-copy">© 2025 智能题库系统 · 高效出题 · 智能练习</div>
       </div>
     </div>
   </div>
@@ -71,7 +75,7 @@
 import { reactive, ref } from 'vue';
 import { login } from '@/api/auth';
 
-const emit = defineEmits(['success']);
+const emit = defineEmits(['success', 'open-register']);
 
 const form = reactive({
   username: '',
@@ -228,10 +232,37 @@ const handleLogin = async () => {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-.login-footer {
+.login-footer-bar {
   margin-top: 32px;
   padding-top: 20px;
   border-top: 1px solid var(--iq-border);
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.login-footer-links {
+  font-size: 13px;
+  color: var(--iq-neutral-500);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.login-register-link {
+  background: none;
+  border: none;
+  color: var(--iq-primary-600);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+.login-register-link:hover {
+  text-decoration: underline;
+  color: var(--iq-primary-700);
+}
+.login-footer-copy {
+  font-size: 12px;
+  color: var(--iq-neutral-400);
 }
 </style>

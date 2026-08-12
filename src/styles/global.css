@@ -615,7 +615,8 @@ a:hover {
   gap: 8px;
 }
 .iq-truncate {
-  max-width: 360px;
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
