@@ -210,9 +210,12 @@
         <!-- 练习子导航 -->
         <div class="iq-practice-subnav">
           <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-          <button class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
-          <button class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 答题记录</button>
-          <button class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 统计分析</button>
+          <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
+          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'adaptive' }" @click="practiceView = 'adaptive'">🧭 自适应练习</button>
+          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'adaptive-progress' }" @click="practiceView = 'adaptive-progress'">🏅 我的自适应成果</button>
+          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 我的答题记录</button>
+          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 我的统计</button>
+          <button v-if="currentUser.role === 'teacher' || currentUser.role === 'admin'" class="iq-subnav-btn" :class="{ active: practiceView === 'adaptive-overview' }" @click="practiceView = 'adaptive-overview'">📈 自适应学情</button>
           <button
             v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
             class="iq-subnav-btn"
@@ -224,6 +227,7 @@
         <!-- 试卷列表 -->
         <ExamList
           v-if="practiceView === 'exams'"
+          :role="currentUser.role"
           @generate="practiceView = 'generate'"
           @start-exam="startExam"
           @toast="handleToastFromChild"
@@ -231,8 +235,24 @@
 
         <!-- 智能组卷 -->
         <GenerateExam
-          v-if="practiceView === 'generate'"
+          v-if="practiceView === 'generate' && currentUser.role === 'teacher'"
           @start-exam="startExam"
+          @toast="handleToastFromChild"
+        />
+
+        <AdaptivePractice
+          v-if="practiceView === 'adaptive' && currentUser.role === 'student'"
+          @toast="handleToastFromChild"
+        />
+
+        <AdaptiveOverview
+          v-if="practiceView === 'adaptive-overview' && (currentUser.role === 'teacher' || currentUser.role === 'admin')"
+          @toast="handleToastFromChild"
+        />
+
+        <AdaptiveProgress
+          v-if="practiceView === 'adaptive-progress' && currentUser.role === 'student'"
+          @practice="practiceView = 'adaptive'"
           @toast="handleToastFromChild"
         />
 
@@ -345,6 +365,9 @@ import PracticeRecords from '@/components/practice/PracticeRecords.vue';
 import RecordDetail from '@/components/practice/RecordDetail.vue';
 import PracticeStats from '@/components/practice/PracticeStats.vue';
 import AdminRecords from '@/components/practice/AdminRecords.vue';
+import AdaptivePractice from '@/components/practice/AdaptivePractice.vue';
+import AdaptiveOverview from '@/components/practice/AdaptiveOverview.vue';
+import AdaptiveProgress from '@/components/practice/AdaptiveProgress.vue';
 
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
@@ -394,6 +417,9 @@ const currentBreadcrumb = computed(() => {
     const map = {
       exams: '试卷列表',
       generate: '智能组卷',
+      adaptive: '自适应练习',
+      'adaptive-overview': '自适应学情',
+      'adaptive-progress': '我的自适应成果',
       practice: '答题中',
       records: '答题记录',
       'record-detail': '记录详情',
@@ -409,6 +435,9 @@ const pageTitle = computed(() => {
   const map = {
     exams: '📋 试卷列表',
     generate: '📝 智能组卷',
+    adaptive: '🧭 自适应练习',
+    'adaptive-overview': '📈 自适应学情',
+    'adaptive-progress': '🏅 我的自适应成果',
     practice: '✍️ 答题中',
     records: '📊 答题记录',
     'record-detail': '📝 答题详情',
