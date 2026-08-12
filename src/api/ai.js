@@ -42,3 +42,10 @@ export const saveGenerated = (questions) => {
   return request.post('/ai/generate/save', { questions });
 };
 
+// AI 小助手（通用对话）
+// body: { messages: [{role, content}], context? }
+// 返回: { reply }
+export const chatWithAssistant = (data) => {
+  return request.post('/ai/chat', data, { timeout: AI_TIMEOUT });
+};
+

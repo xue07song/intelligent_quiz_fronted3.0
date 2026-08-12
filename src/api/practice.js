@@ -6,6 +6,18 @@ export const generateExam = (data) => {
   return request.post('/practice/exams', data);
 };
 
+export const getExamInventory = (chapters = []) => {
+  return request.get('/practice/exam-inventory', { params: { chapters: chapters.join(',') } });
+};
+
+export const previewRuleExam = (data) => {
+  return request.post('/practice/rule-exams/preview', data);
+};
+
+export const generateRuleExam = (data) => {
+  return request.post('/practice/rule-exams', data);
+};
+
 // 试卷列表（分页）
 export const getExams = (params = {}) => {
   return request.get('/practice/exams', { params });

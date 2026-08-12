@@ -30,8 +30,8 @@
           <form class="iq-modal-body" @submit.prevent="handleSubmit">
             <div class="iq-form-grid">
               <div class="iq-form-field">
-                <label class="iq-form-label">ID <span class="iq-req">*</span></label>
-                <input v-model="form.id" class="iq-input" placeholder="如 Q001" :disabled="isEdit" />
+                <label class="iq-form-label">{{ isStudentBank ? '题目编号' : 'ID' }} <span class="iq-req">*</span></label>
+                <input v-model="form.id" class="iq-input" :placeholder="isStudentBank ? '如 SQ001' : '如 Q001'" :disabled="isEdit" />
               </div>
               <div class="iq-form-field">
                 <label class="iq-form-label">章节</label>
@@ -111,6 +111,7 @@ const props = defineProps({
   visible: { type: Boolean, default: false },
   data: { type: Object, default: () => ({}) },
   isEdit: { type: Boolean, default: false },
+  isStudentBank: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['close', 'submit']);
@@ -140,7 +141,12 @@ watch(
   () => [props.visible, props.data, props.isEdit],
   () => {
     if (props.visible) {
-      Object.assign(form, defaultForm(), props.data);
+      const data = { ...props.data };
+      if (props.isStudentBank && data.question_id) {
+        data.id = data.question_id;
+        delete data.question_id;
+      }
+      Object.assign(form, defaultForm(), data);
       if (!form.题型) form.题型 = 2;
     }
   },
@@ -149,7 +155,7 @@ watch(
 
 const handleSubmit = async () => {
   if (!form.id || !form.id.trim()) {
-    alert('ID不能为空');
+    alert(props.isStudentBank ? '题目编号不能为空' : 'ID不能为空');
     return;
   }
   if (!form.题目 || !form.题目.trim()) {
@@ -161,6 +167,9 @@ const handleSubmit = async () => {
     const payload = { ...form };
     if (payload.章节 === '' || payload.章节 === null) payload.章节 = 0;
     if (payload.序号 === '' || payload.序号 === null) payload.序号 = 0;
+    if (props.isStudentBank) {
+      payload.question_id = payload.id;
+    }
     await emit('submit', payload);
   } finally {
     submitting.value = false;

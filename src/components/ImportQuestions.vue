@@ -129,9 +129,11 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { batchImportQuestions } from '@/api/question';
+import { batchImportStudentQuestions } from '@/api/studentQuestion';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
+  isStudentBank: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['close', 'success']);
@@ -197,7 +199,8 @@ const handleSubmit = async () => {
   loading.value = true;
   errorMsg.value = '';
   try {
-    const data = await batchImportQuestions(selectedFile.value);
+    const importFn = props.isStudentBank ? batchImportStudentQuestions : batchImportQuestions;
+    const data = await importFn(selectedFile.value);
     result.value = {
       inserted: data.inserted ?? 0,
       skipped: data.skipped ?? 0,
