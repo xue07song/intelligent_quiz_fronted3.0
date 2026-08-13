@@ -18,6 +18,13 @@ export const generateRuleExam = (data) => {
   return request.post('/practice/rule-exams', data);
 };
 
+export const checkAdaptiveInventory = (data) => request.post('/practice/adaptive/inventory', data);
+export const startAdaptivePractice = (data) => request.post('/practice/adaptive/sessions', data);
+export const getAdaptiveSession = (id) => request.get(`/practice/adaptive/sessions/${id}`);
+export const submitAdaptiveAnswer = (id, data) => request.post(`/practice/adaptive/sessions/${id}/answers`, data);
+export const getAdaptiveOverview = () => request.get('/practice/adaptive-overview');
+export const getAdaptiveProgress = () => request.get('/practice/adaptive-progress');
+
 // 试卷列表（分页）
 export const getExams = (params = {}) => {
   return request.get('/practice/exams', { params });
