@@ -36,11 +36,7 @@
           v-if="currentUser.role !== 'admin'"
           class="iq-nav-item"
           :class="{ active: currentView === 'practice' && !standalonePracticeViews.includes(practiceView) }"
-
-          @click="onEnterPractice"
-=======
           @click="onEnterPractice(); sidebarOpen = false"
-
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"></path>
@@ -237,18 +233,10 @@
         <!-- 练习子导航 -->
         <div v-if="!standalonePracticeViews.includes(practiceView)" class="iq-practice-subnav">
           <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-
-
           <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
           <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'wrong-book' }" @click="practiceView = 'wrong-book'">📕 错题本</button>
           <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 我的答题记录</button>
           <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 我的统计</button>
-
-=======
-          <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
-          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'wrong-book' }" @click="practiceView = 'wrong-book'">📕 错题本</button>
-          <button class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 答题记录</button>
-
           <button
             v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
             class="iq-subnav-btn"
@@ -288,9 +276,6 @@
           @start-exam="startExam"
           @toast="handleToastFromChild"
         />
-
-=======
-
 
         <!-- 班级管理 -->
         <ClassManagement
@@ -575,8 +560,6 @@ const pageTitle = computed(() => {
   };
   return map[practiceView.value] || '';
 });
-
-=======
 
 const startExam = (examId) => {
   activeExamId.value = examId;

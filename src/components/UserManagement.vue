@@ -197,6 +197,14 @@
                   <span v-if="allSubjects.length === 0" class="iq-text-sm iq-text-muted">加载中...</span>
                 </div>
               </div>
+              <div class="iq-form-field" v-if="form.role === 'student' && isEdit">
+                <label class="iq-form-label">必修班级</label>
+                <select v-model="form.class_id" class="iq-select">
+                  <option :value="null">未分班</option>
+                  <option v-for="cls in classList" :key="cls.id" :value="cls.id">{{ cls.name }}</option>
+                </select>
+                <span class="iq-text-xs iq-text-muted">必修班级由学号自动匹配，也可在此手动调整；选修班级请在「班级管理」中由任课教师添加</span>
+              </div>
               <div class="iq-form-field" v-if="!isEdit">
                 <label class="iq-form-label">状态</label>
                 <select v-model="form.status" class="iq-select">
@@ -221,6 +229,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { getUsers, createUser, updateUser, resetUserPassword, toggleUserStatus, deleteUser } from '@/api/user';
 import { getSubjects } from '@/api/subject';
+import { getClasses } from '@/api/class';
 
 const emit = defineEmits(['toast']);
 
@@ -235,6 +244,7 @@ const roleFilter = ref('');
 const statusFilter = ref('');
 
 const allSubjects = ref([]);
+const classList = ref([]);
 
 const dialogVisible = ref(false);
 const isEdit = ref(false);
@@ -246,6 +256,7 @@ const form = reactive({
   role: 'student',
   status: 1,
   subjects: [],
+  class_id: null,
 });
 
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
@@ -289,7 +300,7 @@ const changePage = (newPage) => {
 
 const openCreate = () => {
   isEdit.value = false;
-  Object.assign(form, { id: null, username: '', password: '', nickname: '', role: 'student', status: 1, subjects: [] });
+  Object.assign(form, { id: null, username: '', password: '', nickname: '', role: 'student', status: 1, subjects: [], class_id: null });
   dialogVisible.value = true;
 };
 
@@ -303,6 +314,7 @@ const openEdit = (user) => {
     role: user.role,
     status: user.status,
     subjects: Array.isArray(user.subjects) ? [...user.subjects] : [],
+    class_id: user.class_id || user.classId || null,
   });
   dialogVisible.value = true;
 };
@@ -313,6 +325,9 @@ const handleSubmit = async () => {
       const updateData = { nickname: form.nickname, role: form.role };
       if (form.role === 'teacher') {
         updateData.subjects = form.subjects || [];
+      }
+      if (form.role === 'student') {
+        updateData.class_id = form.class_id || null;
       }
       await updateUser(form.id, updateData);
       showToast('用户更新成功');
@@ -391,6 +406,12 @@ onMounted(async () => {
     allSubjects.value = await getSubjects();
   } catch (e) {
     console.warn('加载科目列表失败:', e);
+  }
+  try {
+    const data = await getClasses();
+    classList.value = Array.isArray(data) ? data : (data.list || []);
+  } catch (e) {
+    console.warn('加载班级列表失败:', e);
   }
 });
 </script>
