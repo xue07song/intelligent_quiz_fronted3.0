@@ -76,6 +76,7 @@ export const adminListRecords = (params = {}) => {
 export const adminGetRecord = (id) => {
   return request.get(`/practice/admin/records/${id}`);
 };
+export const reviewSubjectiveAnswer = (answerId, data) => request.put(`/practice/admin/answers/${answerId}/review`, data);
 
 // 管理端：查看指定用户的答题记录列表
 export const adminListUserRecords = (userId, params = {}) => {

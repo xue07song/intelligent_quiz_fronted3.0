@@ -204,6 +204,7 @@
       <RecordDetail
         :recordId="activeRecordId"
         adminMode
+        :reviewable="role==='teacher'"
         @back="backFromDetail"
         @toast="onToast"
       />

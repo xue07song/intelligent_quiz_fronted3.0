@@ -164,9 +164,9 @@ const paperPresets = [
     { key:'standard-mixed', name:'主客观结合', scene:'综合考查', description:'保留一定比例简答题', count:20, knowledge:5, typeWeights:[20,35,15,15,15,0], difficultyWeights:[15,20,30,25,10] },
   ]},
   { key:'advanced', name:'难点提升卷', tag:'查漏补缺', description:'增加多选、简答和高难度题', detail:'提供难题突破、思维强化和综合挑战三套方案', variants:[
-    { key:'advanced-breakthrough', name:'难题突破', scene:'专项提高', description:'困难与挑战题占比较高', count:20, knowledge:6, typeWeights:[15,35,20,10,20,0], difficultyWeights:[5,10,25,35,25] },
-    { key:'advanced-thinking', name:'思维强化', scene:'能力训练', description:'提高多选和简答题占比', count:20, knowledge:6, typeWeights:[15,30,25,10,20,0], difficultyWeights:[5,10,25,35,25] },
-    { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖更多题型并保持高难度', count:20, knowledge:6, typeWeights:[10,35,20,15,20,0], difficultyWeights:[10,15,25,30,20] },
+    { key:'advanced-breakthrough', name:'难题突破', scene:'专项提高', description:'困难题为主，并纳入程序论述题', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[5,10,25,35,25] },
+    { key:'advanced-thinking', name:'思维强化', scene:'能力训练', description:'提高多选、简答和程序论述题占比', count:20, knowledge:6, typeWeights:[10,25,25,10,20,10], difficultyWeights:[5,10,25,35,25] },
+    { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[10,15,25,30,20] },
   ]},
 ];
 const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2} });
