@@ -10,6 +10,7 @@
           <col v-if="canEdit" class="col-check-col" />
           <col class="col-id-col" />
           <col class="col-chapter-col" />
+          <col class="col-subject-col" />
           <col class="col-type-col" />
           <col class="col-title-col" />
           <col v-if="!compact" class="col-opt-col" />
@@ -32,6 +33,7 @@
             </th>
             <th>ID</th>
             <th>章节</th>
+            <th>科目</th>
             <th>题型</th>
             <th class="col-title">题目内容</th>
             <th v-if="!compact" class="col-opt">选项</th>
@@ -54,6 +56,10 @@
             </td>
             <td><span class="iq-id-chip">{{ item.id }}</span></td>
             <td>{{ item.章节 }}</td>
+            <td>
+              <span v-if="item.科目" class="iq-subject-tag">{{ item.科目 }}</span>
+              <span v-else class="iq-text-muted">--</span>
+            </td>
             <td>
               <span class="iq-type-tag" :class="`type-${item.题型}`">{{ getTypeName(item.题型) }}</span>
             </td>
@@ -114,7 +120,7 @@ const emit = defineEmits(['view', 'edit', 'delete', 'update:modelValue', 'select
 const canEdit = computed(() => props.role === 'admin' || props.role === 'teacher');
 
 const emptyColspan = computed(() => {
-  let cols = 7; // base: id + chapter + type + title + diff + kp + act
+  let cols = 8; // base: id + chapter + subject + type + title + diff + kp + act
   if (canEdit.value) cols += 1; // checkbox
   if (!props.compact) cols += 3; // options + answer + analysis
   return cols;
@@ -223,6 +229,7 @@ const toggleOne = (id) => {
 .q-table col.col-check-col { width: 44px; }
 .q-table col.col-id-col { width: 70px; }
 .q-table col.col-chapter-col { width: 60px; }
+.q-table col.col-subject-col { width: 90px; }
 .q-table col.col-type-col { width: 80px; }
 .q-table col.col-title-col { width: 240px; }
 .q-table col.col-opt-col { width: 160px; }
@@ -289,6 +296,15 @@ const toggleOne = (id) => {
   padding: 2px 8px;
   background: var(--iq-neutral-100);
   color: var(--iq-neutral-700);
+  border-radius: 4px;
+  font-weight: 500;
+}
+.iq-subject-tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 8px;
+  background: #e0e7ff;
+  color: #4338ca;
   border-radius: 4px;
   font-weight: 500;
 }

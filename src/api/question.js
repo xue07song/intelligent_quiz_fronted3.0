@@ -27,12 +27,15 @@ export const batchDeleteQuestions = (ids) => {
 };
 
 // 批量导入 Excel
-export const batchImportQuestions = (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return request.post('/questions/batch-import', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-    });
+export const batchImportQuestions = (file, subject) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (subject) {
+    formData.append('subject', subject);
+  }
+  return request.post('/questions/batch-import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
 };
 
 export const searchQuestions = (keyword) => {

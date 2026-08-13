@@ -30,12 +30,30 @@
     </div>
 
     <div v-else class="iq-card">
+      <div v-if="role === 'teacher' || role === 'admin'" class="exam-list-filters">
+        <div class="filter-item">
+          <label class="filter-label">科目</label>
+          <select v-model="subjectFilter" class="iq-select" @change="page = 1; loadExams()">
+            <option value="">全部科目</option>
+            <option v-for="s in allSubjects" :key="s" :value="s">{{ s }}</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label class="filter-label">目标班级</label>
+          <select v-model="classFilter" class="iq-select" @change="page = 1; loadExams()">
+            <option value="">全部班级</option>
+            <option v-for="c in classList" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+          </select>
+        </div>
+      </div>
       <div class="iq-table-wrap">
         <table class="iq-table">
           <thead>
             <tr>
               <th>ID</th>
               <th>标题</th>
+              <th>科目</th>
+              <th>目标班级</th>
               <th>题数</th>
               <th>客观题</th>
               <th>章节</th>
@@ -50,6 +68,16 @@
             <tr v-for="exam in list" :key="exam.id">
               <td><span class="iq-id-chip">{{ exam.id }}</span></td>
               <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ exam.title }}</td>
+              <td>
+                <span v-if="exam.subject" class="iq-user-subject-tag" style="margin-right:0;">{{ exam.subject }}</span>
+                <span v-else class="iq-text-muted">--</span>
+              </td>
+              <td>
+                <template v-if="exam.class_id || exam.classId">
+                  <span class="iq-tag iq-tag-warning" style="color:#92400e;background:#fef3c7;">{{ exam.class_name || exam.className || '定向班级' }}</span>
+                </template>
+                <span v-else class="iq-tag iq-tag-neutral" style="color:var(--iq-neutral-600);background:var(--iq-neutral-100);">全开放</span>
+              </td>
               <td>{{ exam.total_count }}</td>
               <td>{{ exam.objective_count }}</td>
               <td>{{ exam.chapter || '-' }}</td>
@@ -94,6 +122,8 @@ import { ref, onMounted } from 'vue';
 import { getExams, getExam } from '@/api/practice';
 import { getTypeName, getDifficultyLabel, DIFFICULTY_OPTIONS } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
+import { getSubjects } from '@/api/subject';
+import { getClasses } from '@/api/class';
 import Pagination from '@/components/Pagination.vue';
 
 const emit = defineEmits(['generate', 'start-exam', 'toast']);
@@ -105,6 +135,10 @@ const page = ref(1);
 const pageSize = ref(20);
 const loading = ref(false);
 const previewVisible=ref(false),previewLoading=ref(false),previewExam=ref({questions:[]});
+const allSubjects = ref([]);
+const classList = ref([]);
+const subjectFilter = ref('');
+const classFilter = ref('');
 const openPreview=async(id)=>{previewVisible.value=true;previewLoading.value=true;try{previewExam.value=await getExam(id)}catch(err){emit('toast',{message:err.message||'读取试卷失败',type:'error'});previewVisible.value=false}finally{previewLoading.value=false}};
 const closePreview=()=>{previewVisible.value=false;previewExam.value={questions:[]}};
 
@@ -119,7 +153,10 @@ const difficultyClass = (d) => {
 const loadExams = async () => {
   loading.value = true;
   try {
-    const data = await getExams({ page: page.value, pageSize: pageSize.value });
+    const params = { page: page.value, pageSize: pageSize.value };
+    if (subjectFilter.value) params.subject = subjectFilter.value;
+    if (classFilter.value) params.classId = classFilter.value;
+    const data = await getExams(params);
     list.value = data.list;
     total.value = data.total;
   } catch (err) {
@@ -129,7 +166,14 @@ const loadExams = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    allSubjects.value = await getSubjects();
+  } catch { /* ignore */ }
+  try {
+    const clsData = await getClasses();
+    classList.value = Array.isArray(clsData) ? clsData : (clsData.list || []);
+  } catch { /* ignore */ }
   loadExams();
 });
 
@@ -141,6 +185,35 @@ defineExpose({ loadExams });
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.exam-list-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--iq-neutral-50);
+  border-bottom: 1px solid var(--iq-border);
+}
+.exam-list-filters .filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 170px;
+}
+.exam-list-filters .filter-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--iq-neutral-600);
+}
+.iq-select {
+  height: 36px;
+  border: 1px solid var(--iq-border);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--iq-neutral-800);
+  font-size: 13px;
+  cursor: pointer;
 }
 .iq-page-header {
   display: flex;
