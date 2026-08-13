@@ -119,9 +119,6 @@
       <PracticeStats :userId="selectedUser.id" @toast="onToast" />
     </template>
 
-    <!-- 视图：全局统计总览（以人为界，按人分组展示每人每次明细） -->
-    <template v-if="view === 'allStats'">
-=======
     <!-- 视图：试卷分析详情 -->
     <template v-if="view === 'analysis'">
 
