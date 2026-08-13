@@ -62,7 +62,7 @@
             @click="toggleChapter(chapter)"
           >
             <span class="chapter-check">{{ form.chapters.includes(chapter) ? '✓' : '' }}</span>
-            <span class="chapter-name">第{{ chapter }}章</span>
+            <span class="chapter-name"><b>第{{ chapter }}章</b><em>{{ getChapterName(chapter) }}</em></span>
             <small>{{ chapterTotals[chapter] || 0 }}题</small>
           </button>
         </div>
@@ -145,7 +145,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { generateRuleExam, getExamInventory, previewRuleExam } from '@/api/practice';
 import { smartExam } from '@/api/ai';
-import { TYPE_OPTIONS } from '@/utils/constants';
+import { TYPE_OPTIONS, getChapterLabel, getChapterName } from '@/utils/constants';
 
 const emit = defineEmits(['start-exam', 'toast']);
 const typeOptions = TYPE_OPTIONS;
@@ -192,7 +192,7 @@ const configurationModeText = computed(() => {
 });
 const selectedChapterTitle = computed(() => form.chapters.length ? `已选择 ${form.chapters.length} 个章节` : '当前使用全部章节');
 const selectedChapterDetail = computed(() => form.chapters.length
-  ? [...form.chapters].sort((a,b)=>a-b).map(chapter => `第${chapter}章`).join('、')
+  ? [...form.chapters].sort((a,b)=>a-b).map(getChapterLabel).join('、')
   : '第1章至第10章，共375道题');
 const sumClass = (sum) => sum === form.count ? 'sum-ok' : 'sum-bad';
 const toggleChapter = (chapter) => { const index=form.chapters.indexOf(chapter); index>=0 ? form.chapters.splice(index,1) : form.chapters.push(chapter); form.chapters.sort((a,b)=>a-b); };
@@ -335,4 +335,5 @@ const handleSmartExam = async () => { errorMsg.value='';aiLoading.value=true;try
 .variant-panel{padding:14px;margin:10px 0;border:1px solid #c7d2fe;border-radius:10px;background:#f8faff}.variant-panel-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px;color:#312e81}.variant-panel-head span{font-size:12px;color:#64748b}.variant-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.variant-card{display:flex;flex-direction:column;gap:6px;padding:12px;border:2px solid #e2e8f0;border-radius:9px;background:#fff;color:#475569;text-align:left;font-size:11px;cursor:pointer}.variant-card:hover{border-color:#a5b4fc}.variant-card.active{border-color:#4f46e5;background:#eef2ff}.variant-title{display:flex;align-items:center;justify-content:space-between;color:#1e293b;font-size:13px;font-weight:700}.variant-title small{padding:2px 6px;border-radius:10px;background:#f1f5f9;color:#64748b;font-size:10px}.variant-card b{color:#334155}.iq-input:disabled{background:#f1f5f9;color:#475569;cursor:not-allowed;opacity:1}.distribution-item:has(.iq-input:disabled){background:#f8fafc}.result-actions{display:flex;gap:8px}
 
 @media(max-width:900px){.chapter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.difficulty-grid{grid-template-columns:repeat(3,1fr)}.variant-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:800px){.base-grid,.distribution-grid,.report-grid,.paper-presets,.alternative-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.base-grid,.distribution-grid,.difficulty-grid,.report-grid,.paper-presets,.alternative-grid,.variant-grid{grid-template-columns:1fr}.chapter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-selector-head,.alternative-heading,.variant-panel-head,.result-head{flex-direction:column}.chapter-actions{width:100%}.chapter-action{flex:1}.result-actions{width:100%;flex-direction:column}}
+.chapter-chip{grid-template-columns:24px minmax(0,1fr);min-height:78px}.chapter-name{display:grid;gap:2px;min-width:0}.chapter-name b{font-size:13px}.chapter-name em{font-size:12px;line-height:1.35;font-style:normal;font-weight:500;color:#475569;overflow-wrap:anywhere}.chapter-chip.active .chapter-name em{color:#4338ca}.selected-summary>div{min-width:0}.selected-summary small{line-height:1.6}
 </style>
