@@ -33,15 +33,16 @@
           题库管理
         </button>
         <button
+          v-if="currentUser.role !== 'admin'"
           class="iq-nav-item"
           :class="{ active: currentView === 'practice' }"
-          @click="practiceView = 'exams'; currentView = 'practice'"
+          @click="onEnterPractice"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"></path>
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
           </svg>
-          答题练习
+          {{ currentUser.role === 'student' ? '答题练习' : '出卷与学生管理' }}
         </button>
         <button
           v-if="currentUser.role === 'admin'"
@@ -145,6 +146,7 @@
         <SearchBar
           :initialFilters="filters"
           :role="currentUser.role"
+          :subjects="currentUser.subjects || []"
           :selectedCount="selectedIds.length"
           @search="handleSearch"
           @reset="handleReset"
@@ -217,11 +219,17 @@
           <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 我的统计</button>
           <button v-if="currentUser.role === 'teacher' || currentUser.role === 'admin'" class="iq-subnav-btn" :class="{ active: practiceView === 'adaptive-overview' }" @click="practiceView = 'adaptive-overview'">📈 自适应学情</button>
           <button
-            v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
+            v-if="currentUser.role === 'teacher'"
             class="iq-subnav-btn"
             :class="{ active: practiceView === 'admin-records' }"
             @click="practiceView = 'admin-records'"
-          >👥 做题管理</button>
+          >📊 试卷分析</button>
+          <button
+            v-if="currentUser.role === 'teacher'"
+            class="iq-subnav-btn"
+            :class="{ active: practiceView === 'classes' }"
+            @click="practiceView = 'classes'"
+          >🏫 班级管理</button>
         </div>
 
         <!-- 试卷列表 -->
@@ -236,7 +244,15 @@
         <!-- 智能组卷 -->
         <GenerateExam
           v-if="practiceView === 'generate' && currentUser.role === 'teacher'"
+          :role="currentUser.role"
+          :subjects="currentUser.subjects || []"
           @start-exam="startExam"
+          @toast="handleToastFromChild"
+        />
+
+        <!-- 班级管理 -->
+        <ClassManagement
+          v-if="practiceView === 'classes' && (currentUser.role === 'admin' || currentUser.role === 'teacher')"
           @toast="handleToastFromChild"
         />
 
@@ -300,6 +316,8 @@
       :visible="dialogVisible"
       :data="formData"
       :isEdit="isEdit"
+      :role="currentUser.role"
+      :subjects="currentUser.subjects || []"
       @close="dialogVisible = false"
       @submit="handleSubmit"
     />
@@ -318,6 +336,8 @@
 
     <ImportQuestions
       :visible="importVisible"
+      :role="currentUser.role"
+      :subjects="currentUser.subjects || []"
       @close="importVisible = false"
       @success="handleImportSuccess"
     />
@@ -360,6 +380,7 @@ import Feedback from '@/components/Feedback.vue';
 import Profile from '@/components/Profile.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ExamList from '@/components/practice/ExamList.vue';
+import ClassManagement from '@/components/practice/ClassManagement.vue';
 import ExamPractice from '@/components/practice/ExamPractice.vue';
 import PracticeRecords from '@/components/practice/PracticeRecords.vue';
 import RecordDetail from '@/components/practice/RecordDetail.vue';
@@ -380,6 +401,18 @@ const pwdVisible = ref(false);
 const practiceView = ref('exams');
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
+
+// 教师端进入出卷与学生管理：默认进入"试卷分析"；学生端仍为"试卷列表"
+const onEnterPractice = () => {
+  if (currentUser.value?.role === 'teacher') {
+    practiceView.value = 'admin-records';
+  } else if (currentUser.value?.role === 'student') {
+    practiceView.value = 'exams';
+  } else {
+    practiceView.value = 'exams';
+  }
+  currentView.value = 'practice';
+};
 
 const canEdit = computed(() => currentUser.value?.role === 'admin' || currentUser.value?.role === 'teacher');
 
@@ -425,8 +458,10 @@ const currentBreadcrumb = computed(() => {
       'record-detail': '记录详情',
       stats: '统计分析',
       'admin-records': '做题管理',
+      classes: '班级管理',
     };
-    return '答题练习 / ' + (map[practiceView.value] || '');
+    const parent = currentUser.value?.role === 'student' ? '答题练习' : '出卷与学生管理';
+    return parent + ' / ' + (map[practiceView.value] || '');
   }
   return '';
 });
@@ -443,6 +478,7 @@ const pageTitle = computed(() => {
     'record-detail': '📝 答题详情',
     stats: '📈 统计分析',
     'admin-records': '👥 做题管理',
+    classes: '🏫 班级管理',
   };
   return map[practiceView.value] || '';
 });
@@ -601,6 +637,7 @@ const filters = reactive({
   难度: '',
   章节: '',
   出题人: '',
+  科目: '',
 });
 
 const dialogVisible = ref(false);
@@ -640,6 +677,7 @@ const loadData = async () => {
     if (filters.难度) params.难度 = filters.难度;
     if (filters.章节) params.章节 = filters.章节;
     if (filters.出题人) params.出题人 = filters.出题人;
+    if (filters.科目) params.科目 = filters.科目;
 
     const data = await getQuestions(params);
     list.value = data.list;
@@ -672,6 +710,7 @@ const handleReset = () => {
   filters.难度 = '';
   filters.章节 = '';
   filters.出题人 = '';
+  filters.科目 = '';
   page.value = 1;
   loadData();
 };
@@ -692,6 +731,8 @@ const generateId = () => {
 
 const openAddDialog = () => {
   isEdit.value = false;
+  const teacherSubjects = currentUser.value?.subjects || [];
+  const defaultSubject = teacherSubjects.length === 1 ? teacherSubjects[0] : '';
   formData.value = {
     id: generateId(),
     章节: '',
@@ -705,6 +746,7 @@ const openAddDialog = () => {
     知识点: '',
     使用频率: '',
     出题人: '',
+    科目: defaultSubject,
   };
   dialogVisible.value = true;
 };

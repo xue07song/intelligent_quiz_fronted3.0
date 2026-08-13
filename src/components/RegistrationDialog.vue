@@ -67,6 +67,45 @@
               <input v-model="form.confirmPassword" type="password" class="iq-input" placeholder="再次输入密码" />
             </div>
 
+            <!-- 学生专属字段 -->
+            <template v-if="form.role === 'student'">
+              <div class="iq-form-field">
+                <label class="iq-form-label">学院 <span class="iq-form-required">*</span></label>
+                <input v-model="form.college" type="text" class="iq-input" placeholder="请输入学院，如：计算机学院" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">专业 <span class="iq-form-required">*</span></label>
+                <input v-model="form.major" type="text" class="iq-input" placeholder="请输入专业，如：软件工程" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">学号 <span class="iq-form-required">*</span></label>
+                <input v-model="form.student_no" type="text" class="iq-input" placeholder="请输入学号" maxlength="20" />
+              </div>
+            </template>
+
+            <!-- 教师专属字段 -->
+            <template v-if="form.role === 'teacher'">
+              <div class="iq-form-field">
+                <label class="iq-form-label">工号 <span class="iq-form-required">*</span></label>
+                <input v-model="form.employee_no" type="text" class="iq-input" placeholder="请输入工号" maxlength="20" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">学院 <span class="iq-form-required">*</span></label>
+                <input v-model="form.college" type="text" class="iq-input" placeholder="请输入所在学院，如：计算机学院" />
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">所教科目 <span class="iq-form-required">*</span></label>
+                <div class="iq-subject-checkboxes">
+                  <label v-for="opt in subjectOptions" :key="opt" class="iq-checkbox-item">
+                    <input type="checkbox" class="iq-checkbox" :value="opt" v-model="form.subjects" />
+                    <span>{{ opt }}</span>
+                  </label>
+                  <span v-if="subjectOptions.length === 0" class="iq-text-sm iq-text-muted">科目加载中...</span>
+                </div>
+                <span class="iq-text-xs iq-text-muted">至少选择一个所教科目；如列表不含目标科目，可在审核通过后由管理员补充</span>
+              </div>
+            </template>
+
             <div v-if="errorMsg" class="iq-form-alert-error">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"></circle>
@@ -91,8 +130,9 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue';
+import { reactive, ref, watch, onMounted } from 'vue';
 import { submitRegistration } from '@/api/auth';
+import { getSubjects } from '@/api/subject';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -100,21 +140,51 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'success']);
 
+const subjectOptions = ref([]);
+
+// 接口失败时的兜底科目列表（避免教师注册被阻塞）
+const FALLBACK_SUBJECTS = ['高等数学', '线性代数', '概率论与数理统计', '大学物理', 'C语言程序设计', '数据结构', '操作系统', '计算机网络', '数据库原理', '软件工程', '人工智能', '机器学习', 'Python程序设计', 'Java程序设计', '英语', '思政'];
+
 const form = reactive({
   username: '',
   password: '',
   confirmPassword: '',
   role: 'student',
   nickname: '',
+  // 学生专属
+  college: '',
+  major: '',
+  student_no: '',
+  // 教师专属
+  employee_no: '',
+  subjects: [],
 });
 
 const loading = ref(false);
 const errorMsg = ref('');
 
+const loadSubjects = async () => {
+  try {
+    const data = await getSubjects();
+    // 兼容数组或 {list}
+    const list = Array.isArray(data) ? data : (data?.list || []);
+    const parsed = list.map((s) => (typeof s === 'string' ? s : (s.name || s.subject || ''))).filter(Boolean);
+    subjectOptions.value = parsed.length ? parsed : FALLBACK_SUBJECTS;
+  } catch (e) {
+    // 接口失败（如后端字段缺失）时使用兜底科目，避免阻塞教师注册
+    subjectOptions.value = FALLBACK_SUBJECTS;
+  }
+};
+
+onMounted(loadSubjects);
+
 watch(() => props.visible, (val) => {
   if (!val) {
     setTimeout(() => {
-      Object.assign(form, { username: '', password: '', confirmPassword: '', role: 'student', nickname: '' });
+      Object.assign(form, {
+        username: '', password: '', confirmPassword: '', role: 'student', nickname: '',
+        college: '', major: '', student_no: '', employee_no: '', subjects: [],
+      });
       errorMsg.value = '';
     }, 200);
   }
@@ -140,16 +210,39 @@ const handleSubmit = async () => {
     return;
   }
 
+  // 角色专属字段校验
+  if (form.role === 'student') {
+    if (!form.college.trim()) { errorMsg.value = '请填写学院'; return; }
+    if (!form.major.trim()) { errorMsg.value = '请填写专业'; return; }
+    if (!form.student_no.trim()) { errorMsg.value = '请填写学号'; return; }
+  } else if (form.role === 'teacher') {
+    if (!form.employee_no.trim()) { errorMsg.value = '请填写工号'; return; }
+    if (!form.college.trim()) { errorMsg.value = '请填写学院'; return; }
+    if (!form.subjects.length) { errorMsg.value = '请至少选择一个所教科目'; return; }
+  }
+
   loading.value = true;
   try {
-    await submitRegistration({
+    const payload = {
       username: form.username,
       password: form.password,
       role: form.role,
       nickname: form.nickname || null,
-    });
+      college: form.college.trim() || null,
+    };
+    if (form.role === 'student') {
+      payload.major = form.major.trim() || null;
+      payload.student_no = form.student_no.trim() || null;
+    } else {
+      payload.employee_no = form.employee_no.trim() || null;
+      payload.subjects = form.subjects;
+    }
+    await submitRegistration(payload);
     emit('success');
-    Object.assign(form, { username: '', password: '', confirmPassword: '', role: 'student', nickname: '' });
+    Object.assign(form, {
+      username: '', password: '', confirmPassword: '', role: 'student', nickname: '',
+      college: '', major: '', student_no: '', employee_no: '', subjects: [],
+    });
   } catch (err) {
     errorMsg.value = err.message || '注册申请提交失败';
   } finally {
@@ -299,4 +392,36 @@ const handleSubmit = async () => {
   opacity: 0;
   transform: translateY(8px) scale(0.98);
 }
+
+/* 注册弹窗加宽以容纳科目多选 */
+.iq-modal-md { max-width: 560px; }
+
+.iq-subject-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--iq-border);
+  border-radius: var(--iq-radius-medium);
+  background: var(--iq-card);
+  max-height: 160px;
+  overflow-y: auto;
+}
+.iq-checkbox-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--iq-neutral-700);
+  cursor: pointer;
+  user-select: none;
+}
+.iq-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--iq-primary-500);
+  cursor: pointer;
+}
+.iq-text-xs { font-size: 12px; }
+.iq-text-muted { color: var(--iq-neutral-500); }
 </style>

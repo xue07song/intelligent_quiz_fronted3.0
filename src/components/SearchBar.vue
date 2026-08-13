@@ -69,6 +69,14 @@
         />
       </div>
 
+      <div class="iq-search-field">
+        <label class="iq-search-label">科目</label>
+        <select v-model="filters.科目" class="iq-select" @change="$emit('search', filters)">
+          <option value="">全部科目</option>
+          <option v-for="opt in subjectOptions" :key="opt" :value="opt">{{ opt }}</option>
+        </select>
+      </div>
+
       <div class="iq-search-actions">
         <button class="iq-btn iq-btn-primary" @click="$emit('search', filters)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -97,18 +105,29 @@
 </template>
 
 <script setup>
-import { reactive, computed } from 'vue';
+import { reactive, computed, ref, onMounted } from 'vue';
 import { TYPE_OPTIONS, DIFFICULTY_OPTIONS } from '@/utils/constants';
+import { getSubjects } from '@/api/subject';
 
 const props = defineProps({
   initialFilters: { type: Object, default: () => ({}) },
   role: { type: String, default: '' },
+  subjects: { type: Array, default: () => [] },
   selectedCount: { type: Number, default: 0 },
 });
 
 const emit = defineEmits(['search', 'add', 'reset', 'batch-delete', 'batch-import', 'ai-generate']);
 
 const canEdit = computed(() => props.role === 'admin' || props.role === 'teacher');
+
+const allSubjects = ref([]);
+
+const subjectOptions = computed(() => {
+  if (props.role === 'teacher') {
+    return props.subjects || [];
+  }
+  return allSubjects.value || [];
+});
 
 const filters = reactive({
   id: props.initialFilters.id || '',
@@ -117,6 +136,7 @@ const filters = reactive({
   难度: props.initialFilters.难度 || '',
   章节: props.initialFilters.章节 || '',
   出题人: props.initialFilters.出题人 || '',
+  科目: props.initialFilters.科目 || '',
 });
 
 const typeOptions = TYPE_OPTIONS;
@@ -129,8 +149,19 @@ const handleReset = () => {
   filters.难度 = '';
   filters.章节 = '';
   filters.出题人 = '';
+  filters.科目 = '';
   emit('reset');
 };
+
+onMounted(async () => {
+  if (props.role === 'admin') {
+    try {
+      allSubjects.value = await getSubjects();
+    } catch (e) {
+      console.warn('加载科目列表失败:', e);
+    }
+  }
+});
 </script>
 
 <style scoped>

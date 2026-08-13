@@ -6,8 +6,10 @@ export const generateExam = (data) => {
   return request.post('/practice/exams', data);
 };
 
-export const getExamInventory = (chapters = []) => {
-  return request.get('/practice/exam-inventory', { params: { chapters: chapters.join(',') } });
+export const getExamInventory = (chapters = [], subject = '') => {
+  const params = { chapters: chapters.join(',') };
+  if (subject) params.subject = subject;
+  return request.get('/practice/exam-inventory', { params });
 };
 
 export const previewRuleExam = (data) => {

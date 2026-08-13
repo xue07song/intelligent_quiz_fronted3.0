@@ -32,6 +32,22 @@
       <div class="mode-status"><b>当前配置方式：</b><span>{{ configurationModeText }}</span><button v-if="!isManualMode" type="button" @click="switchToManualMode">退出当前方案，改为手动设置</button></div>
       <div v-if="presetNotice" class="preset-notice">{{ presetNotice }}</div>
       <div class="base-grid">
+        <label><span>组卷科目 <b style="color:#dc2626;">*</b></span>
+          <select v-model="form.subject" class="iq-input" style="height:38px;border:1px solid var(--iq-border);border-radius:8px;padding:0 10px;background:#fff;" @change="handleSubjectChange">
+            <option value="">请选择科目</option>
+            <option
+              v-for="s in subjectOptions"
+              :key="s"
+              :value="s"
+            >{{ s }}</option>
+          </select>
+        </label>
+        <label><span>目标班级（可选）</span>
+          <select v-model="form.classId" class="iq-input" style="height:38px;border:1px solid var(--iq-border);border-radius:8px;padding:0 10px;background:#fff;">
+            <option value="">不限班级（全开放）</option>
+            <option v-for="c in classList" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+        </label>
         <label><span>试卷标题</span><input v-model="form.title" class="iq-input" placeholder="留空则自动生成" /></label>
         <label><span>总题数</span><input v-model.number="form.count" type="number" min="1" max="100" class="iq-input" :disabled="!!activePaperPreset" @change="handleCountChange" /></label>
         <label><span>最少知识点覆盖</span><input v-model.number="form.minKnowledgePoints" type="number" min="1" :max="inventory?.knowledgePoints.length || 111" class="iq-input" :disabled="!!activePaperPreset" @input="markTypeCustom" /></label>
@@ -146,7 +162,13 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { generateRuleExam, getExamInventory, previewRuleExam } from '@/api/practice';
 import { smartExam } from '@/api/ai';
 import { TYPE_OPTIONS } from '@/utils/constants';
+import { getSubjects } from '@/api/subject';
+import { getClasses } from '@/api/class';
 
+const props = defineProps({
+  role: { type: String, default: 'teacher' },
+  subjects: { type: Array, default: () => [] },
+});
 const emit = defineEmits(['start-exam', 'toast']);
 const typeOptions = TYPE_OPTIONS;
 const difficultyNames = { 1: '入门', 2: '简单', 3: '中等', 4: '困难', 5: '挑战' };
@@ -169,8 +191,10 @@ const paperPresets = [
     { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖更多题型并保持高难度', count:20, knowledge:6, typeWeights:[10,35,20,15,20,0], difficultyWeights:[10,15,25,30,20] },
   ]},
 ];
-const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2} });
+const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classId: '' });
 const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), result = ref(null), aiResult = ref(false), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref('standard'), activePaperPreset = ref('standard'), activePaperVariant = ref('standard-balanced');
+const allSubjects = ref([]);
+const classList = ref([]);
 const chapterTotals = {1:43,2:40,3:40,4:29,5:30,6:35,7:37,8:44,9:40,10:37};
 const typeSum = computed(() => Object.values(form.typeDistribution).reduce((s,v)=>s+(Number(v)||0),0));
 const difficultySum = computed(() => Object.values(form.difficultyDistribution).reduce((s,v)=>s+(Number(v)||0),0));
@@ -258,6 +282,35 @@ const buildRulePayload = () => ({
   minKnowledgePoints: Number(form.minKnowledgePoints),
   typeDistribution: { ...form.typeDistribution },
   difficultyDistribution: { ...form.difficultyDistribution },
+  subject: form.subject || undefined,
+  classId: form.classId || undefined,
+});
+const subjectOptions = computed(() => {
+  // 教师：限自己所教科目；管理员：全部科目
+  if (props.role === 'teacher' && props.subjects?.length > 0) return props.subjects;
+  return allSubjects.value;
+});
+const handleSubjectChange = () => {
+  // 切换科目：重载库存与预览
+  preview.value = null;
+  loadInventory();
+};
+onMounted(async () => {
+  try {
+    // 加载科目和班级列表
+    if (props.role !== 'teacher' || !props.subjects?.length) {
+      allSubjects.value = await getSubjects();
+    }
+    try {
+      const clsData = await getClasses();
+      classList.value = Array.isArray(clsData) ? clsData : (clsData.list || []);
+    } catch { /* ignore */ }
+    // 教师只有一个科目时默认选中
+    if (props.role === 'teacher' && props.subjects?.length === 1) {
+      form.subject = props.subjects[0];
+    }
+  } catch { /* ignore */ }
+  loadInventory();
 });
 let previewTimer;
 let previewRequestId = 0;
@@ -284,7 +337,7 @@ const schedulePreview = () => {
 const loadInventory = async () => {
   inventoryLoading.value=true;
   errorMsg.value='';
-  try { inventory.value=await getExamInventory(form.chapters); }
+  try { inventory.value=await getExamInventory(form.chapters, form.subject); }
   catch(err){errorMsg.value=err.message||'读取题库库存失败';}
   finally{
     inventoryLoading.value=false;
@@ -294,9 +347,18 @@ const loadInventory = async () => {
   }
 };
 watch(() => [...form.chapters], loadInventory);
+watch(() => form.subject, loadInventory);
 watch(() => [form.count, form.minKnowledgePoints, ...Object.values(form.typeDistribution), ...Object.values(form.difficultyDistribution)], schedulePreview);
-onMounted(loadInventory);
-const validate = () => { if(!Number.isInteger(form.count)||form.count<1||form.count>100)return '总题数需为1-100之间的整数'; if(typeSum.value!==form.count)return `题型合计为${typeSum.value}，应为${form.count}`; if(difficultySum.value!==form.count)return `难度合计为${difficultySum.value}，应为${form.count}`; if(form.count>(inventory.value?.total||0))return '当前章节范围题目库存不足'; if(form.minKnowledgePoints>(inventory.value?.knowledgePoints.length||0))return '知识点覆盖要求超过当前库存'; return ''; };
+const validateSubject = () => {
+  if (props.role === 'teacher' && !form.subject) {
+    return '请选择组卷科目（教师必填）';
+  }
+  return '';
+};
+const validate = () => {
+  const subErr = validateSubject();
+  if (subErr) return subErr;
+  if(!Number.isInteger(form.count)||form.count<1||form.count>100)return '总题数需为1-100之间的整数'; if(typeSum.value!==form.count)return `题型合计为${typeSum.value}，应为${form.count}`; if(difficultySum.value!==form.count)return `难度合计为${difficultySum.value}，应为${form.count}`; if(form.count>(inventory.value?.total||0))return '当前章节范围题目库存不足'; if(form.minKnowledgePoints>(inventory.value?.knowledgePoints.length||0))return '知识点覆盖要求超过当前库存'; return ''; };
 const formatReason = (reason) => reason.replace(/题型1/g, '判断题').replace(/题型2/g, '单选题').replace(/题型3/g, '多选题').replace(/题型4/g, '填空题').replace(/题型5/g, '简答题').replace(/题型6/g, '程序论述题');
 const typeDistributionText = (distribution) => typeOptions.map(type => `${type.label}${Number(distribution?.[type.value]) || 0}题`).join('、');
 const difficultyDistributionText = (distribution) => [1,2,3,4,5].map(level => `${level}级${Number(distribution?.[level]) || 0}题`).join('、');
@@ -327,7 +389,7 @@ const handleSmartExam = async () => { errorMsg.value='';aiLoading.value=true;try
 </script>
 
 <style scoped>
-.exam-builder{display:flex;flex-direction:column;gap:16px;max-width:1120px}.iq-page-header h2{margin:0;color:var(--iq-neutral-900)}.iq-page-header p,.section-title span,.result-head p{margin:4px 0 0;color:var(--iq-neutral-500);font-size:13px}.section-card{padding:22px 26px}.section-title,.result-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.base-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px}.base-grid label,.distribution-item{display:flex;flex-direction:column;gap:6px;font-size:13px}.inline-actions,.template-actions,.action-row{display:flex;gap:8px;margin-top:12px}.distribution-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.difficulty-grid{grid-template-columns:repeat(5,1fr)}.distribution-item{padding:12px;border:1px solid var(--iq-neutral-200);border-radius:8px}.distribution-item span{font-weight:600}.distribution-item small{font-weight:400;color:var(--iq-neutral-500)}.distribution-item b{font-size:12px;color:var(--iq-neutral-500)}.sum-ok,.ok{color:#059669!important}.sum-bad,.bad{color:#dc2626!important}.info-note,.error-note,.warning-note,.success-note,.strategy-note{padding:11px 13px;border-radius:8px;margin-top:12px;font-size:13px}.info-note{background:#eff6ff;color:#1d4ed8}.error-note{background:#fef2f2;color:#b91c1c}.success-note{background:#ecfdf5;color:#047857}.warning-note{background:#fffbeb;color:#92400e;display:flex;flex-direction:column;gap:4px}.check-list{display:flex;flex-wrap:wrap;gap:18px;font-size:13px}.ai-btn{background:#7c3aed;color:#fff;border-color:#7c3aed}.result-card{border-left:4px solid #10b981}.result-head h3{margin:0}.report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.report-grid h4{margin:0 0 10px}.report-grid p{margin:5px 0;font-size:13px}.point-list{display:flex;flex-wrap:wrap;gap:5px}.point-list span{background:var(--iq-primary-50);color:var(--iq-primary-700);padding:3px 8px;border-radius:15px;font-size:12px}
+.exam-builder{display:flex;flex-direction:column;gap:16px;max-width:1120px;margin:0 auto;width:100%}.iq-page-header h2{margin:0;color:var(--iq-neutral-900)}.iq-page-header p,.section-title span,.result-head p{margin:4px 0 0;color:var(--iq-neutral-500);font-size:13px}.section-card{padding:22px 26px}.section-title,.result-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.base-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}.base-grid label,.distribution-item{display:flex;flex-direction:column;gap:6px;font-size:13px}.inline-actions,.template-actions,.action-row{display:flex;gap:8px;margin-top:12px}.distribution-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.difficulty-grid{grid-template-columns:repeat(5,1fr)}.distribution-item{padding:12px;border:1px solid var(--iq-neutral-200);border-radius:8px}.distribution-item span{font-weight:600}.distribution-item small{font-weight:400;color:var(--iq-neutral-500)}.distribution-item b{font-size:12px;color:var(--iq-neutral-500)}.sum-ok,.ok{color:#059669!important}.sum-bad,.bad{color:#dc2626!important}.info-note,.error-note,.warning-note,.success-note,.strategy-note{padding:11px 13px;border-radius:8px;margin-top:12px;font-size:13px}.info-note{background:#eff6ff;color:#1d4ed8}.error-note{background:#fef2f2;color:#b91c1c}.success-note{background:#ecfdf5;color:#047857}.warning-note{background:#fffbeb;color:#92400e;display:flex;flex-direction:column;gap:4px}.check-list{display:flex;flex-wrap:wrap;gap:18px;font-size:13px}.ai-btn{background:#7c3aed;color:#fff;border-color:#7c3aed}.result-card{border-left:4px solid #10b981}.result-head h3{margin:0}.report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.report-grid h4{margin:0 0 10px}.report-grid p{margin:5px 0;font-size:13px}.point-list{display:flex;flex-wrap:wrap;gap:5px}.point-list span{background:var(--iq-primary-50);color:var(--iq-primary-700);padding:3px 8px;border-radius:15px;font-size:12px}
 
 .chapter-selector{margin-top:20px;padding:18px;border:1px solid #dbe3f0;border-radius:12px;background:#f8fafc}.chapter-selector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}.chapter-selector-head>div:first-child{display:flex;flex-direction:column;gap:3px}.chapter-selector-head b{font-size:14px;color:#172033}.chapter-selector-head small{font-size:12px;color:#64748b}.chapter-actions{display:flex;gap:8px}.chapter-action{padding:7px 12px;border:1px solid #c7d2fe;border-radius:7px;background:#fff;color:#4f46e5;font-size:12px;font-weight:600;cursor:pointer}.chapter-action:hover{background:#eef2ff}.selected-summary{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:12px;border:1px solid #a5b4fc;border-radius:9px;background:#eef2ff;color:#3730a3}.selected-summary.empty{border-color:#cbd5e1;background:#fff;color:#475569}.summary-icon{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;border-radius:50%;background:#4f46e5;color:#fff;font-weight:700}.selected-summary.empty .summary-icon{background:#94a3b8}.selected-summary>div{display:flex;flex-direction:column;gap:2px}.selected-summary b{font-size:13px}.selected-summary small{font-size:12px;color:#6366f1}.selected-summary.empty small{color:#64748b}.chapter-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.chapter-chip{position:relative;display:grid;grid-template-columns:24px 1fr;grid-template-rows:auto auto;align-items:center;column-gap:8px;min-height:64px;padding:10px 11px;border:2px solid #e2e8f0;border-radius:10px;background:#fff;color:#334155;text-align:left;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s,transform .15s}.chapter-chip:hover{border-color:#a5b4fc;background:#f8faff;transform:translateY(-1px)}.chapter-chip.active{border-color:#4f46e5;background:#eef2ff;color:#312e81;box-shadow:0 0 0 2px rgba(79,70,229,.1)}.chapter-check{grid-row:1/3;display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border:2px solid #cbd5e1;border-radius:6px;background:#fff;color:#fff;font-size:14px;font-weight:800}.chapter-chip.active .chapter-check{border-color:#4f46e5;background:#4f46e5}.chapter-name{font-size:13px;font-weight:700}.chapter-chip small{font-size:11px;color:#64748b}.chapter-chip.active small{color:#6366f1}.chapter-help{margin:10px 0 0;color:#64748b;font-size:12px}
 .feasibility-note{padding:14px;margin-top:12px;border:1px solid #fecaca;border-radius:9px;background:#fff7f7;color:#991b1b;font-size:13px}.feasibility-title{display:flex;justify-content:space-between;gap:12px}.feasibility-title span{color:#b91c1c}.feasibility-note ul{margin:9px 0 0;padding-left:20px}.feasibility-note li+li{margin-top:5px}.suggestion-box{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 12px;margin-top:12px;border-radius:8px;background:#fff;color:#334155}.suggestion-box>div{display:flex;flex-direction:column;gap:4px}.suggestion-box span{font-size:12px;color:#64748b}

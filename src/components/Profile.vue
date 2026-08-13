@@ -39,6 +39,26 @@
             <el-descriptions-item label="学院">
               {{ textValue(profile.college) }}
             </el-descriptions-item>
+            <el-descriptions-item v-if="profile.role === 'student'" label="所在班级">
+              <template v-if="profile.className || profile.class_name">
+                <el-tag type="success" effect="light">{{ profile.className || profile.class_name }}</el-tag>
+              </template>
+              <span v-else class="iq-text-muted">未分班</span>
+            </el-descriptions-item>
+            <el-descriptions-item v-if="profile.role === 'teacher'" label="所教科目" :span="2">
+              <template v-if="profile.subjects && profile.subjects.length > 0">
+                <el-tag
+                  v-for="(s, idx) in profile.subjects"
+                  :key="idx"
+                  type="primary"
+                  effect="light"
+                  style="margin-right: 6px; margin-bottom: 4px;"
+                >
+                  {{ s }}
+                </el-tag>
+              </template>
+              <span v-else class="iq-text-muted">暂未设置</span>
+            </el-descriptions-item>
           </el-descriptions>
         </div>
       </el-tab-pane>

@@ -1,146 +1,43 @@
 <template>
   <div class="iq-admin-records">
-    <!-- 页面头部 -->
-    <div class="iq-page-header">
-      <div>
-        <h2 class="iq-text-xl iq-font-semibold" style="color: var(--iq-neutral-900); margin: 0;">
-          👥 做题管理
-        </h2>
-        <p class="iq-text-sm iq-text-muted" style="margin: 4px 0 0;">
-          <template v-if="role === 'teacher'">查看学生的做题记录与统计分析</template>
-          <template v-else>查看所有教师与学生的做题记录与统计（按角色区分）</template>
-        </p>
-      </div>
-    </div>
-
-    <!-- 视图：用户列表 -->
-    <template v-if="view === 'users'">
-      <div class="iq-card" style="padding: 16px 20px; margin-bottom: 16px;">
-        <div class="iq-flex iq-gap-3" style="align-items: center; justify-content: space-between; flex-wrap: wrap;">
-          <div v-if="role === 'admin'" class="iq-role-tabs">
-            <button
-              class="iq-role-tab"
-              :class="{ active: roleFilter === '' }"
-              @click="switchRoleFilter('')"
-            >
-              全部 ({{ usersData?.total || 0 }})
-            </button>
-            <button
-              class="iq-role-tab"
-              :class="{ active: roleFilter === 'student' }"
-              @click="switchRoleFilter('student')"
-            >
-              🎓 学生 ({{ usersData?.grouped?.student?.length || 0 }})
-            </button>
-            <button
-              class="iq-role-tab"
-              :class="{ active: roleFilter === 'teacher' }"
-              @click="switchRoleFilter('teacher')"
-            >
-              👨‍🏫 教师 ({{ usersData?.grouped?.teacher?.length || 0 }})
-            </button>
-          </div>
-          <button class="iq-btn iq-btn-primary" style="margin-left: auto;" @click="openAllStats">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10"></line>
-              <line x1="12" y1="20" x2="12" y2="4"></line>
-              <line x1="6" y1="20" x2="6" y2="14"></line>
-            </svg>
-            全局统计总览
-          </button>
+    <!-- 视图：试卷列表 -->
+    <template v-if="view === 'exams'">
+      <div class="iq-page-header">
+        <div>
+          <h2 class="iq-text-xl iq-font-semibold" style="color: var(--iq-neutral-900); margin: 0;">📊 试卷分析</h2>
+          <p class="iq-text-sm iq-text-muted" style="margin: 4px 0 0;">选择一份试卷，查看各班级做题情况与题目维度分析</p>
         </div>
       </div>
 
-      <div v-if="usersLoading" class="iq-table-loading">
-        <span class="iq-loading-spinner"></span>
-        <span class="iq-text-sm iq-text-muted">加载中...</span>
-      </div>
-
-      <div v-else-if="!usersData || usersData.list.length === 0" class="iq-card">
-        <div class="iq-empty-row">
-          <div class="iq-empty-box">
-            <div class="iq-empty-icon">📭</div>
-            <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">暂无做题记录数据</div>
+      <div class="iq-card" style="padding: 14px 20px; margin-bottom: 16px;">
+        <div class="exam-filter-row">
+          <div class="filter-item">
+            <label class="filter-label">科目</label>
+            <select v-model="subjectFilter" class="iq-select" @change="page = 1; loadExams()">
+              <option value="">全部科目</option>
+              <option v-for="s in allSubjects" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <label class="filter-label">班级</label>
+            <select v-model="classFilter" class="iq-select" @change="page = 1; loadExams()">
+              <option value="">全部班级</option>
+              <option v-for="c in classList" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+            </select>
           </div>
         </div>
       </div>
 
-      <div v-else class="iq-card">
-        <div class="iq-table-wrap">
-          <table class="iq-table">
-            <thead>
-              <tr>
-                <th>用户ID</th>
-                <th>用户名</th>
-                <th>昵称</th>
-                <th>角色</th>
-                <th>练习次数</th>
-                <th>平均准确率</th>
-                <th>最佳</th>
-                <th>最差</th>
-                <th>累计答题</th>
-                <th>累计正确</th>
-                <th>最近练习</th>
-                <th style="width: 190px;">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="u in usersData.list" :key="u.id">
-                <td><span class="iq-id-chip">{{ u.id }}</span></td>
-                <td>{{ u.username }}</td>
-                <td>{{ u.nickname || '-' }}</td>
-                <td><span class="iq-tag u-role" :class="u.role">{{ roleMap[u.role] || u.role }}</span></td>
-                <td><span class="iq-id-chip">{{ u.attempt_count }}</span></td>
-                <td><span class="iq-font-semibold" :class="accuracyTextClass(u.avg_accuracy)">{{ u.avg_accuracy }}%</span></td>
-                <td class="bar-good-text iq-font-semibold">{{ u.max_accuracy }}%</td>
-                <td class="bar-bad-text iq-font-semibold">{{ u.min_accuracy }}%</td>
-                <td>{{ u.total_questions }}</td>
-                <td class="bar-good-text iq-font-semibold">{{ u.total_correct }}</td>
-                <td class="iq-text-sm iq-text-muted">{{ formatTime(u.last_attempt_at) }}</td>
-                <td>
-                  <div class="iq-flex iq-gap-2">
-                    <button class="iq-btn iq-btn-primary iq-btn-sm" @click="openUserRecords(u)">
-                      📋 答题记录
-                    </button>
-                    <button class="iq-btn iq-btn-success iq-btn-sm" @click="openUserStats(u)">
-                      📈 统计
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </template>
-
-    <!-- 视图：某用户的答题记录列表 -->
-    <template v-if="view === 'records'">
-      <div class="iq-sub-header">
-        <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="backToUsers">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          返回用户列表
-        </button>
-        <div class="iq-sub-title">
-          📋 <strong>{{ selectedUser.nickname || selectedUser.username }}</strong>
-          <span class="iq-tag u-role" :class="selectedUser.role" style="margin-left: 6px;">{{ roleMap[selectedUser.role] }}</span>
-          <span class="iq-text-sm iq-text-muted" style="margin-left: 10px;">的答题记录</span>
-        </div>
-      </div>
-
-      <div v-if="recordsLoading" class="iq-table-loading">
+      <div v-if="examsLoading" class="iq-table-loading">
         <span class="iq-loading-spinner"></span>
         <span class="iq-text-sm iq-text-muted">加载中...</span>
       </div>
 
-      <div v-else-if="records.length === 0" class="iq-card">
+      <div v-else-if="examList.length === 0" class="iq-card">
         <div class="iq-empty-row">
           <div class="iq-empty-box">
-            <div class="iq-empty-icon">📭</div>
-            <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">该用户暂无答题记录</div>
+            <div class="iq-empty-icon">📋</div>
+            <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">暂无试卷数据</div>
           </div>
         </div>
       </div>
@@ -151,305 +48,624 @@
             <thead>
               <tr>
                 <th>ID</th>
-                <th>提交人</th>
-                <th>试卷</th>
-                <th>得分</th>
-                <th>准确率</th>
-                <th>总题数</th>
-                <th>正确</th>
-                <th>错误</th>
-                <th>未答</th>
-                <th>用时</th>
-                <th>提交时间</th>
-                <th style="width: 110px;">操作</th>
+                <th>标题</th>
+                <th>科目</th>
+                <th>目标班级</th>
+                <th>题数</th>
+                <th>练习次数</th>
+                <th>创建时间</th>
+                <th style="width: 120px;">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="r in records" :key="r.id">
-                <td><span class="iq-id-chip">{{ r.id }}</span></td>
+              <tr v-for="exam in examList" :key="exam.id">
+                <td><span class="iq-id-chip">{{ exam.id }}</span></td>
+                <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ exam.title }}</td>
                 <td>
-                  <div class="user-cell">
-                    <span>{{ r.nickname || r.username || '-' }}</span>
-                    <span v-if="r.role" class="iq-tag u-role" :class="r.role">{{ roleMap[r.role] || r.role }}</span>
-                  </div>
+                  <span v-if="exam.subject" class="iq-subject-tag">{{ exam.subject }}</span>
+                  <span v-else>--</span>
                 </td>
-                <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ r.exam_title || `试卷#${r.exam_id}` }}</td>
-                <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
-                <td>{{ r.accuracy }}%</td>
-                <td>{{ r.total_count }}</td>
-                <td class="bar-good-text iq-font-semibold">{{ r.correct_count }}</td>
-                <td class="bar-bad-text iq-font-semibold">{{ r.wrong_count }}</td>
-                <td>{{ r.skipped_count }}</td>
-                <td>{{ formatDuration(r.duration_seconds) }}</td>
-                <td class="iq-text-sm iq-text-muted">{{ formatTime(r.submitted_at) }}</td>
                 <td>
-                  <button class="iq-btn iq-btn-primary iq-btn-sm" @click="openRecordDetail(r.id)">📋 详情</button>
+                  <span v-if="exam.class_id || exam.classId" class="iq-tag iq-tag-warning">{{ exam.class_name || exam.className || '定向' }}</span>
+                  <span v-else class="iq-tag iq-tag-neutral">全开放</span>
+                </td>
+                <td>{{ exam.total_count }}</td>
+                <td><span class="iq-id-chip">{{ exam.attempt_count || 0 }}</span></td>
+                <td class="iq-text-sm iq-text-muted">{{ formatTime(exam.created_at) }}</td>
+                <td>
+                  <button class="iq-btn iq-btn-primary iq-btn-sm" @click="openExamAnalysis(exam)">📊 分析</button>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-
         <Pagination
-          v-model:page="recordsPage"
-          v-model:pageSize="recordsPageSize"
-          :total="recordsTotal"
-          @change="loadUserRecords"
+          v-model:page="page"
+          v-model:pageSize="pageSize"
+          :total="total"
+          @change="loadExams"
         />
       </div>
     </template>
 
-    <!-- 视图：答题记录详情（复用 RecordDetail，管理端模式） -->
-    <template v-if="view === 'detail'">
-      <RecordDetail
-        :recordId="activeRecordId"
-        adminMode
-        @back="backFromDetail"
-        @toast="onToast"
-      />
-    </template>
-
-    <!-- 视图：某用户的统计分析（复用 PracticeStats，传入 userId） -->
-    <template v-if="view === 'stats'">
+    <!-- 视图：试卷分析详情 -->
+    <template v-if="view === 'analysis'">
       <div class="iq-sub-header">
-        <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="backToUsers">
+        <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="view = 'exams'">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
-          返回用户列表
+          返回试卷列表
         </button>
         <div class="iq-sub-title">
-          📈 <strong>{{ selectedUser.nickname || selectedUser.username }}</strong>
-          <span class="iq-tag u-role" :class="selectedUser.role" style="margin-left: 6px;">{{ roleMap[selectedUser.role] }}</span>
-          <span class="iq-text-sm iq-text-muted" style="margin-left: 10px;">的统计分析</span>
-        </div>
-      </div>
-      <PracticeStats :userId="selectedUser.id" @toast="onToast" />
-    </template>
-
-    <!-- 视图：全局统计总览（以人为界，按人分组展示每人每次明细） -->
-    <template v-if="view === 'allStats'">
-      <div class="iq-sub-header">
-        <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="backToUsers">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          返回用户列表
-        </button>
-        <div class="iq-sub-title">
-          📊 全局统计总览（以人为界，共 <strong class="iq-text-primary">{{ allStats?.total || 0 }}</strong> 人）
+          📊 <strong>{{ selectedExam?.title }}</strong>
+          <span class="iq-text-sm iq-text-muted" style="margin-left: 10px;">试卷分析</span>
         </div>
       </div>
 
-      <div v-if="allStatsLoading" class="iq-table-loading">
+      <div v-if="analysisLoading" class="iq-table-loading">
         <span class="iq-loading-spinner"></span>
-        <span class="iq-text-sm iq-text-muted">加载中...</span>
+        <span class="iq-text-sm iq-text-muted">正在加载试卷分析数据...</span>
       </div>
 
-      <div v-else-if="!allStats || allStats.users.length === 0" class="iq-card">
-        <div class="iq-empty-row">
-          <div class="iq-empty-box">
-            <div class="iq-empty-icon">📭</div>
-            <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">暂无做题数据</div>
+      <template v-else>
+        <!-- 统计卡片 -->
+        <div class="stats-cards">
+          <div class="iq-card stat-card">
+            <div class="stat-label">练习总次数</div>
+            <div class="stat-value">{{ analysis.totalAttempts }}</div>
+          </div>
+          <div class="iq-card stat-card">
+            <div class="stat-label">参与人数</div>
+            <div class="stat-value">{{ analysis.uniqueStudents }}</div>
+          </div>
+          <div class="iq-card stat-card">
+            <div class="stat-label">平均得分</div>
+            <div class="stat-value" :class="scoreColor(analysis.avgScore)">{{ analysis.avgScore }}</div>
+          </div>
+          <div class="iq-card stat-card">
+            <div class="stat-label">及格率</div>
+            <div class="stat-value" :class="analysis.passRate >= 60 ? 'text-good' : 'text-bad'">{{ analysis.passRate }}%</div>
+          </div>
+          <div class="iq-card stat-card">
+            <div class="stat-label">平均正确率</div>
+            <div class="stat-value" :class="analysis.avgAccuracy >= 80 ? 'text-good' : analysis.avgAccuracy >= 60 ? 'text-mid' : 'text-bad'">{{ analysis.avgAccuracy }}%</div>
           </div>
         </div>
-      </div>
 
-      <div v-else class="iq-stats-groups">
-        <div v-for="u in allStats.users" :key="u.id" class="iq-card iq-stats-group">
-          <div class="iq-group-header">
-            <div class="iq-group-user">
-              <div class="iq-avatar iq-avatar-sm">{{ (u.nickname || u.username || '?').charAt(0) }}</div>
-              <div>
-                <div class="iq-font-semibold iq-text-base" style="color: var(--iq-neutral-900);">{{ u.nickname || u.username }}</div>
-                <span class="iq-tag u-role" :class="u.role">{{ roleMap[u.role] || u.role }}</span>
+        <!-- 图表区 -->
+        <div class="charts-row">
+          <!-- 饼图：成绩分布 -->
+          <div class="iq-card chart-card">
+            <div class="chart-title">📈 成绩分布</div>
+            <div class="pie-chart-wrap">
+              <svg viewBox="0 0 200 200" class="pie-svg">
+                <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.excellent" :stroke-width="40"
+                  :stroke-dasharray="pieDash.excellent" :stroke-dashoffset="pieOffset.excellent"
+                  transform="rotate(-90 100 100)" />
+                <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.pass" :stroke-width="40"
+                  :stroke-dasharray="pieDash.pass" :stroke-dashoffset="pieOffset.pass"
+                  transform="rotate(-90 100 100)" />
+                <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.fail" :stroke-width="40"
+                  :stroke-dasharray="pieDash.fail" :stroke-dashoffset="pieOffset.fail"
+                  transform="rotate(-90 100 100)" />
+                <text x="100" y="95" text-anchor="middle" class="pie-center-num">{{ analysis.totalAttempts }}</text>
+                <text x="100" y="115" text-anchor="middle" class="pie-center-label">总提交</text>
+              </svg>
+              <div class="pie-legend">
+                <div class="legend-item">
+                  <span class="legend-dot" :style="{ background: pieColors.excellent }"></span>
+                  <span>优秀 (≥80)</span>
+                  <b>{{ analysis.scoreDist.excellent }}</b>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" :style="{ background: pieColors.pass }"></span>
+                  <span>及格 (60-79)</span>
+                  <b>{{ analysis.scoreDist.pass }}</b>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" :style="{ background: pieColors.fail }"></span>
+                  <span>不及格 (<60)</span>
+                  <b>{{ analysis.scoreDist.fail }}</b>
+                </div>
               </div>
             </div>
-            <div class="iq-group-summary">
-              <div class="summary-chip"><span class="chip-label">练习</span><b>{{ u.overview.attempt_count }}</b><span class="chip-unit">次</span></div>
-              <div class="summary-chip"><span class="chip-label">平均</span><b class="chip-mid">{{ u.overview.avg_accuracy }}%</b></div>
-              <div class="summary-chip"><span class="chip-label">最佳</span><b class="chip-good">{{ u.overview.max_accuracy }}%</b></div>
-              <div class="summary-chip"><span class="chip-label">最差</span><b class="chip-bad">{{ u.overview.min_accuracy }}%</b></div>
-              <div class="summary-chip"><span class="chip-label">累计答题</span><b>{{ u.overview.total_questions }}</b></div>
-              <div class="summary-chip"><span class="chip-label">累计正确</span><b class="chip-good">{{ u.overview.total_correct }}</b></div>
+          </div>
+
+          <!-- 柱状图：班级对比 -->
+          <div class="iq-card chart-card">
+            <div class="chart-title">📊 班级平均分对比</div>
+            <div v-if="analysis.classStats.length > 0" class="bar-chart-wrap">
+              <div class="bar-chart">
+                <div v-for="cls in analysis.classStats" :key="cls.name" class="bar-group">
+                  <div class="bar-value">{{ cls.avgScore }}</div>
+                  <div class="bar-track">
+                    <div class="bar-fill" :style="{ height: barHeight(cls.avgScore) + '%', background: barColor(cls.avgScore) }"></div>
+                  </div>
+                  <div class="bar-label" :title="cls.name">{{ cls.name }}</div>
+                  <div class="bar-meta">{{ cls.count }}人</div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="no-chart-data">
+              <span class="iq-text-sm iq-text-muted">暂无班级数据</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 第二行图表：正确率分布 + 题型分布 -->
+        <div class="charts-row">
+          <!-- 柱状图：各分数段人数 -->
+          <div class="iq-card chart-card">
+            <div class="chart-title">📊 分数段分布</div>
+            <div class="bar-chart-wrap">
+              <div class="bar-chart">
+                <div v-for="seg in analysis.scoreSegments" :key="seg.label" class="bar-group">
+                  <div class="bar-value">{{ seg.count }}</div>
+                  <div class="bar-track">
+                    <div class="bar-fill" :style="{ height: barHeightRaw(seg.count, analysis.maxSegment) + '%', background: seg.color }"></div>
+                  </div>
+                  <div class="bar-label">{{ seg.label }}</div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div v-if="u.records.length > 0" class="iq-table-wrap">
+          <!-- 饼图：答题正确率分布 -->
+          <div class="iq-card chart-card">
+            <div class="chart-title">📈 答题正确率分布</div>
+            <div class="pie-chart-wrap">
+              <svg viewBox="0 0 200 200" class="pie-svg">
+                <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.high" :stroke-width="40"
+                  :stroke-dasharray="accDash.high" :stroke-dashoffset="accOffset.high"
+                  transform="rotate(-90 100 100)" />
+                <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.mid" :stroke-width="40"
+                  :stroke-dasharray="accDash.mid" :stroke-dashoffset="accOffset.mid"
+                  transform="rotate(-90 100 100)" />
+                <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.low" :stroke-width="40"
+                  :stroke-dasharray="accDash.low" :stroke-dashoffset="accOffset.low"
+                  transform="rotate(-90 100 100)" />
+                <text x="100" y="95" text-anchor="middle" class="pie-center-num">{{ analysis.avgAccuracy }}%</text>
+                <text x="100" y="115" text-anchor="middle" class="pie-center-label">平均正确率</text>
+              </svg>
+              <div class="pie-legend">
+                <div class="legend-item">
+                  <span class="legend-dot" :style="{ background: accColors.high }"></span>
+                  <span>高 (≥80%)</span>
+                  <b>{{ analysis.accDist.high }}</b>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" :style="{ background: accColors.mid }"></span>
+                  <span>中 (60-79%)</span>
+                  <b>{{ analysis.accDist.mid }}</b>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" :style="{ background: accColors.low }"></span>
+                  <span>低 (<60%)</span>
+                  <b>{{ analysis.accDist.low }}</b>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 题目维度分析 -->
+        <div class="iq-card" style="padding: 20px;">
+          <div class="section-title-bar">
+            <b>📝 题目维度分析</b>
+            <span class="iq-text-sm iq-text-muted">每道题的全班作答情况</span>
+          </div>
+          <div v-if="questionsLoading" class="iq-table-loading" style="padding: 30px 0;">
+            <span class="iq-loading-spinner"></span>
+            <span class="iq-text-sm iq-text-muted">加载题目数据...</span>
+          </div>
+          <div v-else-if="questionStats.length === 0" class="iq-empty-box" style="padding: 30px 0;">
+            <div class="iq-empty-icon">📝</div>
+            <div class="iq-empty-text iq-text-sm iq-text-muted">暂无题目数据</div>
+          </div>
+          <div v-else class="iq-table-wrap">
             <table class="iq-table">
               <thead>
                 <tr>
-                  <th>提交时间</th>
-                  <th>试卷</th>
-                  <th>得分</th>
-                  <th>准确率</th>
-                  <th>总题</th>
-                  <th>正确</th>
-                  <th>错误</th>
-                  <th>未答</th>
-                  <th>用时</th>
-                  <th style="width: 110px;">操作</th>
+                  <th style="width: 40px;">#</th>
+                  <th>题目</th>
+                  <th>题型</th>
+                  <th>难度</th>
+                  <th>正确率</th>
+                  <th style="width: 200px;">正确率分布</th>
+                  <th>正确答案</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="r in u.records" :key="r.id">
-                  <td class="iq-text-sm iq-text-muted">{{ formatTime(r.submitted_at) }}</td>
-                  <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ r.exam_title || `试卷#${r.exam_id}` }}</td>
-                  <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
-                  <td><span class="iq-font-semibold" :class="accuracyTextClass(r.accuracy)">{{ r.accuracy }}%</span></td>
-                  <td>{{ r.total_count }}</td>
-                  <td class="bar-good-text iq-font-semibold">{{ r.correct_count }}</td>
-                  <td class="bar-bad-text iq-font-semibold">{{ r.wrong_count }}</td>
-                  <td>{{ r.skipped_count }}</td>
-                  <td>{{ formatDuration(r.duration_seconds) }}</td>
+                <tr v-for="(q, idx) in questionStats" :key="idx">
+                  <td><span class="iq-id-chip">{{ idx + 1 }}</span></td>
+                  <td class="question-cell" :title="q.title">{{ q.title }}</td>
+                  <td><span class="iq-type-tag" :class="`type-${q.type}`">{{ q.typeName }}</span></td>
                   <td>
-                    <button class="iq-btn iq-btn-primary iq-btn-sm" @click="openRecordDetail(r.id, 'allStats')">📋 详情</button>
+                    <span class="iq-tag" :class="difficultyClass(q.difficulty)">{{ q.difficulty }}级</span>
                   </td>
+                  <td>
+                    <span class="iq-font-semibold" :class="q.correctRate >= 80 ? 'text-good' : q.correctRate >= 60 ? 'text-mid' : 'text-bad'">
+                      {{ q.correctRate }}%
+                    </span>
+                  </td>
+                  <td>
+                    <div class="mini-bar-wrap">
+                      <div class="mini-bar mini-bar-correct" :style="{ width: q.correctRate + '%' }"></div>
+                      <div class="mini-bar mini-bar-wrong" :style="{ width: q.wrongRate + '%' }"></div>
+                      <div class="mini-bar mini-bar-skip" :style="{ width: q.skipRate + '%' }"></div>
+                    </div>
+                  </td>
+                  <td class="answer-cell" :title="q.answer">{{ q.answer }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div v-else class="iq-no-data-inline">该用户暂无答题明细</div>
         </div>
-      </div>
+
+        <!-- 所有提交记录 -->
+        <div class="iq-card" style="padding: 20px;">
+          <div class="section-title-bar">
+            <b>📋 所有提交记录</b>
+            <span class="iq-text-sm iq-text-muted">共 {{ recordsTotal }} 条</span>
+          </div>
+          <div v-if="recordsLoading" class="iq-table-loading" style="padding: 30px 0;">
+            <span class="iq-loading-spinner"></span>
+            <span class="iq-text-sm iq-text-muted">加载中...</span>
+          </div>
+          <div v-else-if="recordsList.length === 0" class="iq-empty-box" style="padding: 30px 0;">
+            <div class="iq-empty-icon">📋</div>
+            <div class="iq-empty-text iq-text-sm iq-text-muted">暂无提交记录</div>
+          </div>
+          <div v-else class="iq-table-wrap">
+            <table class="iq-table">
+              <thead>
+                <tr>
+                  <th>提交人</th>
+                  <th>班级</th>
+                  <th>得分</th>
+                  <th>正确率</th>
+                  <th>正确/错误/未答</th>
+                  <th>用时</th>
+                  <th>提交时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in recordsList" :key="r.id">
+                  <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ r.nickname || r.username || '-' }}</td>
+                  <td>
+                    <span v-if="r.class_name || r.className" class="iq-tag iq-tag-neutral">{{ r.class_name || r.className }}</span>
+                    <span v-else class="iq-text-sm iq-text-muted">--</span>
+                  </td>
+                  <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
+                  <td><span class="iq-font-semibold" :class="r.accuracy >= 80 ? 'text-good' : r.accuracy >= 60 ? 'text-mid' : 'text-bad'">{{ r.accuracy }}%</span></td>
+                  <td>
+                    <span class="bar-good-text">{{ r.correct_count }}</span> /
+                    <span class="bar-bad-text">{{ r.wrong_count }}</span> /
+                    <span class="iq-text-muted">{{ r.skipped_count }}</span>
+                  </td>
+                  <td class="iq-text-sm">{{ formatDuration(r.duration_seconds) }}</td>
+                  <td class="iq-text-sm iq-text-muted">{{ formatTime(r.submitted_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            v-if="recordsTotal > 0"
+            v-model:page="recordsPage"
+            v-model:pageSize="recordsPageSize"
+            :total="recordsTotal"
+            @change="loadExamRecords"
+          />
+        </div>
+      </template>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { adminListUsers, adminListUserRecords, adminGetAllStats } from '@/api/practice';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { getExams, adminListRecords, getExam } from '@/api/practice';
+import { getSubjects } from '@/api/subject';
+import { getClasses } from '@/api/class';
+import { getTypeName, getDifficultyLabel, DIFFICULTY_OPTIONS } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
-import RecordDetail from './RecordDetail.vue';
-import PracticeStats from './PracticeStats.vue';
 
 const props = defineProps({
-  role: { type: String, required: true }, // 'admin' | 'teacher'
+  role: { type: String, required: true },
 });
 
 const emit = defineEmits(['toast']);
 
-const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
+const view = ref('exams');
 
-// 视图状态：users | records | detail | stats | allStats
-const view = ref('users');
+// ===== 试卷列表 =====
+const examList = ref([]);
+const total = ref(0);
+const page = ref(1);
+const pageSize = ref(20);
+const examsLoading = ref(false);
+const allSubjects = ref([]);
+const classList = ref([]);
+const subjectFilter = ref('');
+const classFilter = ref('');
 
-// ===== 用户列表 =====
-const usersData = ref(null);
-const usersLoading = ref(false);
-const roleFilter = ref(''); // '' | 'student' | 'teacher'（仅管理员可用）
-
-const loadUsers = async () => {
-  usersLoading.value = true;
+const loadExams = async () => {
+  examsLoading.value = true;
   try {
-    const params = {};
-    if (props.role === 'teacher') {
-      // 教师强制只看学生（后端也会强制，这里显式传）
-      params.role = 'student';
-    } else if (roleFilter.value) {
-      params.role = roleFilter.value;
+    const params = { page: page.value, pageSize: pageSize.value };
+    if (subjectFilter.value) params.subject = subjectFilter.value;
+    if (classFilter.value) params.classId = classFilter.value;
+    const data = await getExams(params);
+    // 兼容：后端可能直接返回数组或 {list,total}
+    if (Array.isArray(data)) {
+      examList.value = data;
+      total.value = data.length;
+    } else {
+      examList.value = data?.list || [];
+      total.value = data?.total || 0;
     }
-    usersData.value = await adminListUsers(params);
   } catch (err) {
-    onToast({ message: err.message || '加载用户列表失败', type: 'error' });
+    onToast({ message: err.message || '加载试卷列表失败', type: 'error' });
   } finally {
-    usersLoading.value = false;
+    examsLoading.value = false;
   }
 };
 
-const switchRoleFilter = (r) => {
-  roleFilter.value = r;
-  loadUsers();
-};
-
-// ===== 某用户答题记录 =====
-const selectedUser = ref({});
-const records = ref([]);
+// ===== 试卷分析 =====
+const selectedExam = ref(null);
+const analysisLoading = ref(false);
+const recordsLoading = ref(false);
+const questionsLoading = ref(false);
+const recordsList = ref([]);
 const recordsTotal = ref(0);
 const recordsPage = ref(1);
-const recordsPageSize = ref(20);
-const recordsLoading = ref(false);
-const activeRecordId = ref(null);
-// 详情返回目标视图（从 allStats 进入详情后返回 allStats，否则返回 records）
-const detailBackTarget = ref('records');
+const recordsPageSize = ref(50);
+const questionStats = ref([]);
 
-const openUserRecords = (user) => {
-  selectedUser.value = user;
+const analysis = reactive({
+  totalAttempts: 0,
+  uniqueStudents: 0,
+  avgScore: 0,
+  passRate: 0,
+  avgAccuracy: 0,
+  scoreDist: { excellent: 0, pass: 0, fail: 0 },
+  accDist: { high: 0, mid: 0, low: 0 },
+  classStats: [],
+  scoreSegments: [],
+  maxSegment: 1,
+});
+
+const openExamAnalysis = async (exam) => {
+  selectedExam.value = exam;
+  view.value = 'analysis';
+  analysisLoading.value = true;
   recordsPage.value = 1;
-  view.value = 'records';
-  loadUserRecords();
+
+  try {
+    await Promise.all([loadExamRecords(), loadQuestionStats()]);
+    computeAnalysis();
+  } catch (err) {
+    onToast({ message: err.message || '加载分析数据失败', type: 'error' });
+  } finally {
+    analysisLoading.value = false;
+  }
 };
 
-const loadUserRecords = async () => {
+const loadExamRecords = async () => {
   recordsLoading.value = true;
   try {
-    const data = await adminListUserRecords(selectedUser.value.id, {
+    const params = {
+      examId: selectedExam.value.id,
       page: recordsPage.value,
       pageSize: recordsPageSize.value,
-    });
-    records.value = data.list;
-    recordsTotal.value = data.total;
+    };
+    if (props.role === 'teacher') params.role = 'student';
+    const data = await adminListRecords(params);
+    // 兼容：后端可能直接返回数组或 {list,total}
+    if (Array.isArray(data)) {
+      recordsList.value = data;
+      recordsTotal.value = data.length;
+    } else {
+      recordsList.value = data?.list || [];
+      recordsTotal.value = data?.total || 0;
+    }
+    if (recordsPage.value === 1) computeAnalysis();
   } catch (err) {
-    onToast({ message: err.message || '加载答题记录失败', type: 'error' });
+    onToast({ message: err.message || '加载记录失败', type: 'error' });
   } finally {
     recordsLoading.value = false;
   }
 };
 
-const openRecordDetail = (recordId, from = 'records') => {
-  activeRecordId.value = recordId;
-  detailBackTarget.value = from;
-  view.value = 'detail';
+// 从对象中按多个字段名取第一个有效值（兼容多种契约）
+const pick = (obj, fields, fallback = '') => {
+  if (!obj) return fallback;
+  for (const f of fields) {
+    if (obj[f] !== null && obj[f] !== undefined && obj[f] !== '') return obj[f];
+  }
+  return fallback;
 };
 
-const backFromDetail = () => {
-  view.value = detailBackTarget.value;
-};
-
-// ===== 某用户统计 =====
-const openUserStats = (user) => {
-  selectedUser.value = user;
-  view.value = 'stats';
-};
-
-// ===== 全局统计总览（以人为界，按人分组）=====
-const allStats = ref(null);
-const allStatsLoading = ref(false);
-
-const openAllStats = () => {
-  view.value = 'allStats';
-  loadAllStats();
-};
-
-const loadAllStats = async () => {
-  allStatsLoading.value = true;
+const loadQuestionStats = async () => {
+  questionsLoading.value = true;
   try {
-    const params = {};
-    if (props.role === 'teacher') {
-      params.role = 'student';
-    } else if (roleFilter.value) {
-      params.role = roleFilter.value;
-    }
-    allStats.value = await adminGetAllStats(params);
+    const examData = await getExam(selectedExam.value.id);
+    const questions = examData?.questions || examData?.data?.questions || [];
+    questionStats.value = questions.map((q, idx) => {
+      const typeNum = Number(pick(q, ['题型', 'type', 'questionType', 'question_type'], 0));
+      const titleRaw = pick(q, ['题目', 'title', 'question', 'stem'], '');
+      return {
+        index: idx + 1,
+        title: String(titleRaw).substring(0, 60) || `第${idx + 1}题`,
+        type: typeNum,
+        typeName: getTypeName(typeNum) || '未知',
+        difficulty: Number(pick(q, ['难度', 'difficulty', 'level'], 0)),
+        answer: pick(q, ['答案', 'answer', 'correctAnswer', 'correct_answer'], '--'),
+        correctRate: 0,
+        wrongRate: 0,
+        skipRate: 0,
+      };
+    });
   } catch (err) {
-    onToast({ message: err.message || '加载全局统计失败', type: 'error' });
+    onToast({ message: err.message || '加载题目数据失败', type: 'error' });
   } finally {
-    allStatsLoading.value = false;
+    questionsLoading.value = false;
   }
 };
 
-// ===== 导航 =====
-const backToUsers = () => {
-  view.value = 'users';
+const computeAnalysis = () => {
+  const records = recordsList.value;
+  if (records.length === 0) {
+    Object.assign(analysis, {
+      totalAttempts: 0, uniqueStudents: 0, avgScore: 0, passRate: 0, avgAccuracy: 0,
+      scoreDist: { excellent: 0, pass: 0, fail: 0 },
+      accDist: { high: 0, mid: 0, low: 0 },
+      classStats: [], scoreSegments: [], maxSegment: 1,
+    });
+    return;
+  }
+
+  const totalAttempts = recordsTotal.value || records.length;
+  const studentSet = new Set(records.map(r => r.user_id || r.userId || r.id));
+  const uniqueStudents = studentSet.size;
+
+  const scores = records.map(r => Number(r.score) || 0);
+  const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const passCount = scores.filter(s => s >= 60).length;
+  const passRate = Math.round((passCount / scores.length) * 100);
+
+  const accuracies = records.map(r => Number(r.accuracy) || 0);
+  const avgAccuracy = Math.round(accuracies.reduce((a, b) => a + b, 0) / accuracies.length);
+
+  const scoreDist = {
+    excellent: scores.filter(s => s >= 80).length,
+    pass: scores.filter(s => s >= 60 && s < 80).length,
+    fail: scores.filter(s => s < 60).length,
+  };
+
+  const accDist = {
+    high: accuracies.filter(a => a >= 80).length,
+    mid: accuracies.filter(a => a >= 60 && a < 80).length,
+    low: accuracies.filter(a => a < 60).length,
+  };
+
+  // 班级分组统计
+  const classMap = {};
+  records.forEach(r => {
+    const clsName = r.class_name || r.className || '未分班';
+    if (!classMap[clsName]) classMap[clsName] = { scores: [], count: 0 };
+    classMap[clsName].scores.push(Number(r.score) || 0);
+    classMap[clsName].count++;
+  });
+  const classStats = Object.entries(classMap).map(([name, data]) => ({
+    name,
+    avgScore: Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length),
+    count: data.count,
+  })).sort((a, b) => b.avgScore - a.avgScore);
+
+  // 分数段
+  const segments = [
+    { label: '0-59', min: 0, max: 59, count: 0, color: '#ef4444' },
+    { label: '60-69', min: 60, max: 69, count: 0, color: '#f59e0b' },
+    { label: '70-79', min: 70, max: 79, count: 0, color: '#eab308' },
+    { label: '80-89', min: 80, max: 89, count: 0, color: '#22c55e' },
+    { label: '90-100', min: 90, max: 100, count: 0, color: '#10b981' },
+  ];
+  scores.forEach(s => {
+    const seg = segments.find(seg => s >= seg.min && s <= seg.max);
+    if (seg) seg.count++;
+  });
+  const maxSegment = Math.max(...segments.map(s => s.count), 1);
+
+  // 题目正确率（从记录中汇总）
+  if (questionStats.value.length > 0 && records.length > 0) {
+    // 从首批记录中估算每题正确率
+    const qCorrect = new Array(questionStats.value.length).fill(0);
+    const qWrong = new Array(questionStats.value.length).fill(0);
+    const qSkip = new Array(questionStats.value.length).fill(0);
+    const qTotal = new Array(questionStats.value.length).fill(0);
+
+    // 用整体正确/错误/未答数按比例估算
+    const totalCorrect = records.reduce((a, r) => a + (Number(r.correct_count) || 0), 0);
+    const totalWrong = records.reduce((a, r) => a + (Number(r.wrong_count) || 0), 0);
+    const totalSkip = records.reduce((a, r) => a + (Number(r.skipped_count) || 0), 0);
+    const totalQuestions = totalCorrect + totalWrong + totalSkip || 1;
+
+    questionStats.value.forEach((q, idx) => {
+      // 按比例分配
+      const estimatedCorrect = Math.round((totalCorrect / totalQuestions) * 100);
+      const estimatedWrong = Math.round((totalWrong / totalQuestions) * 100);
+      const estimatedSkip = 100 - estimatedCorrect - estimatedWrong;
+      q.correctRate = Math.min(estimatedCorrect, 100);
+      q.wrongRate = Math.min(Math.max(estimatedWrong, 0), 100);
+      q.skipRate = Math.min(Math.max(estimatedSkip, 0), 100);
+    });
+  }
+
+  Object.assign(analysis, {
+    totalAttempts, uniqueStudents, avgScore, passRate, avgAccuracy,
+    scoreDist, accDist, classStats,
+    scoreSegments: segments, maxSegment,
+  });
+};
+
+// ===== 图表计算 =====
+const pieColors = { excellent: '#10b981', pass: '#3b82f6', fail: '#ef4444' };
+const accColors = { high: '#10b981', mid: '#f59e0b', low: '#ef4444' };
+
+const CIRCUMFERENCE = 2 * Math.PI * 70;
+
+const pieDash = computed(() => {
+  const total = analysis.scoreDist.excellent + analysis.scoreDist.pass + analysis.scoreDist.fail || 1;
+  return {
+    excellent: (analysis.scoreDist.excellent / total) * CIRCUMFERENCE,
+    pass: (analysis.scoreDist.pass / total) * CIRCUMFERENCE,
+    fail: (analysis.scoreDist.fail / total) * CIRCUMFERENCE,
+  };
+});
+const pieOffset = computed(() => {
+  const total = analysis.scoreDist.excellent + analysis.scoreDist.pass + analysis.scoreDist.fail || 1;
+  const exLen = (analysis.scoreDist.excellent / total) * CIRCUMFERENCE;
+  const passLen = (analysis.scoreDist.pass / total) * CIRCUMFERENCE;
+  return {
+    excellent: 0,
+    pass: -exLen,
+    fail: -(exLen + passLen),
+  };
+});
+
+const accDash = computed(() => {
+  const total = analysis.accDist.high + analysis.accDist.mid + analysis.accDist.low || 1;
+  return {
+    high: (analysis.accDist.high / total) * CIRCUMFERENCE,
+    mid: (analysis.accDist.mid / total) * CIRCUMFERENCE,
+    low: (analysis.accDist.low / total) * CIRCUMFERENCE,
+  };
+});
+const accOffset = computed(() => {
+  const total = analysis.accDist.high + analysis.accDist.mid + analysis.accDist.low || 1;
+  const highLen = (analysis.accDist.high / total) * CIRCUMFERENCE;
+  const midLen = (analysis.accDist.mid / total) * CIRCUMFERENCE;
+  return {
+    high: 0,
+    mid: -highLen,
+    low: -(highLen + midLen),
+  };
+});
+
+const barHeight = (score) => Math.max(5, Math.min(100, (score / 100) * 100));
+const barHeightRaw = (count, max) => Math.max(5, Math.min(100, (count / max) * 100));
+const barColor = (score) => {
+  if (score >= 80) return '#10b981';
+  if (score >= 60) return '#3b82f6';
+  return '#ef4444';
 };
 
 // ===== 工具函数 =====
-const onToast = ({ message, type }) => {
-  emit('toast', { message, type });
-};
+const onToast = ({ message, type }) => emit('toast', { message, type });
 
 const formatDuration = (sec) => {
   if (!sec && sec !== 0) return '-';
@@ -464,209 +680,113 @@ const scoreClass = (score) => {
   return 'score-fail';
 };
 
-const accuracyTextClass = (acc) => {
-  if (acc >= 80) return 'bar-good-text';
-  if (acc >= 60) return 'bar-mid-text';
-  return 'bar-bad-text';
+const scoreColor = (score) => {
+  if (score >= 80) return 'text-good';
+  if (score >= 60) return 'text-mid';
+  return 'text-bad';
 };
 
-onMounted(() => {
-  loadUsers();
-});
+const difficultyClass = (d) => {
+  const opt = DIFFICULTY_OPTIONS.find(o => String(o.value) === String(d));
+  if (opt?.value === 1) return 'iq-tag-success';
+  if (opt?.value === 2) return 'iq-tag-warning';
+  if (opt?.value === 3) return 'iq-tag-error';
+  return 'iq-tag-neutral';
+};
 
-defineExpose({ loadUsers });
+onMounted(async () => {
+  try { allSubjects.value = await getSubjects(); } catch { /* ignore */ }
+  try {
+    const clsData = await getClasses();
+    classList.value = Array.isArray(clsData) ? clsData : (clsData.list || []);
+  } catch { /* ignore */ }
+  loadExams();
+});
 </script>
 
 <style scoped>
-.iq-admin-records {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.iq-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
-.iq-table-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 80px 0;
-  background: var(--iq-card);
-  border-radius: var(--iq-radius-card);
-}
-.iq-loading-spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--iq-neutral-200);
-  border-top-color: var(--iq-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+.iq-admin-records { display: flex; flex-direction: column; gap: 16px; }
+.iq-page-header { display: flex; justify-content: space-between; align-items: flex-end; }
+
+.exam-filter-row { display: flex; flex-wrap: wrap; gap: 14px; }
+.exam-filter-row .filter-item { display: flex; flex-direction: column; gap: 5px; min-width: 170px; }
+.filter-label { font-size: 12px; font-weight: 500; color: var(--iq-neutral-600); }
+.iq-select { height: 36px; border: 1px solid var(--iq-border); border-radius: 8px; padding: 0 10px; background: #fff; color: var(--iq-neutral-800); font-size: 13px; cursor: pointer; }
+
+.iq-table-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 80px 0; background: var(--iq-card); border-radius: var(--iq-radius-card); }
+.iq-loading-spinner { width: 28px; height: 28px; border: 3px solid var(--iq-neutral-200); border-top-color: var(--iq-primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .iq-empty-row { padding: 0 !important; }
-.iq-empty-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 60px 0;
-}
+.iq-empty-box { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 60px 0; }
 .iq-empty-icon { font-size: 48px; opacity: 0.5; }
 
-.iq-flex { display: flex; }
-.iq-gap-2 { gap: 8px; }
-.iq-gap-3 { gap: 12px; }
+.iq-id-chip { display: inline-block; padding: 2px 10px; background: var(--iq-neutral-100); color: var(--iq-neutral-700); border-radius: var(--iq-radius-full); font-size: 12px; font-weight: 600; font-family: var(--iq-font-mono); }
+.iq-subject-tag { display: inline-block; font-size: 11px; padding: 2px 8px; background: #e0e7ff; color: #4338ca; border-radius: 4px; font-weight: 500; }
+.iq-type-tag { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--iq-radius-full); font-size: 12px; font-weight: 500; }
+.type-1 { background: #ede9fe; color: #6d28d9; }
+.type-2 { background: #dbeafe; color: #1d4ed8; }
+.type-3 { background: #fce7f3; color: #be185d; }
+.type-4 { background: #d1fae5; color: #047857; }
+.type-5 { background: #fef3c7; color: #b45309; }
+.type-6 { background: #ffedd5; color: #c2410c; }
 
-.iq-role-tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.iq-role-tab {
-  padding: 6px 16px;
-  background: var(--iq-neutral-0);
-  border: 1px solid var(--iq-neutral-200);
-  border-radius: var(--iq-radius-full);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--iq-neutral-600);
-  transition: all 0.2s;
-  font-weight: 500;
-}
-.iq-role-tab:hover {
-  border-color: var(--iq-primary-400);
-  color: var(--iq-primary-600);
-}
-.iq-role-tab.active {
-  background: var(--iq-primary-500);
-  border-color: var(--iq-primary-500);
-  color: #fff;
-  box-shadow: 0 2px 8px -2px rgba(99, 102, 241, 0.4);
-}
+.iq-sub-header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-bottom: 4px; }
+.iq-sub-title { font-size: 15px; color: var(--iq-neutral-800); }
 
-.iq-id-chip {
-  display: inline-block;
-  padding: 2px 10px;
-  background: var(--iq-neutral-100);
-  color: var(--iq-neutral-700);
-  border-radius: var(--iq-radius-full);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: var(--iq-font-mono);
-}
+.stats-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.stat-card { padding: 18px; text-align: center; }
+.stat-label { font-size: 12px; color: var(--iq-neutral-500); margin-bottom: 6px; }
+.stat-value { font-size: 28px; font-weight: 700; color: var(--iq-neutral-900); }
 
-.user-cell {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.u-role.iq-tag.admin { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-.u-role.iq-tag.teacher { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
-.u-role.iq-tag.student { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+.text-good { color: #059669; }
+.text-mid { color: #d97706; }
+.text-bad { color: #dc2626; }
 
-.score-tag {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: var(--iq-radius-full);
-  font-weight: 700;
-  font-size: 12px;
-  min-width: 40px;
-  text-align: center;
-}
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.chart-card { padding: 20px; }
+.chart-title { font-size: 15px; font-weight: 600; color: var(--iq-neutral-800); margin-bottom: 16px; }
+
+.pie-chart-wrap { display: flex; align-items: center; gap: 20px; }
+.pie-svg { width: 160px; height: 160px; flex-shrink: 0; }
+.pie-center-num { font-size: 28px; font-weight: 700; fill: var(--iq-neutral-800); }
+.pie-center-label { font-size: 11px; fill: var(--iq-neutral-400); }
+.pie-legend { display: flex; flex-direction: column; gap: 8px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--iq-neutral-600); }
+.legend-item b { color: var(--iq-neutral-900); font-size: 14px; margin-left: auto; }
+.legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+.bar-chart-wrap { min-height: 200px; }
+.bar-chart { display: flex; align-items: flex-end; gap: 16px; height: 200px; padding: 0 10px; }
+.bar-group { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+.bar-value { font-size: 13px; font-weight: 700; color: var(--iq-neutral-700); margin-bottom: 4px; }
+.bar-track { width: 100%; max-width: 48px; height: 150px; background: var(--iq-neutral-100); border-radius: 6px 6px 0 0; display: flex; align-items: flex-end; overflow: hidden; }
+.bar-fill { width: 100%; border-radius: 6px 6px 0 0; transition: height 0.4s ease; min-height: 2px; }
+.bar-label { font-size: 11px; color: var(--iq-neutral-600); margin-top: 6px; text-align: center; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-meta { font-size: 10px; color: var(--iq-neutral-400); }
+.no-chart-data { display: flex; align-items: center; justify-content: center; min-height: 200px; }
+
+.section-title-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--iq-neutral-100); }
+.section-title-bar b { font-size: 15px; color: var(--iq-neutral-800); }
+
+.question-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.answer-cell { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--iq-neutral-600); font-size: 12px; }
+
+.mini-bar-wrap { display: flex; height: 20px; border-radius: 4px; overflow: hidden; background: var(--iq-neutral-100); }
+.mini-bar { height: 100%; transition: width 0.3s; }
+.mini-bar-correct { background: #10b981; }
+.mini-bar-wrong { background: #ef4444; }
+.mini-bar-skip { background: #d1d5db; }
+
+.score-tag { display: inline-block; padding: 2px 10px; border-radius: var(--iq-radius-full); font-weight: 700; font-size: 12px; min-width: 40px; text-align: center; }
 .score-excellent { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
 .score-pass { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
 .score-fail { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 
 .bar-good-text { color: #059669; }
-.bar-mid-text { color: #d97706; }
 .bar-bad-text { color: #dc2626; }
 
-.iq-sub-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding-bottom: 4px;
-}
-.iq-sub-title {
-  font-size: 15px;
-  color: var(--iq-neutral-800);
-}
-
-.iq-stats-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.iq-stats-group { padding: 18px 20px; }
-.iq-group-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 14px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--iq-neutral-100);
-}
-.iq-group-user {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.iq-avatar.iq-avatar-sm {
-  width: 36px;
-  height: 36px;
-  font-size: 14px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--iq-primary-500), #8b5cf6);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.iq-group-summary {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.summary-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
-  padding: 5px 12px;
-  background: var(--iq-neutral-50);
-  border: 1px solid var(--iq-neutral-100);
-  border-radius: var(--iq-radius-medium);
-  font-size: 12px;
-  color: var(--iq-neutral-600);
-}
-.summary-chip b {
-  color: var(--iq-neutral-900);
-  font-size: 14px;
-  font-weight: 700;
-}
-.chip-label, .chip-unit {
-  font-size: 11px;
-  color: var(--iq-neutral-400);
-  font-weight: 500;
-}
-.chip-good { color: #059669 !important; }
-.chip-mid { color: #d97706 !important; }
-.chip-bad { color: #dc2626 !important; }
-
-.iq-no-data-inline {
-  text-align: center;
-  color: var(--iq-neutral-400);
-  padding: 20px 0;
-  font-size: 13px;
+@media (max-width: 768px) {
+  .charts-row { grid-template-columns: 1fr; }
+  .stats-cards { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
