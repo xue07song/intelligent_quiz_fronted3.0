@@ -68,7 +68,6 @@
               </svg>
               {{ favoriteSet.has(String(q.id)) ? '已收藏' : '收藏' }}
             </button>
-=======
             <span v-if="Number(q.题型)>=4" class="iq-tag iq-tag-warning" style="font-size: 11px;">语义评阅 · 教师可复核</span>
 
           </div>

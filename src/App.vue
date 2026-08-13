@@ -35,18 +35,8 @@
         <button
           v-if="currentUser.role !== 'admin'"
           class="iq-nav-item"
-
-          :class="{ active: currentView === 'practice' }"
-          @click="practiceView = 'exams'; currentView = 'practice'; sidebarOpen = false"
-=======
-
           :class="{ active: currentView === 'practice' && !standalonePracticeViews.includes(practiceView) }"
-          @click="practiceView = 'exams'; currentView = 'practice'"
-=======
-          :class="{ active: currentView === 'practice' }"
-          @click="onEnterPractice"
-
-
+          @click="onEnterPractice(); sidebarOpen = false"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"></path>
@@ -243,16 +233,9 @@
         <!-- 练习子导航 -->
         <div v-if="!standalonePracticeViews.includes(practiceView)" class="iq-practice-subnav">
           <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-
-          <button class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
+          <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
           <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'wrong-book' }" @click="practiceView = 'wrong-book'">📕 错题本</button>
           <button class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 答题记录</button>
-          <button class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 统计分析</button>
-=======
-          <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
-          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 我的答题记录</button>
-          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 我的统计</button>
-
           <button
             v-if="currentUser.role === 'teacher'"
             class="iq-subnav-btn"
@@ -290,7 +273,9 @@
         <WrongBook
           v-if="practiceView === 'wrong-book' && currentUser.role === 'student'"
           @start-exam="startExam"
-=======
+          @toast="handleToastFromChild"
+        />
+
         <!-- 班级管理 -->
         <ClassManagement
           v-if="practiceView === 'classes' && (currentUser.role === 'admin' || currentUser.role === 'teacher')"
@@ -433,7 +418,6 @@ import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ExamList from '@/components/practice/ExamList.vue';
 
 import WrongBook from '@/components/practice/WrongBook.vue';
-=======
 import ClassManagement from '@/components/practice/ClassManagement.vue';
 
 import ExamPractice from '@/components/practice/ExamPractice.vue';
@@ -518,47 +502,22 @@ const currentBreadcrumb = computed(() => {
     const map = {
       exams: '试卷列表',
       generate: '智能组卷',
-
       'wrong-book': '错题本',
-=======
       adaptive: '自适应练习',
       'adaptive-overview': '自适应学情',
       'adaptive-progress': '我的自适应成果',
       'learning-analysis': '学习分析',
-
       practice: '答题中',
       records: '答题记录',
       'record-detail': '记录详情',
       stats: '统计分析',
-      'admin-records': '做题管理',
+      'admin-records': '试卷分析',
       classes: '班级管理',
     };
     const parent = currentUser.value?.role === 'student' ? '答题练习' : '出卷与学生管理';
     return parent + ' / ' + (map[practiceView.value] || '');
   }
   return '';
-});
-
-const pageTitle = computed(() => {
-  const map = {
-    exams: '📋 试卷列表',
-    generate: '📝 智能组卷',
-
-    'wrong-book': '📕 错题本',
-=======
-    adaptive: '🧭 自适应练习',
-    'adaptive-overview': '📈 自适应学情',
-    'adaptive-progress': '🏅 我的自适应成果',
-    'learning-analysis': '学习分析',
-
-    practice: '✍️ 答题中',
-    records: '📊 答题记录',
-    'record-detail': '📝 答题详情',
-    stats: '📈 统计分析',
-    'admin-records': '👥 做题管理',
-    classes: '🏫 班级管理',
-  };
-  return map[practiceView.value] || '';
 });
 
 const startExam = (examId) => {

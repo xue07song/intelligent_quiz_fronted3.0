@@ -163,8 +163,6 @@ import { generateRuleExam, getExamInventory, previewRuleExam } from '@/api/pract
 import { smartExam } from '@/api/ai';
 
 import { TYPE_OPTIONS, getChapterLabel, getChapterName } from '@/utils/constants';
-=======
-import { TYPE_OPTIONS } from '@/utils/constants';
 import { getSubjects } from '@/api/subject';
 import { getClasses } from '@/api/class';
 
