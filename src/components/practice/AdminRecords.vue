@@ -88,8 +88,43 @@
       </div>
     </template>
 
+
+    <!-- 视图：答题记录详情（复用 RecordDetail，管理端模式） -->
+    <template v-if="view === 'detail'">
+      <RecordDetail
+        :recordId="activeRecordId"
+        adminMode
+        :reviewable="role==='teacher'"
+        @back="backFromDetail"
+        @toast="onToast"
+      />
+    </template>
+
+    <!-- 视图：某用户的统计分析（复用 PracticeStats，传入 userId） -->
+    <template v-if="view === 'stats'">
+      <div class="iq-sub-header">
+        <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="backToUsers">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          返回用户列表
+        </button>
+        <div class="iq-sub-title">
+          📈 <strong>{{ selectedUser.nickname || selectedUser.username }}</strong>
+          <span class="iq-tag u-role" :class="selectedUser.role" style="margin-left: 6px;">{{ roleMap[selectedUser.role] }}</span>
+          <span class="iq-text-sm iq-text-muted" style="margin-left: 10px;">的统计分析</span>
+        </div>
+      </div>
+      <PracticeStats :userId="selectedUser.id" @toast="onToast" />
+    </template>
+
+    <!-- 视图：全局统计总览（以人为界，按人分组展示每人每次明细） -->
+    <template v-if="view === 'allStats'">
+=======
     <!-- 视图：试卷分析详情 -->
     <template v-if="view === 'analysis'">
+
       <div class="iq-sub-header">
         <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="view = 'exams'">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

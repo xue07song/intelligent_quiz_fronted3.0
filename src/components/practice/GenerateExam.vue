@@ -78,7 +78,7 @@
             @click="toggleChapter(chapter)"
           >
             <span class="chapter-check">{{ form.chapters.includes(chapter) ? '✓' : '' }}</span>
-            <span class="chapter-name">第{{ chapter }}章</span>
+            <span class="chapter-name"><b>第{{ chapter }}章</b><em>{{ getChapterName(chapter) }}</em></span>
             <small>{{ chapterTotals[chapter] || 0 }}题</small>
           </button>
         </div>
@@ -161,9 +161,13 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { generateRuleExam, getExamInventory, previewRuleExam } from '@/api/practice';
 import { smartExam } from '@/api/ai';
+
+import { TYPE_OPTIONS, getChapterLabel, getChapterName } from '@/utils/constants';
+=======
 import { TYPE_OPTIONS } from '@/utils/constants';
 import { getSubjects } from '@/api/subject';
 import { getClasses } from '@/api/class';
+
 
 const props = defineProps({
   role: { type: String, default: 'teacher' },
@@ -186,9 +190,9 @@ const paperPresets = [
     { key:'standard-mixed', name:'主客观结合', scene:'综合考查', description:'保留一定比例简答题', count:20, knowledge:5, typeWeights:[20,35,15,15,15,0], difficultyWeights:[15,20,30,25,10] },
   ]},
   { key:'advanced', name:'难点提升卷', tag:'查漏补缺', description:'增加多选、简答和高难度题', detail:'提供难题突破、思维强化和综合挑战三套方案', variants:[
-    { key:'advanced-breakthrough', name:'难题突破', scene:'专项提高', description:'困难与挑战题占比较高', count:20, knowledge:6, typeWeights:[15,35,20,10,20,0], difficultyWeights:[5,10,25,35,25] },
-    { key:'advanced-thinking', name:'思维强化', scene:'能力训练', description:'提高多选和简答题占比', count:20, knowledge:6, typeWeights:[15,30,25,10,20,0], difficultyWeights:[5,10,25,35,25] },
-    { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖更多题型并保持高难度', count:20, knowledge:6, typeWeights:[10,35,20,15,20,0], difficultyWeights:[10,15,25,30,20] },
+    { key:'advanced-breakthrough', name:'难题突破', scene:'专项提高', description:'困难题为主，并纳入程序论述题', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[5,10,25,35,25] },
+    { key:'advanced-thinking', name:'思维强化', scene:'能力训练', description:'提高多选、简答和程序论述题占比', count:20, knowledge:6, typeWeights:[10,25,25,10,20,10], difficultyWeights:[5,10,25,35,25] },
+    { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[10,15,25,30,20] },
   ]},
 ];
 const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classId: '' });
@@ -216,7 +220,7 @@ const configurationModeText = computed(() => {
 });
 const selectedChapterTitle = computed(() => form.chapters.length ? `已选择 ${form.chapters.length} 个章节` : '当前使用全部章节');
 const selectedChapterDetail = computed(() => form.chapters.length
-  ? [...form.chapters].sort((a,b)=>a-b).map(chapter => `第${chapter}章`).join('、')
+  ? [...form.chapters].sort((a,b)=>a-b).map(getChapterLabel).join('、')
   : '第1章至第10章，共375道题');
 const sumClass = (sum) => sum === form.count ? 'sum-ok' : 'sum-bad';
 const toggleChapter = (chapter) => { const index=form.chapters.indexOf(chapter); index>=0 ? form.chapters.splice(index,1) : form.chapters.push(chapter); form.chapters.sort((a,b)=>a-b); };
@@ -397,4 +401,5 @@ const handleSmartExam = async () => { errorMsg.value='';aiLoading.value=true;try
 .variant-panel{padding:14px;margin:10px 0;border:1px solid #c7d2fe;border-radius:10px;background:#f8faff}.variant-panel-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px;color:#312e81}.variant-panel-head span{font-size:12px;color:#64748b}.variant-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.variant-card{display:flex;flex-direction:column;gap:6px;padding:12px;border:2px solid #e2e8f0;border-radius:9px;background:#fff;color:#475569;text-align:left;font-size:11px;cursor:pointer}.variant-card:hover{border-color:#a5b4fc}.variant-card.active{border-color:#4f46e5;background:#eef2ff}.variant-title{display:flex;align-items:center;justify-content:space-between;color:#1e293b;font-size:13px;font-weight:700}.variant-title small{padding:2px 6px;border-radius:10px;background:#f1f5f9;color:#64748b;font-size:10px}.variant-card b{color:#334155}.iq-input:disabled{background:#f1f5f9;color:#475569;cursor:not-allowed;opacity:1}.distribution-item:has(.iq-input:disabled){background:#f8fafc}.result-actions{display:flex;gap:8px}
 
 @media(max-width:900px){.chapter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.difficulty-grid{grid-template-columns:repeat(3,1fr)}.variant-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:800px){.base-grid,.distribution-grid,.report-grid,.paper-presets,.alternative-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.base-grid,.distribution-grid,.difficulty-grid,.report-grid,.paper-presets,.alternative-grid,.variant-grid{grid-template-columns:1fr}.chapter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-selector-head,.alternative-heading,.variant-panel-head,.result-head{flex-direction:column}.chapter-actions{width:100%}.chapter-action{flex:1}.result-actions{width:100%;flex-direction:column}}
+.chapter-chip{grid-template-columns:24px minmax(0,1fr);min-height:78px}.chapter-name{display:grid;gap:2px;min-width:0}.chapter-name b{font-size:13px}.chapter-name em{font-size:12px;line-height:1.35;font-style:normal;font-weight:500;color:#475569;overflow-wrap:anywhere}.chapter-chip.active .chapter-name em{color:#4338ca}.selected-summary>div{min-width:0}.selected-summary small{line-height:1.6}
 </style>
