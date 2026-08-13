@@ -2,10 +2,10 @@
   <div class="iq-exam-list">
     <div class="iq-page-header">
       <div>
-        <h2 class="iq-text-xl iq-font-semibold" style="color: var(--iq-neutral-900); margin: 0;">我的试卷</h2>
-        <p class="iq-text-sm iq-text-muted" style="margin: 4px 0 0;">从这里选择试卷开始练习答题</p>
+        <h2 class="iq-text-xl iq-font-semibold" style="color: var(--iq-neutral-900); margin: 0;">{{ role === 'teacher' ? '我创建的试卷' : '教师试卷' }}</h2>
+        <p class="iq-text-sm iq-text-muted" style="margin: 4px 0 0;">{{ role === 'student' ? '选择教师发布的试卷开始答题' : role === 'admin' ? '查看所有教师创建的试卷和题目内容' : '管理自己创建的试卷' }}</p>
       </div>
-      <button class="iq-btn iq-btn-primary" @click="$emit('generate')">
+        <button v-if="role === 'teacher'" class="iq-btn iq-btn-primary" @click="$emit('generate')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -30,12 +30,30 @@
     </div>
 
     <div v-else class="iq-card">
+      <div v-if="role === 'teacher' || role === 'admin'" class="exam-list-filters">
+        <div class="filter-item">
+          <label class="filter-label">科目</label>
+          <select v-model="subjectFilter" class="iq-select" @change="page = 1; loadExams()">
+            <option value="">全部科目</option>
+            <option v-for="s in allSubjects" :key="s" :value="s">{{ s }}</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label class="filter-label">目标班级</label>
+          <select v-model="classFilter" class="iq-select" @change="page = 1; loadExams()">
+            <option value="">全部班级</option>
+            <option v-for="c in classList" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
+          </select>
+        </div>
+      </div>
       <div class="iq-table-wrap">
         <table class="iq-table">
           <thead>
             <tr>
               <th>ID</th>
               <th>标题</th>
+              <th>科目</th>
+              <th>目标班级</th>
               <th>题数</th>
               <th>客观题</th>
               <th>章节</th>
@@ -50,6 +68,16 @@
             <tr v-for="exam in list" :key="exam.id">
               <td><span class="iq-id-chip">{{ exam.id }}</span></td>
               <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ exam.title }}</td>
+              <td>
+                <span v-if="exam.subject" class="iq-user-subject-tag" style="margin-right:0;">{{ exam.subject }}</span>
+                <span v-else class="iq-text-muted">--</span>
+              </td>
+              <td>
+                <template v-if="exam.class_id || exam.classId">
+                  <span class="iq-tag iq-tag-warning" style="color:#92400e;background:#fef3c7;">{{ exam.class_name || exam.className || '定向班级' }}</span>
+                </template>
+                <span v-else class="iq-tag iq-tag-neutral" style="color:var(--iq-neutral-600);background:var(--iq-neutral-100);">全开放</span>
+              </td>
               <td>{{ exam.total_count }}</td>
               <td>{{ exam.objective_count }}</td>
               <td>{{ exam.chapter || '-' }}</td>
@@ -64,12 +92,13 @@
               <td><span class="iq-id-chip">{{ exam.attempt_count || 0 }}</span></td>
               <td class="iq-text-sm iq-text-muted">{{ formatTime(exam.created_at) }}</td>
               <td>
-                <button class="iq-btn iq-btn-primary iq-btn-sm" @click="$emit('start-exam', exam.id)">
+                <button v-if="role === 'student'" class="iq-btn iq-btn-primary iq-btn-sm" @click="$emit('start-exam', exam.id)">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                   </svg>
                   开始答题
                 </button>
+                <button v-else class="iq-btn iq-btn-secondary iq-btn-sm" @click="openPreview(exam.id)">查看题目</button>
               </td>
             </tr>
           </tbody>
@@ -83,23 +112,35 @@
         @change="loadExams"
       />
     </div>
+
+    <div v-if="previewVisible" class="preview-mask" @click.self="closePreview"><div class="preview-dialog"><div class="preview-head"><div><h2>{{ previewExam.title }}</h2><p>创建教师：{{ previewExam.creator_name || '-' }} · 共 {{ previewExam.questions?.length || 0 }} 题</p></div><button class="close" @click="closePreview">×</button></div><div v-if="previewLoading" class="preview-loading">正在读取试卷题目...</div><div v-else class="preview-body"><article v-for="(q,index) in previewExam.questions" :key="q.id" class="preview-question"><div class="number">{{ index+1 }}</div><div><div class="question-meta"><span>{{ getTypeName(q.题型) }}</span><span>难度{{ q.难度 }}</span><span>{{ q.知识点 || '未标注知识点' }}</span></div><h3>{{ q.题目 }}</h3><p v-if="q.选项">{{ q.选项 }}</p><details><summary>查看答案与解析</summary><p><b>答案：</b>{{ q.答案 }}</p><p v-if="q.解析"><b>解析：</b>{{ q.解析 }}</p></details></div></article></div></div></div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getExams } from '@/api/practice';
+import { getExams, getExam } from '@/api/practice';
 import { getTypeName, getDifficultyLabel, DIFFICULTY_OPTIONS } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
+import { getSubjects } from '@/api/subject';
+import { getClasses } from '@/api/class';
 import Pagination from '@/components/Pagination.vue';
 
 const emit = defineEmits(['generate', 'start-exam', 'toast']);
+defineProps({ role: { type: String, default: 'student' } });
 
 const list = ref([]);
 const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const loading = ref(false);
+const previewVisible=ref(false),previewLoading=ref(false),previewExam=ref({questions:[]});
+const allSubjects = ref([]);
+const classList = ref([]);
+const subjectFilter = ref('');
+const classFilter = ref('');
+const openPreview=async(id)=>{previewVisible.value=true;previewLoading.value=true;try{previewExam.value=await getExam(id)}catch(err){emit('toast',{message:err.message||'读取试卷失败',type:'error'});previewVisible.value=false}finally{previewLoading.value=false}};
+const closePreview=()=>{previewVisible.value=false;previewExam.value={questions:[]}};
 
 const difficultyClass = (d) => {
   const opt = DIFFICULTY_OPTIONS.find(o => String(o.value) === String(d));
@@ -112,7 +153,10 @@ const difficultyClass = (d) => {
 const loadExams = async () => {
   loading.value = true;
   try {
-    const data = await getExams({ page: page.value, pageSize: pageSize.value });
+    const params = { page: page.value, pageSize: pageSize.value };
+    if (subjectFilter.value) params.subject = subjectFilter.value;
+    if (classFilter.value) params.classId = classFilter.value;
+    const data = await getExams(params);
     list.value = data.list;
     total.value = data.total;
   } catch (err) {
@@ -122,7 +166,14 @@ const loadExams = async () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    allSubjects.value = await getSubjects();
+  } catch { /* ignore */ }
+  try {
+    const clsData = await getClasses();
+    classList.value = Array.isArray(clsData) ? clsData : (clsData.list || []);
+  } catch { /* ignore */ }
   loadExams();
 });
 
@@ -134,6 +185,35 @@ defineExpose({ loadExams });
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.exam-list-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 14px 20px;
+  background: var(--iq-neutral-50);
+  border-bottom: 1px solid var(--iq-border);
+}
+.exam-list-filters .filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 170px;
+}
+.exam-list-filters .filter-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--iq-neutral-600);
+}
+.iq-select {
+  height: 36px;
+  border: 1px solid var(--iq-border);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--iq-neutral-800);
+  font-size: 13px;
+  cursor: pointer;
 }
 .iq-page-header {
   display: flex;
@@ -195,4 +275,5 @@ defineExpose({ loadExams });
 .type-4 { background: #d1fae5; color: #047857; }
 .type-5 { background: #fef3c7; color: #b45309; }
 .type-6 { background: #ffedd5; color: #c2410c; }
+.preview-mask{position:fixed;inset:0;z-index:1000;background:#0f172a88;display:grid;place-items:center;padding:30px}.preview-dialog{width:min(900px,95vw);max-height:88vh;display:flex;flex-direction:column;background:white;border-radius:18px;box-shadow:0 25px 70px #0f172a55}.preview-head{display:flex;justify-content:space-between;padding:22px 26px;border-bottom:1px solid #e2e8f0}.preview-head h2{margin:0}.preview-head p{margin:5px 0 0;color:#64748b}.close{border:0;background:#f1f5f9;width:34px;height:34px;border-radius:50%;font-size:24px}.preview-body{overflow:auto;padding:20px 26px}.preview-loading{padding:70px;text-align:center}.preview-question{display:grid;grid-template-columns:36px 1fr;gap:12px;padding:18px 0;border-bottom:1px solid #e2e8f0}.number{width:30px;height:30px;display:grid;place-items:center;background:#eef2ff;color:#4338ca;border-radius:8px;font-weight:700}.question-meta{display:flex;gap:7px}.question-meta span{font-size:12px;padding:3px 7px;background:#f1f5f9;border-radius:10px}.preview-question h3{font-size:16px;line-height:1.6}.preview-question p{white-space:pre-wrap;color:#475569}details{margin-top:10px;padding:10px;background:#f8fafc;border-radius:8px}summary{cursor:pointer;color:#4f46e5;font-weight:600}
 </style>

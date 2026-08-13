@@ -38,6 +38,13 @@
                 <input v-model.number="form.章节" type="number" class="iq-input" placeholder="章节编号" />
               </div>
               <div class="iq-form-field">
+                <label class="iq-form-label">科目 <span class="iq-req">*</span></label>
+                <select v-model="form.科目" class="iq-select">
+                  <option value="">请选择科目</option>
+                  <option v-for="opt in subjectOptions" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+              <div class="iq-form-field">
                 <label class="iq-form-label">题型 <span class="iq-req">*</span></label>
                 <select v-model="form.题型" class="iq-select">
                   <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -104,19 +111,31 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue';
+import { reactive, watch, ref, onMounted, computed } from 'vue';
 import { TYPE_OPTIONS, DIFFICULTY_OPTIONS } from '@/utils/constants';
+import { getSubjects } from '@/api/subject';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   data: { type: Object, default: () => ({}) },
   isEdit: { type: Boolean, default: false },
+  role: { type: String, default: '' },
+  subjects: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(['close', 'submit']);
 
 const typeOptions = TYPE_OPTIONS;
 const difficultyOptions = DIFFICULTY_OPTIONS;
+
+const allSubjects = ref([]);
+
+const subjectOptions = computed(() => {
+  if (props.role === 'teacher') {
+    return props.subjects || [];
+  }
+  return allSubjects.value || [];
+});
 
 const defaultForm = () => ({
   id: '',
@@ -131,6 +150,7 @@ const defaultForm = () => ({
   知识点: '',
   使用频率: '',
   出题人: '',
+  科目: '',
 });
 
 const form = reactive(defaultForm());
@@ -156,6 +176,10 @@ const handleSubmit = async () => {
     alert('题目内容不能为空');
     return;
   }
+  if (!form.科目 || !form.科目.trim()) {
+    alert('科目不能为空');
+    return;
+  }
   submitting.value = true;
   try {
     const payload = { ...form };
@@ -166,6 +190,16 @@ const handleSubmit = async () => {
     submitting.value = false;
   }
 };
+
+onMounted(async () => {
+  if (props.role === 'admin') {
+    try {
+      allSubjects.value = await getSubjects();
+    } catch (e) {
+      console.warn('加载科目列表失败:', e);
+    }
+  }
+});
 </script>
 
 <style scoped>

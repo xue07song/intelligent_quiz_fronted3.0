@@ -66,6 +66,17 @@
               </div>
             </div>
 
+            <div class="iq-form-field" style="margin-bottom: 16px;">
+              <label class="iq-form-label">导入科目 <span class="iq-req">*</span></label>
+              <select v-model="selectedSubject" class="iq-select">
+                <option value="">请选择统一导入的科目</option>
+                <option v-for="opt in subjectOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+              <div class="iq-text-sm iq-text-muted" style="margin-top: 4px;">
+                本次导入的所有题目将归属到此科目
+              </div>
+            </div>
+
             <div class="iq-import-tips">
               <div class="iq-import-tips-title">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -127,11 +138,14 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
 import { batchImportQuestions } from '@/api/question';
+import { getSubjects } from '@/api/subject';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
+  role: { type: String, default: '' },
+  subjects: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(['close', 'success']);
@@ -142,13 +156,28 @@ const isDragging = ref(false);
 const loading = ref(false);
 const errorMsg = ref('');
 const result = ref(null);
+const allSubjects = ref([]);
+const selectedSubject = ref('');
+
+const subjectOptions = computed(() => {
+  if (props.role === 'teacher') {
+    return props.subjects || [];
+  }
+  return allSubjects.value || [];
+});
 
 watch(() => props.visible, (val) => {
-  if (!val) {
+  if (val) {
+    // 教师单科目时自动选中
+    if (props.role === 'teacher' && props.subjects?.length === 1) {
+      selectedSubject.value = props.subjects[0];
+    }
+  } else {
     setTimeout(() => {
       selectedFile.value = null;
       result.value = null;
       errorMsg.value = '';
+      selectedSubject.value = '';
     }, 200);
   }
 });
@@ -194,10 +223,14 @@ const formatSize = (b) => {
 
 const handleSubmit = async () => {
   if (!selectedFile.value) return;
+  if (!selectedSubject.value) {
+    errorMsg.value = '请先选择要导入的科目';
+    return;
+  }
   loading.value = true;
   errorMsg.value = '';
   try {
-    const data = await batchImportQuestions(selectedFile.value);
+    const data = await batchImportQuestions(selectedFile.value, selectedSubject.value);
     result.value = {
       inserted: data.inserted ?? 0,
       skipped: data.skipped ?? 0,
@@ -217,6 +250,16 @@ const resetAndContinue = () => {
   result.value = null;
   errorMsg.value = '';
 };
+
+onMounted(async () => {
+  if (props.role === 'admin') {
+    try {
+      allSubjects.value = await getSubjects();
+    } catch (e) {
+      console.warn('加载科目列表失败:', e);
+    }
+  }
+});
 </script>
 
 <style scoped>

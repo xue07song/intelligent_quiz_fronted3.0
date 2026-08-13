@@ -53,6 +53,9 @@
               <th>用户名</th>
               <th>昵称</th>
               <th>申请角色</th>
+              <th>学院</th>
+              <th>专业 / 科目</th>
+              <th>学号 / 工号</th>
               <th>状态</th>
               <th>拒绝原因</th>
               <th>申请时间</th>
@@ -67,6 +70,13 @@
               <td>
                 <span class="iq-role-tag" :class="item.role">{{ getRoleLabel(item.role) }}</span>
               </td>
+              <td>{{ item.college || '--' }}</td>
+              <td>
+                <span v-if="item.role === 'student'">{{ item.major || '--' }}</span>
+                <span v-else-if="item.role === 'teacher' && item.subjects && item.subjects.length" class="iq-subject-list">{{ item.subjects.join('、') }}</span>
+                <span v-else>--</span>
+              </td>
+              <td>{{ (item.role === 'student' ? item.student_no : item.employee_no) || '--' }}</td>
               <td>
                 <span class="iq-status-tag" :class="item.status">{{ getStatusLabel(item.status) }}</span>
               </td>
@@ -86,7 +96,7 @@
               </td>
             </tr>
             <tr v-if="list.length === 0">
-              <td :colspan="8" class="iq-empty-row">
+              <td :colspan="11" class="iq-empty-row">
                 <div class="iq-empty-box">
                   <div class="iq-empty-icon">📭</div>
                   <div class="iq-empty-text iq-text-sm iq-text-muted">暂无注册申请</div>
@@ -504,5 +514,13 @@ onMounted(() => {
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
+}
+
+.iq-subject-list {
+  display: inline-block;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
