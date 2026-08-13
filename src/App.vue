@@ -259,6 +259,8 @@
           :examId="activeExamId"
           @exit="exitExam"
           @view-record="viewRecord"
+          @update-question-id="currentQuestionId = $event"
+          @update-exam-id="currentExamId = $event"
           @toast="handleToastFromChild"
         />
 
@@ -326,11 +328,16 @@
     />
 
     <Toast :message="toastMessage" :type="toastType" />
+
+    <AIAssistant
+      v-if="currentUser?.role === 'student'"
+      @start-exam="startExam"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, provide, onMounted, onUnmounted, watch } from 'vue';
 import {
   getQuestions,
   addQuestion,
@@ -351,6 +358,7 @@ import RegistrationDialog from '@/components/RegistrationDialog.vue';
 import UserManagement from '@/components/UserManagement.vue';
 import RegistrationAudit from '@/components/RegistrationAudit.vue';
 import ChangePassword from '@/components/ChangePassword.vue';
+import AIAssistant from '@/components/AIAssistant.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
 import AiGenerate from '@/components/AiGenerate.vue';
 import Feedback from '@/components/Feedback.vue';
@@ -374,8 +382,18 @@ const pwdVisible = ref(false);
 
 // ===== 答题练习 =====
 const practiceView = ref('exams');
+const currentQuestionId = ref(null);
+const currentExamId = ref(null);
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
+
+provide('assistantState', {
+  currentView,
+  practiceView,
+  currentQuestionId,
+  currentExamId,
+  currentUser,
+});
 
 const canEdit = computed(() => currentUser.value?.role === 'admin' || currentUser.value?.role === 'teacher');
 
