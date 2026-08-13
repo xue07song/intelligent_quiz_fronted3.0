@@ -49,6 +49,17 @@ export const getPracticeStats = () => {
   return request.get('/practice/statistics');
 };
 
+// 错题本：分页列表
+export const getWrongQuestions = (params = {}) => {
+  return request.get('/practice/wrong-questions', { params });
+};
+
+// 错题本：错题重练
+// body: { count, 章节, 题型, title }
+export const createWrongExam = (data) => {
+  return request.post('/practice/wrong-exams', data);
+};
+
 // ==================== 管理端接口（教师/管理员）====================
 // 教师只能查看学生数据；管理员可查看所有人并按角色筛选
 
