@@ -6,8 +6,10 @@ export const generateExam = (data) => {
   return request.post('/practice/exams', data);
 };
 
-export const getExamInventory = (chapters = []) => {
-  return request.get('/practice/exam-inventory', { params: { chapters: chapters.join(',') } });
+export const getExamInventory = (chapters = [], subject = '') => {
+  const params = { chapters: chapters.join(',') };
+  if (subject) params.subject = subject;
+  return request.get('/practice/exam-inventory', { params });
 };
 
 export const previewRuleExam = (data) => {
@@ -17,6 +19,16 @@ export const previewRuleExam = (data) => {
 export const generateRuleExam = (data) => {
   return request.post('/practice/rule-exams', data);
 };
+
+export const checkAdaptiveInventory = (data) => request.post('/practice/adaptive/inventory', data);
+export const startAdaptivePractice = (data) => request.post('/practice/adaptive/sessions', data);
+export const getAdaptiveSession = (id) => request.get(`/practice/adaptive/sessions/${id}`);
+export const submitAdaptiveAnswer = (id, data) => request.post(`/practice/adaptive/sessions/${id}/answers`, data);
+export const getAdaptiveOverview = () => request.get('/practice/adaptive-overview');
+export const getAdaptiveProgress = () => request.get('/practice/adaptive-progress');
+export const getLearningAnalysis = () => request.get('/practice/learning-analysis/me');
+export const getLearningAnalysisOverview = () => request.get('/practice/learning-analysis/overview');
+export const getStudentLearningAnalysis = (userId) => request.get(`/practice/learning-analysis/students/${userId}`);
 
 // 试卷列表（分页）
 export const getExams = (params = {}) => {
@@ -77,6 +89,7 @@ export const adminListRecords = (params = {}) => {
 export const adminGetRecord = (id) => {
   return request.get(`/practice/admin/records/${id}`);
 };
+export const reviewSubjectiveAnswer = (answerId, data) => request.put(`/practice/admin/answers/${answerId}/review`, data);
 
 // 管理端：查看指定用户的答题记录列表
 export const adminListUserRecords = (userId, params = {}) => {

@@ -54,6 +54,7 @@
             <span class="q-num">第 {{ idx + 1 }} 题</span>
             <span class="q-type-tag" :class="`type-${q.题型}`">{{ getTypeName(q.题型) }}</span>
             <span class="iq-tag iq-tag-neutral" style="font-size: 11px;">{{ getDifficultyLabel(q.难度) }}</span>
+
             <span v-if="!isObjective(q.题型)" class="iq-tag iq-tag-warning" style="font-size: 11px;">📝 人工批阅</span>
             <button
               type="button"
@@ -67,9 +68,12 @@
               </svg>
               {{ favoriteSet.has(String(q.id)) ? '已收藏' : '收藏' }}
             </button>
+=======
+            <span v-if="Number(q.题型)>=4" class="iq-tag iq-tag-warning" style="font-size: 11px;">语义评阅 · 教师可复核</span>
+
           </div>
           <div class="q-title">{{ q.题目 }}</div>
-          <div v-if="q.选项" class="q-options">{{ q.选项 }}</div>
+          <div v-if="[2,3].includes(Number(q.题型)) && q.选项" class="q-options option-row"><label v-for="opt in parseOptions(q.选项)" :key="opt.key" :class="['option-choice',{selected:Number(q.题型)===3?(multiAnswers[q.id]||[]).includes(opt.key):answers[q.id]===opt.key}]"><input v-if="Number(q.题型)===2" type="radio" :name="`q-${q.id}`" :value="opt.key" v-model="answers[q.id]"><input v-else type="checkbox" :value="opt.key" v-model="multiAnswers[q.id]" @change="syncMulti(q.id)"><b>{{opt.key}}.</b> {{opt.text}}</label></div>
 
           <!-- 答题输入区 -->
           <div class="q-answer">
@@ -88,21 +92,9 @@
               </label>
             </div>
             <!-- 单选题 -->
-            <div v-else-if="Number(q.题型) === 2" class="iq-radio-group iq-radio-col">
-              <label v-for="opt in parseOptions(q.选项)" :key="opt.key" class="iq-radio">
-                <input type="radio" :name="`q-${q.id}`" :value="opt.key" v-model="answers[q.id]" />
-                <span class="iq-radio-custom"></span>
-                <span><b>{{ opt.key }}.</b> {{ opt.text }}</span>
-              </label>
-            </div>
+            <div v-else-if="Number(q.题型) === 2" class="choice-hint">请直接点击上方选项</div>
             <!-- 多选题 -->
-            <div v-else-if="Number(q.题型) === 3" class="iq-checkbox-group iq-checkbox-col">
-              <label v-for="opt in parseOptions(q.选项)" :key="opt.key" class="iq-checkbox-item">
-                <input type="checkbox" :value="opt.key" v-model="multiAnswers[q.id]" @change="syncMulti(q.id)" />
-                <span class="iq-checkbox-custom"></span>
-                <span><b>{{ opt.key }}.</b> {{ opt.text }}</span>
-              </label>
-            </div>
+            <div v-else-if="Number(q.题型) === 3" class="choice-hint">可直接点击上方一个或多个选项</div>
             <!-- 填空题 -->
             <input v-else-if="Number(q.题型) === 4" v-model="answers[q.id]" class="iq-input" placeholder="请输入答案" />
             <!-- 简答/程序题 -->
@@ -322,6 +314,13 @@ function isObjective(type) {
 }
 
 function parseOptions(text) {
+  const str=String(text||'').trim();
+  const markers=[...str.matchAll(/(?:^|\s)([A-Fa-f])\s*[.、．）)]\s*/g)];
+  if(markers.length>1)return markers.map((marker,index)=>({key:marker[1].toUpperCase(),text:str.slice(marker.index+marker[0].length,markers[index+1]?.index??str.length).trim()}));
+  return str.split(/\n+/).map(v=>v.trim()).filter(Boolean).map((value,index)=>({key:String.fromCharCode(65+index),text:value.replace(/^[A-Fa-f]\s*[.、．）)]?\s*/, '')}));
+}
+
+function legacyParseOptions(text) {
   if (!text) return [];
   const str = String(text).trim();
   const lines = str.split(/\n+/).filter(Boolean);
@@ -624,6 +623,7 @@ onUnmounted(() => {
   line-height: 1.8;
   border: 1px solid var(--iq-neutral-100);
 }
+.option-row{display:flex;flex-wrap:wrap;gap:8px;white-space:normal}.option-choice{display:inline-flex;align-items:center;gap:5px;padding:9px 12px;border:1px solid var(--iq-neutral-200);border-radius:6px;background:#fff;cursor:pointer}.option-choice input{position:absolute;opacity:0;pointer-events:none}.option-choice.selected{border-color:var(--iq-primary);background:var(--iq-primary-50);color:var(--iq-primary-800)}.choice-hint{font-size:12px;color:var(--iq-neutral-500)}
 .q-answer {
   display: flex;
   flex-direction: column;

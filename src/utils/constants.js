@@ -24,7 +24,18 @@ const DIFFICULTY_MAP = {
   '困难': '⭐⭐⭐⭐⭐',
 };
 
-const CHAPTER_MAP = {};
+const CHAPTER_MAP = {
+  1: '计算思维基础',
+  2: '计算机系统基础',
+  3: 'Python 程序设计',
+  4: '算法与问题求解',
+  5: '数字素养与数字化',
+  6: '人工智能基础',
+  7: '智能技术应用',
+  8: '智能技术与机器学习',
+  9: '大模型与办公实践',
+  10: '科技伦理与治理',
+};
 
 const TYPE_OPTIONS = Object.entries(TYPE_MAP).map(([value, label]) => ({ value: Number(value), label }));
 
@@ -41,5 +52,7 @@ export const getDifficultyLabel = (d) => {
   const s = String(d || '');
   return DIFFICULTY_MAP[s] || s;
 };
+export const getChapterName = (chapter) => CHAPTER_MAP[Number(chapter)] || '未命名章节';
+export const getChapterLabel = (chapter) => `第${Number(chapter)}章 ${getChapterName(chapter)}`;
 
 export { TYPE_MAP, DIFFICULTY_MAP, CHAPTER_MAP, TYPE_OPTIONS, DIFFICULTY_OPTIONS };

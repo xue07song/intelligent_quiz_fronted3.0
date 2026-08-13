@@ -52,6 +52,8 @@
               <th>用户名</th>
               <th>昵称</th>
               <th>角色</th>
+              <th>所教科目</th>
+              <th>班级</th>
               <th>状态</th>
               <th>创建时间</th>
               <th style="width: 240px;">操作</th>
@@ -64,6 +66,26 @@
               <td>{{ user.nickname || '--' }}</td>
               <td>
                 <span class="iq-tag u-role" :class="user.role">{{ roleMap[user.role] }}</span>
+              </td>
+              <td>
+                <template v-if="user.role === 'teacher' && user.subjects && user.subjects.length > 0">
+                  <span
+                    v-for="(s, idx) in user.subjects"
+                    :key="idx"
+                    class="iq-user-subject-tag"
+                    style="margin-right: 4px;"
+                  >{{ s }}</span>
+                </template>
+                <span v-else>--</span>
+              </td>
+              <td>
+                <template v-if="user.role === 'student'">
+                  <span v-if="user.className || user.class_name" class="iq-tag iq-tag-success">
+                    {{ user.className || user.class_name }}
+                  </span>
+                  <span v-else class="iq-text-sm" style="color: var(--iq-neutral-500);">未分班</span>
+                </template>
+                <span v-else>--</span>
               </td>
               <td>
                 <span class="iq-tag" :class="user.status === 1 ? 'iq-tag-success' : 'iq-tag-neutral'">
@@ -83,7 +105,7 @@
               </td>
             </tr>
             <tr v-if="list.length === 0">
-              <td colspan="7" class="iq-empty-row">
+              <td colspan="9" class="iq-empty-row">
                 <div class="iq-empty-box">
                   <div class="iq-empty-icon">📭</div>
                   <div class="iq-empty-text iq-text-sm iq-text-muted">暂无数据</div>
@@ -156,6 +178,25 @@
                   <option value="student">学生</option>
                 </select>
               </div>
+              <div class="iq-form-field" v-if="form.role === 'teacher'">
+                <label class="iq-form-label">所教科目</label>
+                <div class="iq-subject-checkboxes">
+                  <label
+                    v-for="opt in allSubjects"
+                    :key="opt"
+                    class="iq-checkbox-item"
+                  >
+                    <input
+                      type="checkbox"
+                      class="iq-checkbox"
+                      :value="opt"
+                      v-model="form.subjects"
+                    />
+                    <span>{{ opt }}</span>
+                  </label>
+                  <span v-if="allSubjects.length === 0" class="iq-text-sm iq-text-muted">加载中...</span>
+                </div>
+              </div>
               <div class="iq-form-field" v-if="!isEdit">
                 <label class="iq-form-label">状态</label>
                 <select v-model="form.status" class="iq-select">
@@ -179,6 +220,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import { getUsers, createUser, updateUser, resetUserPassword, toggleUserStatus, deleteUser } from '@/api/user';
+import { getSubjects } from '@/api/subject';
 
 const emit = defineEmits(['toast']);
 
@@ -192,6 +234,8 @@ const keyword = ref('');
 const roleFilter = ref('');
 const statusFilter = ref('');
 
+const allSubjects = ref([]);
+
 const dialogVisible = ref(false);
 const isEdit = ref(false);
 const form = reactive({
@@ -201,6 +245,7 @@ const form = reactive({
   nickname: '',
   role: 'student',
   status: 1,
+  subjects: [],
 });
 
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
@@ -244,20 +289,32 @@ const changePage = (newPage) => {
 
 const openCreate = () => {
   isEdit.value = false;
-  Object.assign(form, { id: null, username: '', password: '', nickname: '', role: 'student', status: 1 });
+  Object.assign(form, { id: null, username: '', password: '', nickname: '', role: 'student', status: 1, subjects: [] });
   dialogVisible.value = true;
 };
 
 const openEdit = (user) => {
   isEdit.value = true;
-  Object.assign(form, { id: user.id, username: user.username, password: '', nickname: user.nickname || '', role: user.role, status: user.status });
+  Object.assign(form, {
+    id: user.id,
+    username: user.username,
+    password: '',
+    nickname: user.nickname || '',
+    role: user.role,
+    status: user.status,
+    subjects: Array.isArray(user.subjects) ? [...user.subjects] : [],
+  });
   dialogVisible.value = true;
 };
 
 const handleSubmit = async () => {
   try {
     if (isEdit.value) {
-      await updateUser(form.id, { nickname: form.nickname, role: form.role });
+      const updateData = { nickname: form.nickname, role: form.role };
+      if (form.role === 'teacher') {
+        updateData.subjects = form.subjects || [];
+      }
+      await updateUser(form.id, updateData);
       showToast('用户更新成功');
     } else {
       if (!form.username || !form.password) {
@@ -268,13 +325,17 @@ const handleSubmit = async () => {
         showToast('密码至少6位', 'error');
         return;
       }
-      await createUser({
+      const createData = {
         username: form.username,
         password: form.password,
         role: form.role,
         nickname: form.nickname,
         status: form.status,
-      });
+      };
+      if (form.role === 'teacher') {
+        createData.subjects = form.subjects || [];
+      }
+      await createUser(createData);
       showToast('用户创建成功');
     }
     dialogVisible.value = false;
@@ -324,8 +385,13 @@ const handleDelete = async (user) => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   loadUsers();
+  try {
+    allSubjects.value = await getSubjects();
+  } catch (e) {
+    console.warn('加载科目列表失败:', e);
+  }
 });
 </script>
 
@@ -418,6 +484,37 @@ onMounted(() => {
 .act-enable:hover:not(:disabled) { background: var(--iq-state-success-bg) !important; color: #047857 !important; }
 .act-del { color: var(--iq-state-error) !important; }
 .act-del:hover:not(:disabled) { background: var(--iq-state-error-bg) !important; color: #b91c1c !important; }
+
+.iq-user-subject-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 6px;
+  background: #e0e7ff;
+  color: #4338ca;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.iq-subject-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 8px 0;
+}
+.iq-checkbox-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--iq-neutral-700);
+}
+.iq-checkbox-item input[type="checkbox"].iq-checkbox {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--iq-primary);
+  cursor: pointer;
+}
 
 .iq-empty-row { padding: 0 !important; }
 .iq-empty-box {

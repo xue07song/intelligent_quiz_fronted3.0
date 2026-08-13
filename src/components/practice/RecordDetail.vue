@@ -103,6 +103,14 @@
               <span class="a-label">💡 解析：</span>
               <span class="a-value">{{ a.解析 }}</span>
             </div>
+            <div v-if="reviewable && [4,5,6].includes(Number(a.question_type))" class="review-panel">
+              <b>教师复核</b>
+              <select v-model="reviewForms[a.id].status" class="iq-input"><option value="correct">判定正确</option><option value="partial">部分掌握</option><option value="incorrect">需要巩固</option></select>
+              <label v-if="reviewForms[a.id].status==='partial'">本题得分 <input v-model.number="reviewForms[a.id].awardedScore" class="iq-input" type="number" min="0" :max="reviewForms[a.id].fullScore" step="0.5"> / {{reviewForms[a.id].fullScore}}分</label>
+              <input v-model="reviewForms[a.id].comment" class="iq-input" placeholder="填写简洁的复核意见">
+              <button class="iq-btn iq-btn-primary iq-btn-sm" :disabled="reviewing===a.id" @click="saveReview(a)">{{reviewing===a.id?'保存中...':'保存复核'}}</button>
+              <small v-if="a.review_status">上次复核：{{reviewStatusText(a.review_status)}}<template v-if="a.review_comment"> · {{a.review_comment}}</template></small>
+            </div>
           </div>
         </div>
       </div>
@@ -112,7 +120,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getRecord, adminGetRecord } from '@/api/practice';
+import { getRecord, adminGetRecord, reviewSubjectiveAnswer } from '@/api/practice';
 import { getTypeName } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
 
@@ -121,12 +129,18 @@ const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 const props = defineProps({
   recordId: { type: [Number, String], required: true },
   adminMode: { type: Boolean, default: false },
+  reviewable: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['back', 'toast']);
 
 const loading = ref(true);
 const record = ref(null);
+const reviewing = ref(null);
+const reviewForms = ref({});
+const reviewStatusText = status => ({correct:'正确',partial:'部分掌握',incorrect:'需要巩固'}[status]||status);
+const prepareReviewForms = () => { const full=Math.round((record.value?.total_count?100/Number(record.value.total_count):100)*100)/100;reviewForms.value = Object.fromEntries((record.value?.answers||[]).map(a=>[a.id,{status:a.review_status||'correct',awardedScore:Math.round((Number(a.review_score_rate)||0.5)*full*100)/100,fullScore:full,comment:a.review_comment||''}])); };
+const saveReview = async a => { reviewing.value=a.id;try{await reviewSubjectiveAnswer(a.id,reviewForms.value[a.id]);emit('toast',{message:'复核结果已保存，成绩已更新',type:'success'});await loadRecord()}catch(err){emit('toast',{message:err.message||'保存复核失败',type:'error'})}finally{reviewing.value=null} };
 
 const formatDuration = (sec) => {
   if (!sec) return '-';
@@ -161,6 +175,7 @@ const loadRecord = async () => {
     record.value = props.adminMode
       ? await adminGetRecord(props.recordId)
       : await getRecord(props.recordId);
+    prepareReviewForms();
   } catch (err) {
     emit('toast', { message: err.message || '加载记录失败', type: 'error' });
   } finally {
@@ -388,4 +403,5 @@ onMounted(() => {
 }
 .text-correct { color: var(--iq-state-success); font-weight: 600; }
 .text-wrong { color: var(--iq-state-error); font-weight: 600; }
+.review-panel{display:grid;grid-template-columns:110px 150px 180px 1fr auto;align-items:center;gap:9px;margin-top:10px;padding:12px;border-top:1px dashed var(--iq-neutral-200);background:#f5f7ff}.review-panel label{display:flex;align-items:center;gap:6px;font-size:12px}.review-panel small{grid-column:1/-1;color:var(--iq-neutral-500)}@media(max-width:760px){.review-panel{grid-template-columns:1fr}.review-panel small{grid-column:auto}}
 </style>
