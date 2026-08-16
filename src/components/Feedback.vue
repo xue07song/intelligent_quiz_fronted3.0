@@ -68,47 +68,47 @@
         <div class="iq-table-wrap">
           <table class="iq-table">
             <thead>
-              <tr>
-                <th>ID</th>
-                <th v-if="isAdmin">用户名</th>
-                <th>标题</th>
-                <th>分类</th>
-                <th>状态</th>
-                <th>回复</th>
-                <th>提交时间</th>
-                <th style="width: 160px;">操作</th>
-              </tr>
+            <tr>
+              <th>ID</th>
+              <th v-if="isAdmin">用户名</th>
+              <th>标题</th>
+              <th>分类</th>
+              <th>状态</th>
+              <th>回复</th>
+              <th>提交时间</th>
+              <th style="width: 160px;">操作</th>
+            </tr>
             </thead>
             <tbody>
-              <tr v-for="item in list" :key="item.id">
-                <td><span class="iq-id-chip">{{ item.id }}</span></td>
-                <td v-if="isAdmin">
-                  <span class="iq-id-chip">{{ item.user_name || item.user_id }}</span>
-                </td>
-                <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ item.title }}</td>
-                <td><span class="iq-tag" :class="categoryTagClass(item.category)">{{ categoryLabel(item.category) }}</span></td>
-                <td><span class="iq-tag" :class="statusTagClass(item.status)">{{ statusLabel(item.status) }}</span></td>
-                <td>
-                  <span v-if="item.replied_at" class="iq-tag iq-tag-success">已回复</span>
-                  <span v-else class="iq-tag iq-tag-neutral">-</span>
-                </td>
-                <td class="iq-text-sm iq-text-muted">{{ formatTime(item.created_at) }}</td>
-                <td>
-                  <div class="iq-action-group">
-                    <button class="iq-btn iq-btn-primary iq-btn-sm" @click="openDetail(item.id)">详情</button>
-                    <button class="iq-btn iq-btn-danger iq-btn-sm" @click="handleDelete(item)">删除</button>
-                  </div>
-                </td>
-              </tr>
+            <tr v-for="item in list" :key="item.id">
+              <td><span class="iq-id-chip">{{ item.id }}</span></td>
+              <td v-if="isAdmin">
+                <span class="iq-id-chip">{{ item.user_name || item.user_id }}</span>
+              </td>
+              <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ item.title }}</td>
+              <td><span class="iq-tag" :class="categoryTagClass(item.category)">{{ categoryLabel(item.category) }}</span></td>
+              <td><span class="iq-tag" :class="statusTagClass(item.status)">{{ statusLabel(item.status) }}</span></td>
+              <td>
+                <span v-if="item.replied_at" class="iq-tag iq-tag-success">已回复</span>
+                <span v-else class="iq-tag iq-tag-neutral">-</span>
+              </td>
+              <td class="iq-text-sm iq-text-muted">{{ formatTime(item.created_at) }}</td>
+              <td>
+                <div class="iq-action-group">
+                  <button class="iq-btn iq-btn-primary iq-btn-sm" @click="openDetail(item.id)">详情</button>
+                  <button class="iq-btn iq-btn-danger iq-btn-sm" @click="handleDelete(item)">删除</button>
+                </div>
+              </td>
+            </tr>
             </tbody>
           </table>
         </div>
 
         <Pagination
-          v-model:page="page"
-          v-model:pageSize="pageSize"
-          :total="total"
-          @change="loadList"
+            v-model:page="page"
+            v-model:pageSize="pageSize"
+            :total="total"
+            @change="loadList"
         />
       </div>
     </template>
@@ -180,10 +180,10 @@
               <span class="iq-font-semibold iq-text-base" style="color: var(--iq-neutral-900);">处理状态</span>
             </div>
             <select
-              :value="detail.status"
-              class="iq-select"
-              style="width: auto; min-width: 160px;"
-              @change="handleStatusChange($event.target.value)"
+                :value="detail.status"
+                class="iq-select"
+                style="width: auto; min-width: 160px;"
+                @change="handleStatusChange($event.target.value)"
             >
               <option value="pending">⏳ 待处理</option>
               <option value="processing">🔄 处理中</option>
@@ -199,15 +199,15 @@
             </div>
             <div class="iq-reply-form">
               <textarea
-                v-model="replyText"
-                class="iq-textarea"
-                placeholder="输入回复内容..."
-                rows="3"
+                  v-model="replyText"
+                  class="iq-textarea"
+                  placeholder="输入回复内容..."
+                  rows="3"
               ></textarea>
               <button
-                class="iq-btn iq-btn-primary"
-                :disabled="!replyText.trim() || replyLoading"
-                @click="handleReply"
+                  class="iq-btn iq-btn-primary"
+                  :disabled="!replyText.trim() || replyLoading"
+                  @click="handleReply"
               >
                 <span v-if="replyLoading" class="iq-btn-spinner"></span>
                 {{ replyLoading ? '提交中...' : '发送回复' }}
@@ -255,10 +255,10 @@
                 <label class="iq-form-label">反馈类型</label>
                 <div class="iq-category-grid">
                   <label
-                    v-for="cat in categories"
-                    :key="cat.value"
-                    class="iq-category-option"
-                    :class="{ active: form.category === cat.value }"
+                      v-for="cat in categories"
+                      :key="cat.value"
+                      class="iq-category-option"
+                      :class="{ active: form.category === cat.value }"
                   >
                     <input type="radio" :value="cat.value" v-model="form.category" />
                     <span class="iq-cat-icon">{{ cat.icon }}</span>
@@ -270,30 +270,30 @@
               <div class="iq-form-field">
                 <label class="iq-form-label">标题 <span class="iq-req">*</span></label>
                 <input
-                  v-model="form.title"
-                  class="iq-input"
-                  placeholder="简短描述问题或建议"
-                  maxlength="100"
+                    v-model="form.title"
+                    class="iq-input"
+                    placeholder="简短描述问题或建议"
+                    maxlength="100"
                 />
               </div>
 
               <div class="iq-form-field">
                 <label class="iq-form-label">详细内容 <span class="iq-req">*</span></label>
                 <textarea
-                  v-model="form.content"
-                  class="iq-textarea"
-                  placeholder="请详细描述你遇到的问题或建议..."
-                  rows="5"
+                    v-model="form.content"
+                    class="iq-textarea"
+                    placeholder="请详细描述你遇到的问题或建议..."
+                    rows="5"
                 ></textarea>
               </div>
 
               <div class="iq-form-field">
                 <label class="iq-form-label">联系方式 <span class="iq-text-xs iq-text-muted">（可选）</span></label>
                 <input
-                  v-model="form.contact"
-                  class="iq-input"
-                  placeholder="邮箱 / 手机号，方便我们联系你"
-                  maxlength="100"
+                    v-model="form.contact"
+                    class="iq-input"
+                    placeholder="邮箱 / 手机号，方便我们联系你"
+                    maxlength="100"
                 />
               </div>
 
@@ -335,7 +335,7 @@ const emit = defineEmits(['toast']);
 const isAdmin = computed(() => props.role === 'admin');
 
 // ===== 视图状态 =====
-const view = ref('list'); // 'list' | 'detail'
+const view = ref('list');
 
 // ===== 列表 =====
 const list = ref([]);
@@ -360,8 +360,8 @@ const loadList = async () => {
     if (filters.status) params.status = filters.status;
 
     const data = isAdmin.value
-      ? await getAllFeedback(params)
-      : await getMyFeedback(params);
+        ? await getAllFeedback(params)
+        : await getMyFeedback(params);
     list.value = data.list;
     total.value = data.total;
   } catch (err) {
@@ -500,7 +500,6 @@ const handleReply = async () => {
   replyLoading.value = true;
   try {
     await replyFeedback(detail.value.id, replyText.value.trim());
-    // 重新加载详情获取回复
     detail.value = await getFeedbackDetail(detail.value.id);
     replyText.value = '';
     emit('toast', { message: '✅ 回复成功', type: 'success' });

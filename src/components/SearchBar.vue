@@ -1,13 +1,13 @@
 <template>
-  <div class="iq-card iq-search-card">
+  <div class="iq-search-bar">
     <div class="iq-search-grid">
       <div class="iq-search-field">
         <label class="iq-search-label">题目ID</label>
         <input
-          v-model="filters.id"
-          class="iq-input"
-          placeholder="如 Q001"
-          @keyup.enter="$emit('search', filters)"
+            v-model="filters.id"
+            class="iq-input"
+            placeholder="如 Q001"
+            @keyup.enter="$emit('search', filters)"
         />
       </div>
 
@@ -15,10 +15,10 @@
         <label class="iq-search-label">关键词</label>
         <div class="iq-kw-wrap">
           <input
-            v-model="filters.关键词"
-            class="iq-input"
-            placeholder="搜索题目内容、选项、知识点..."
-            @keyup.enter="$emit('search', filters)"
+              v-model="filters.关键词"
+              class="iq-input"
+              placeholder="搜索题目内容、选项、知识点..."
+              @keyup.enter="$emit('search', filters)"
           />
           <div class="iq-kw-hint">
             <div class="hint-title iq-font-medium">关键词匹配范围</div>
@@ -51,21 +51,21 @@
       <div class="iq-search-field">
         <label class="iq-search-label">章节</label>
         <input
-          v-model="filters.章节"
-          type="number"
-          class="iq-input"
-          placeholder="章节号"
-          @keyup.enter="$emit('search', filters)"
+            v-model="filters.章节"
+            type="number"
+            class="iq-input"
+            placeholder="章节号"
+            @keyup.enter="$emit('search', filters)"
         />
       </div>
 
       <div class="iq-search-field">
         <label class="iq-search-label">出题人</label>
         <input
-          v-model="filters.出题人"
-          class="iq-input"
-          placeholder="出题人"
-          @keyup.enter="$emit('search', filters)"
+            v-model="filters.出题人"
+            class="iq-input"
+            placeholder="出题人"
+            @keyup.enter="$emit('search', filters)"
         />
       </div>
 
@@ -87,19 +87,6 @@
         </button>
         <button class="iq-btn iq-btn-secondary" @click="handleReset">重置</button>
       </div>
-
-      <div v-if="canEdit" class="iq-search-batch">
-        <button
-          class="iq-btn iq-btn-danger iq-btn-sm"
-          :disabled="selectedCount === 0"
-          @click="$emit('batch-delete')"
-        >
-          🗑️ 批量删除{{ selectedCount ? ` (${selectedCount})` : '' }}
-        </button>
-        <button class="iq-btn iq-btn-secondary iq-btn-sm" @click="$emit('batch-import')">📥 批量导入</button>
-        <button class="iq-btn iq-btn-secondary iq-btn-sm" @click="$emit('ai-generate')">🤖 AI 出题</button>
-        <button class="iq-btn iq-btn-primary iq-btn-sm" @click="$emit('add')">+ 新增题目</button>
-      </div>
     </div>
   </div>
 </template>
@@ -113,12 +100,9 @@ const props = defineProps({
   initialFilters: { type: Object, default: () => ({}) },
   role: { type: String, default: '' },
   subjects: { type: Array, default: () => [] },
-  selectedCount: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(['search', 'add', 'reset', 'batch-delete', 'batch-import', 'ai-generate']);
-
-const canEdit = computed(() => props.role === 'admin' || props.role === 'teacher');
+const emit = defineEmits(['search', 'reset']);
 
 const allSubjects = ref([]);
 
@@ -165,28 +149,37 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.iq-search-card {
+.iq-search-bar {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
   padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
+
 .iq-search-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   gap: 14px 16px;
   align-items: end;
 }
+
 .iq-search-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
+
 .iq-search-label {
   font-size: 12px;
   font-weight: 500;
   color: var(--iq-neutral-600);
 }
+
 .iq-kw-wrap {
   position: relative;
 }
+
 .iq-kw-hint {
   position: absolute;
   top: calc(100% + 6px);
@@ -207,43 +200,54 @@ onMounted(async () => {
   transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
   pointer-events: none;
 }
+
 .iq-kw-wrap:hover .iq-kw-hint {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
 }
+
 .hint-title {
   font-size: 13px;
   color: var(--iq-neutral-900);
   margin-bottom: 8px;
 }
+
 .hint-list {
   margin: 0 0 10px;
   padding-left: 18px;
 }
+
 .hint-list li {
   margin-bottom: 2px;
 }
+
 .hint-list strong {
   color: var(--iq-primary-600);
 }
+
 .hint-tip {
   padding-top: 8px;
   border-top: 1px dashed var(--iq-border);
   color: var(--iq-neutral-500);
   font-size: 11px;
 }
+
 .iq-search-actions {
   display: flex;
   gap: 8px;
   align-items: center;
 }
-.iq-search-batch {
-  grid-column: span 6;
-  display: flex;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--iq-border);
-  margin-top: 2px;
+
+@media (max-width: 900px) {
+  .iq-search-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .iq-search-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

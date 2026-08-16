@@ -1,164 +1,177 @@
 <template>
-  <div class="iq-exam-list">
-    <div class="iq-page-header">
-      <div>
-        <h2 class="iq-text-xl iq-font-semibold" style="color: var(--iq-neutral-900); margin: 0;">{{ role === 'teacher' ? '我创建的试卷' : '教师试卷' }}</h2>
-        <p class="iq-text-sm iq-text-muted" style="margin: 4px 0 0;">{{ role === 'student' ? '选择教师发布的试卷开始答题' : role === 'admin' ? '查看所有教师创建的试卷和题目内容' : '管理自己创建的试卷' }}</p>
+  <div class="exam-list-page">
+    <!-- ===== 顶部横幅 ===== -->
+    <div class="page-banner">
+      <div class="banner-icon">📋</div>
+      <div class="banner-content">
+        <h1>{{ role === 'teacher' ? '我创建的试卷' : '教师试卷' }}</h1>
+        <p>{{ role === 'student' ? '选择教师发布的试卷开始答题' : role === 'admin' ? '查看所有教师创建的试卷和题目内容' : '管理自己创建的试卷' }}</p>
       </div>
-        <button v-if="role === 'teacher'" class="iq-btn iq-btn-primary" @click="$emit('generate')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
-        </svg>
-        新建试卷
-      </button>
+      <div class="banner-stats">
+        <span class="stat-number">{{ total }}</span>
+        <span class="stat-label">张试卷</span>
+      </div>
     </div>
 
-    <div v-if="loading" class="iq-table-loading">
-      <span class="iq-loading-spinner"></span>
-      <span class="iq-text-sm iq-text-muted">加载中...</span>
+    <!-- ===== 操作栏 ===== -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <span class="result-info">共 <strong>{{ total }}</strong> 张试卷</span>
+      </div>
+      <div class="toolbar-right">
+        <button v-if="role === 'teacher'" class="btn-primary" @click="$emit('generate')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          新建试卷
+        </button>
+        <button class="btn-refresh" @click="loadExams">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6" />
+            <path d="M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10" />
+            <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14" />
+          </svg>
+          刷新
+        </button>
+      </div>
     </div>
 
-    <div v-else-if="list.length === 0" class="iq-card">
-      <div class="iq-empty-row">
-        <div class="iq-empty-box">
-          <div class="iq-empty-icon">📋</div>
-          <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">暂无试卷</div>
-          <div class="iq-text-sm iq-text-muted">点击「新建试卷」开始组卷练习</div>
+    <!-- ===== 加载状态 ===== -->
+    <div v-if="loading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>加载中...</p>
+    </div>
+
+    <!-- ===== 空状态 ===== -->
+    <div v-else-if="list.length === 0" class="empty-state">
+      <div class="empty-icon">📭</div>
+      <h3>暂无试卷</h3>
+      <p>{{ role === 'teacher' ? '点击「新建试卷」开始组卷' : '教师还没有发布试卷，请耐心等待' }}</p>
+    </div>
+
+    <!-- ===== 试卷卡片网格 ===== -->
+    <div v-else class="paper-grid">
+      <div
+          v-for="exam in list"
+          :key="exam.id"
+          class="paper-card"
+          @click="handleCardClick(exam)"
+      >
+        <div class="paper-card-header">
+          <span class="paper-type-badge" :class="getTypeClass(exam)">
+            {{ exam.class_id || exam.classId ? '定向' : '全开放' }}
+          </span>
+          <span class="paper-id">#{{ exam.id }}</span>
+        </div>
+
+        <h3 class="paper-title">{{ exam.title }}</h3>
+
+        <div class="paper-meta">
+          <span class="meta-item">
+            <span class="meta-icon">📊</span>
+            {{ exam.total_count || 0 }} 题
+          </span>
+          <span class="meta-item">
+            <span class="meta-icon">⭐</span>
+            {{ exam.difficulty ? getDifficultyLabel(exam.difficulty) : '不限' }}
+          </span>
+          <span class="meta-item">
+            <span class="meta-icon">👥</span>
+            {{ exam.attempt_count || 0 }} 次练习
+          </span>
+          <span v-if="exam.subject" class="meta-item">
+            <span class="meta-icon">📚</span>
+            {{ exam.subject }}
+          </span>
+        </div>
+
+        <div class="paper-card-footer">
+          <span class="paper-date">{{ formatTime(exam.created_at) }}</span>
+          <button class="btn-start" @click.stop="handleStartExam(exam.id)">
+            {{ role === 'student' ? '📝 开始答题' : '查看题目' }}
+          </button>
         </div>
       </div>
     </div>
 
-    <div v-else class="iq-card">
-      <div v-if="role === 'teacher' || role === 'admin'" class="exam-list-filters">
-        <div class="filter-item">
-          <label class="filter-label">科目</label>
-          <select v-model="subjectFilter" class="iq-select" @change="page = 1; loadExams()">
-            <option value="">全部科目</option>
-            <option v-for="s in allSubjects" :key="s" :value="s">{{ s }}</option>
-          </select>
-        </div>
-        <div class="filter-item">
-          <label class="filter-label">目标班级</label>
-          <select v-model="classFilter" class="iq-select" @change="page = 1; loadExams()">
-            <option value="">全部班级</option>
-            <option v-for="c in classList" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
-          </select>
-        </div>
-      </div>
-      <div class="iq-table-wrap">
-        <table class="iq-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>标题</th>
-              <th>科目</th>
-              <th>目标班级</th>
-              <th>题数</th>
-              <th>客观题</th>
-              <th>章节</th>
-              <th>题型</th>
-              <th>难度</th>
-              <th>练习次数</th>
-              <th>创建时间</th>
-              <th style="width: 120px;">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="exam in list" :key="exam.id">
-              <td><span class="iq-id-chip">{{ exam.id }}</span></td>
-              <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ exam.title }}</td>
-              <td>
-                <span v-if="exam.subject" class="iq-user-subject-tag" style="margin-right:0;">{{ exam.subject }}</span>
-                <span v-else class="iq-text-muted">--</span>
-              </td>
-              <td>
-                <template v-if="exam.class_id || exam.classId">
-                  <span class="iq-tag iq-tag-warning" style="color:#92400e;background:#fef3c7;">{{ exam.class_name || exam.className || '定向班级' }}</span>
-                </template>
-                <span v-else class="iq-tag iq-tag-neutral" style="color:var(--iq-neutral-600);background:var(--iq-neutral-100);">全开放</span>
-              </td>
-              <td>{{ exam.total_count }}</td>
-              <td>{{ exam.objective_count }}</td>
-              <td>{{ exam.chapter || '-' }}</td>
-              <td>
-                <span v-if="exam.question_type" class="iq-type-tag" :class="`type-${exam.question_type}`">{{ getTypeName(exam.question_type) }}</span>
-                <span v-else class="iq-tag iq-tag-neutral">不限</span>
-              </td>
-              <td>
-                <span v-if="exam.difficulty" class="iq-tag" :class="difficultyClass(exam.difficulty)">{{ getDifficultyLabel(exam.difficulty) }}</span>
-                <span v-else class="iq-tag iq-tag-neutral">不限</span>
-              </td>
-              <td><span class="iq-id-chip">{{ exam.attempt_count || 0 }}</span></td>
-              <td class="iq-text-sm iq-text-muted">{{ formatTime(exam.created_at) }}</td>
-              <td>
-                <button v-if="role === 'student'" class="iq-btn iq-btn-primary iq-btn-sm" @click="$emit('start-exam', exam.id)">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                  </svg>
-                  开始答题
-                </button>
-                <button v-else class="iq-btn iq-btn-secondary iq-btn-sm" @click="openPreview(exam.id)">查看题目</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
+    <!-- ===== 分页 ===== -->
+    <div v-if="total > pageSize" class="pagination-wrapper">
       <Pagination
-        v-model:page="page"
-        v-model:pageSize="pageSize"
-        :total="total"
-        @change="loadExams"
+          v-model:page="page"
+          v-model:pageSize="pageSize"
+          :total="total"
+          @change="loadExams"
       />
     </div>
 
-    <div v-if="previewVisible" class="preview-mask" @click.self="closePreview"><div class="preview-dialog"><div class="preview-head"><div><h2>{{ previewExam.title }}</h2><p>创建教师：{{ previewExam.creator_name || '-' }} · 共 {{ previewExam.questions?.length || 0 }} 题</p></div><button class="close" @click="closePreview">×</button></div><div v-if="previewLoading" class="preview-loading">正在读取试卷题目...</div><div v-else class="preview-body"><article v-for="(q,index) in previewExam.questions" :key="q.id" class="preview-question"><div class="number">{{ index+1 }}</div><div><div class="question-meta"><span>{{ getTypeName(q.题型) }}</span><span>难度{{ q.难度 }}</span><span>{{ q.知识点 || '未标注知识点' }}</span></div><h3>{{ q.题目 }}</h3><p v-if="q.选项">{{ q.选项 }}</p><details><summary>查看答案与解析</summary><p><b>答案：</b>{{ q.答案 }}</p><p v-if="q.解析"><b>解析：</b>{{ q.解析 }}</p></details></div></article></div></div></div>
+    <!-- ===== 预览弹窗（教师/管理员用） ===== -->
+    <div v-if="previewVisible" class="preview-mask" @click.self="closePreview">
+      <div class="preview-dialog">
+        <div class="preview-head">
+          <div>
+            <h2>{{ previewExam.title }}</h2>
+            <p>创建教师：{{ previewExam.creator_name || '-' }} · 共 {{ previewExam.questions?.length || 0 }} 题</p>
+          </div>
+          <button class="close-btn" @click="closePreview">✕</button>
+        </div>
+        <div v-if="previewLoading" class="preview-loading">正在读取试卷题目...</div>
+        <div v-else class="preview-body">
+          <div v-for="(q, index) in previewExam.questions" :key="q.id" class="preview-question">
+            <div class="preview-number">{{ index + 1 }}</div>
+            <div>
+              <div class="preview-meta">
+                <span>{{ getTypeName(q.题型) }}</span>
+                <span>难度 {{ q.难度 }}</span>
+                <span>{{ q.知识点 || '未标注知识点' }}</span>
+              </div>
+              <h4>{{ q.题目 }}</h4>
+              <p v-if="q.选项" class="preview-options">{{ q.选项 }}</p>
+              <details class="preview-details">
+                <summary>查看答案与解析</summary>
+                <p><b>答案：</b>{{ q.答案 }}</p>
+                <p v-if="q.解析"><b>解析：</b>{{ q.解析 }}</p>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import { getExams, getExam } from '@/api/practice';
-import { getTypeName, getDifficultyLabel, DIFFICULTY_OPTIONS } from '@/utils/constants';
+import { getTypeName, getDifficultyLabel } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
-import { getSubjects } from '@/api/subject';
-import { getClasses } from '@/api/class';
 import Pagination from '@/components/Pagination.vue';
 
+const props = defineProps({
+  role: { type: String, default: 'student' },
+});
+
 const emit = defineEmits(['generate', 'start-exam', 'toast']);
-defineProps({ role: { type: String, default: 'student' } });
 
 const list = ref([]);
 const total = ref(0);
 const page = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(12);
 const loading = ref(false);
-const previewVisible=ref(false),previewLoading=ref(false),previewExam=ref({questions:[]});
-const allSubjects = ref([]);
-const classList = ref([]);
-const subjectFilter = ref('');
-const classFilter = ref('');
-const openPreview=async(id)=>{previewVisible.value=true;previewLoading.value=true;try{previewExam.value=await getExam(id)}catch(err){emit('toast',{message:err.message||'读取试卷失败',type:'error'});previewVisible.value=false}finally{previewLoading.value=false}};
-const closePreview=()=>{previewVisible.value=false;previewExam.value={questions:[]}};
 
-const difficultyClass = (d) => {
-  const opt = DIFFICULTY_OPTIONS.find(o => String(o.value) === String(d));
-  if (opt?.value === 1) return 'iq-tag-success';
-  if (opt?.value === 2) return 'iq-tag-warning';
-  if (opt?.value === 3) return 'iq-tag-error';
-  return 'iq-tag-neutral';
-};
+// 预览相关
+const previewVisible = ref(false);
+const previewLoading = ref(false);
+const previewExam = ref({ questions: [] });
 
 const loadExams = async () => {
   loading.value = true;
   try {
     const params = { page: page.value, pageSize: pageSize.value };
-    if (subjectFilter.value) params.subject = subjectFilter.value;
-    if (classFilter.value) params.classId = classFilter.value;
     const data = await getExams(params);
-    list.value = data.list;
-    total.value = data.total;
+    list.value = data.list || [];
+    total.value = data.total || 0;
   } catch (err) {
     emit('toast', { message: err.message || '加载试卷列表失败', type: 'error' });
   } finally {
@@ -166,14 +179,43 @@ const loadExams = async () => {
   }
 };
 
-onMounted(async () => {
+const handleStartExam = (examId) => {
+  if (props.role === 'student') {
+    emit('start-exam', examId);
+  } else {
+    openPreview(examId);
+  }
+};
+
+const handleCardClick = (exam) => {
+  if (props.role === 'student') {
+    emit('start-exam', exam.id);
+  }
+};
+
+const openPreview = async (id) => {
+  previewVisible.value = true;
+  previewLoading.value = true;
   try {
-    allSubjects.value = await getSubjects();
-  } catch { /* ignore */ }
-  try {
-    const clsData = await getClasses();
-    classList.value = Array.isArray(clsData) ? clsData : (clsData.list || []);
-  } catch { /* ignore */ }
+    previewExam.value = await getExam(id);
+  } catch (err) {
+    emit('toast', { message: err.message || '读取试卷失败', type: 'error' });
+    previewVisible.value = false;
+  } finally {
+    previewLoading.value = false;
+  }
+};
+
+const closePreview = () => {
+  previewVisible.value = false;
+  previewExam.value = { questions: [] };
+};
+
+const getTypeClass = (exam) => {
+  return exam.class_id || exam.classId ? 'badge-directed' : 'badge-open';
+};
+
+onMounted(() => {
   loadExams();
 });
 
@@ -181,99 +223,391 @@ defineExpose({ loadExams });
 </script>
 
 <style scoped>
-.iq-exam-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* ===== 页面容器 ===== */
+.exam-list-page {
+  max-width: 1200px;
+  margin: 0 auto;
 }
-.exam-list-filters {
+
+/* ===== 顶部横幅 ===== */
+.page-banner {
   display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 32px;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  border-radius: 16px;
+  color: #fff;
+  margin-bottom: 24px;
+}
+
+.banner-icon { font-size: 36px; line-height: 1; }
+.banner-content { flex: 1; }
+.banner-content h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: #fff;
+}
+.banner-content p {
+  font-size: 14px;
+  opacity: 0.85;
+  margin: 0;
+}
+
+.banner-stats {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 8px 20px;
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+}
+.banner-stats .stat-number {
+  font-size: 28px;
+  font-weight: 700;
+}
+.banner-stats .stat-label {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+/* ===== 工具栏 ===== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 14px;
-  padding: 14px 20px;
-  background: var(--iq-neutral-50);
-  border-bottom: 1px solid var(--iq-border);
+  gap: 12px;
 }
-.exam-list-filters .filter-item {
+
+.result-info {
+  font-size: 14px;
+  color: #64748B;
+}
+.result-info strong { color: #1E293B; }
+
+.toolbar-right {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 170px;
+  gap: 10px;
 }
-.exam-list-filters .filter-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--iq-neutral-600);
-}
-.iq-select {
-  height: 36px;
-  border: 1px solid var(--iq-border);
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: #6366F1;
+  color: #fff;
+  border: none;
   border-radius: 8px;
-  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-primary:hover { background: #4F46E5; }
+
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
   background: #fff;
-  color: var(--iq-neutral-800);
+  color: #475569;
   font-size: 13px;
   cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
 }
-.iq-page-header {
+.btn-refresh:hover { background: #F8FAFC; border-color: #CBD5E1; }
+
+/* ===== 试卷卡片网格 ===== */
+.paper-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* ===== 单个卡片 ===== */
+.paper-card {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 20px 22px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  flex-direction: column;
 }
-.iq-table-loading {
+.paper-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.12);
+  border-color: #C7D2FE;
+}
+
+/* 卡片头部 */
+.paper-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.paper-type-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 12px;
+  border-radius: 20px;
+}
+.badge-open {
+  background: #DCFCE7;
+  color: #15803D;
+}
+.badge-directed {
+  background: #DBEAFE;
+  color: #1D4ED8;
+}
+
+.paper-id {
+  font-size: 12px;
+  color: #94A3B8;
+  font-family: monospace;
+}
+
+/* 标题 */
+.paper-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1E293B;
+  margin: 0 0 14px 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 元数据 */
+.paper-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 12px 0;
+  border-top: 1px solid #F1F5F9;
+  border-bottom: 1px solid #F1F5F9;
+}
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #64748B;
+}
+.meta-icon { font-size: 14px; }
+
+/* 底部 */
+.paper-card-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.paper-date {
+  font-size: 12px;
+  color: #94A3B8;
+}
+
+.btn-start {
+  padding: 6px 16px;
+  background: #6366F1;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-start:hover {
+  background: #4F46E5;
+  transform: scale(1.02);
+}
+
+/* ===== 加载状态 ===== */
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 80px 0;
-  background: var(--iq-card);
-  border-radius: var(--iq-radius-card);
+  padding: 60px 0;
+  color: #94A3B8;
 }
-.iq-loading-spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--iq-neutral-200);
-  border-top-color: var(--iq-primary);
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #E2E8F0;
+  border-top: 3px solid #6366F1;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  margin-bottom: 12px;
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
-.iq-empty-row { padding: 0 !important; }
-.iq-empty-box {
+
+/* ===== 空状态 ===== */
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  justify-content: center;
   padding: 60px 0;
+  color: #94A3B8;
 }
-.iq-empty-icon { font-size: 48px; opacity: 0.5; }
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 {
+  font-size: 18px;
+  color: #475569;
+  margin: 0 0 4px 0;
+}
+.empty-state p {
+  font-size: 14px;
+  margin: 0;
+}
 
-.iq-id-chip {
-  display: inline-block;
-  font-family: var(--iq-font-mono);
-  font-size: 12px;
-  padding: 2px 8px;
-  background: var(--iq-neutral-100);
-  color: var(--iq-neutral-700);
-  border-radius: 4px;
-  font-weight: 500;
+/* ===== 分页 ===== */
+.pagination-wrapper {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
 }
-.iq-type-tag {
-  display: inline-flex;
-  align-items: center;
+
+/* ===== 预览弹窗 ===== */
+.preview-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.6);
+  display: grid;
+  place-items: center;
+  padding: 30px;
+  backdrop-filter: blur(4px);
+}
+.preview-dialog {
+  width: min(900px, 95vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 25px 70px rgba(15, 23, 42, 0.4);
+}
+.preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 22px 26px;
+  border-bottom: 1px solid #E2E8F0;
+}
+.preview-head h2 { margin: 0; font-size: 18px; }
+.preview-head p { margin: 5px 0 0; color: #64748B; font-size: 14px; }
+.close-btn {
+  border: 0;
+  background: #F1F5F9;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.close-btn:hover { background: #E2E8F0; }
+
+.preview-body {
+  overflow: auto;
+  padding: 20px 26px;
+}
+.preview-loading { padding: 70px 0; text-align: center; color: #94A3B8; }
+.preview-question {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 12px;
+  padding: 18px 0;
+  border-bottom: 1px solid #F1F5F9;
+}
+.preview-number {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: #EEF2FF;
+  color: #4338CA;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.preview-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.preview-meta span {
+  font-size: 12px;
   padding: 2px 10px;
-  border-radius: var(--iq-radius-full);
-  font-size: 12px;
+  background: #F1F5F9;
+  border-radius: 12px;
+  color: #475569;
+}
+.preview-question h4 {
+  font-size: 15px;
+  margin: 0 0 6px 0;
+  color: #1E293B;
   font-weight: 500;
 }
-.type-1 { background: #ede9fe; color: #6d28d9; }
-.type-2 { background: #dbeafe; color: #1d4ed8; }
-.type-3 { background: #fce7f3; color: #be185d; }
-.type-4 { background: #d1fae5; color: #047857; }
-.type-5 { background: #fef3c7; color: #b45309; }
-.type-6 { background: #ffedd5; color: #c2410c; }
-.preview-mask{position:fixed;inset:0;z-index:1000;background:#0f172a88;display:grid;place-items:center;padding:30px}.preview-dialog{width:min(900px,95vw);max-height:88vh;display:flex;flex-direction:column;background:white;border-radius:18px;box-shadow:0 25px 70px #0f172a55}.preview-head{display:flex;justify-content:space-between;padding:22px 26px;border-bottom:1px solid #e2e8f0}.preview-head h2{margin:0}.preview-head p{margin:5px 0 0;color:#64748b}.close{border:0;background:#f1f5f9;width:34px;height:34px;border-radius:50%;font-size:24px}.preview-body{overflow:auto;padding:20px 26px}.preview-loading{padding:70px;text-align:center}.preview-question{display:grid;grid-template-columns:36px 1fr;gap:12px;padding:18px 0;border-bottom:1px solid #e2e8f0}.number{width:30px;height:30px;display:grid;place-items:center;background:#eef2ff;color:#4338ca;border-radius:8px;font-weight:700}.question-meta{display:flex;gap:7px}.question-meta span{font-size:12px;padding:3px 7px;background:#f1f5f9;border-radius:10px}.preview-question h3{font-size:16px;line-height:1.6}.preview-question p{white-space:pre-wrap;color:#475569}details{margin-top:10px;padding:10px;background:#f8fafc;border-radius:8px}summary{cursor:pointer;color:#4f46e5;font-weight:600}
+.preview-options {
+  white-space: pre-wrap;
+  color: #475569;
+  font-size: 14px;
+  margin: 6px 0;
+}
+.preview-details {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: #F8FAFC;
+  border-radius: 8px;
+}
+.preview-details summary {
+  cursor: pointer;
+  color: #4F46E5;
+  font-weight: 600;
+  font-size: 13px;
+}
+.preview-details p {
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+@media (max-width: 640px) {
+  .page-banner {
+    flex-direction: column;
+    text-align: center;
+    padding: 20px;
+  }
+  .paper-grid {
+    grid-template-columns: 1fr;
+  }
+  .preview-dialog { max-height: 95vh; }
+  .preview-head { flex-direction: column; gap: 12px; }
+}
 </style>
