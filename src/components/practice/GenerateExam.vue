@@ -1,6 +1,13 @@
 <template>
   <div class="exam-builder">
-    <div class="iq-page-header"><div><h2>智能组卷</h2><p>按照章节、六种题型、五级难度和知识点要求生成结构合理的试卷</p></div></div>
+    <!-- ===== 顶部横幅（与题库管理风格一致） ===== -->
+    <header class="iq-page-hero">
+      <div class="hero-content">
+        <span class="hero-badge">📝 出卷管理</span>
+        <h1 class="hero-title">智能组卷</h1>
+        <p class="hero-desc">按照章节、六种题型、五级难度和知识点要求生成结构合理的试卷</p>
+      </div>
+    </header>
 
     <section class="iq-card section-card">
       <div class="section-title"><b>1. 基本设置</b><span v-if="inventory">当前范围可用 {{ inventory.total }} 题 · {{ inventory.knowledgePoints.length }} 个知识点</span></div>
@@ -36,9 +43,9 @@
           <select v-model="form.subject" class="iq-input" style="height:38px;border:1px solid var(--iq-border);border-radius:8px;padding:0 10px;background:#fff;" @change="handleSubjectChange">
             <option value="">请选择科目</option>
             <option
-              v-for="s in subjectOptions"
-              :key="s"
-              :value="s"
+                v-for="s in subjectOptions"
+                :key="s"
+                :value="s"
             >{{ s }}</option>
           </select>
         </label>
@@ -69,13 +76,13 @@
         </div>
         <div class="chapter-grid">
           <button
-            v-for="chapter in 10"
-            :key="chapter"
-            type="button"
-            class="chapter-chip"
-            :class="{ active: form.chapters.includes(chapter) }"
-            :aria-pressed="form.chapters.includes(chapter)"
-            @click="toggleChapter(chapter)"
+              v-for="chapter in 10"
+              :key="chapter"
+              type="button"
+              class="chapter-chip"
+              :class="{ active: form.chapters.includes(chapter) }"
+              :aria-pressed="form.chapters.includes(chapter)"
+              @click="toggleChapter(chapter)"
           >
             <span class="chapter-check">{{ form.chapters.includes(chapter) ? '✓' : '' }}</span>
             <span class="chapter-name"><b>第{{ chapter }}章</b><em>{{ getChapterName(chapter) }}</em></span>
@@ -187,20 +194,20 @@ const templates = [{ key: 'basic', label: '基础练习' }, { key: 'standard', l
 const weights = { basic: [35,30,20,10,5], standard: [20,20,25,25,10], advanced: [5,10,25,35,25] };
 const paperPresets = [
   { key:'foundation', name:'基础巩固卷', tag:'适合复习', description:'基础题为主，客观题占比高', detail:'提供基础均衡、客观强化和章节复习三套方案', variants:[
-    { key:'foundation-balanced', name:'基础均衡', scene:'日常复习', description:'兼顾四类客观题，少量简答题', count:20, knowledge:4, typeWeights:[25,40,15,15,5,0], difficultyWeights:[40,30,20,10,0] },
-    { key:'foundation-objective', name:'客观强化', scene:'快速检测', description:'判断和单选占比较高，全部自动判分', count:20, knowledge:4, typeWeights:[30,45,15,10,0,0], difficultyWeights:[35,30,20,10,5] },
-    { key:'foundation-review', name:'章节复习', scene:'单章回顾', description:'题型更完整，保留少量主观题', count:20, knowledge:5, typeWeights:[20,40,15,15,10,0], difficultyWeights:[30,30,25,10,5] },
-  ]},
+      { key:'foundation-balanced', name:'基础均衡', scene:'日常复习', description:'兼顾四类客观题，少量简答题', count:20, knowledge:4, typeWeights:[25,40,15,15,5,0], difficultyWeights:[40,30,20,10,0] },
+      { key:'foundation-objective', name:'客观强化', scene:'快速检测', description:'判断和单选占比较高，全部自动判分', count:20, knowledge:4, typeWeights:[30,45,15,10,0,0], difficultyWeights:[35,30,20,10,5] },
+      { key:'foundation-review', name:'章节复习', scene:'单章回顾', description:'题型更完整，保留少量主观题', count:20, knowledge:5, typeWeights:[20,40,15,15,10,0], difficultyWeights:[30,30,25,10,5] },
+    ]},
   { key:'standard', name:'标准综合卷', tag:'日常测验', description:'题型和五级难度相对均衡', detail:'提供综合均衡、客观测验和主客观结合三套方案', variants:[
-    { key:'standard-balanced', name:'综合均衡', scene:'日常测验', description:'题型与五级难度分布均衡', count:20, knowledge:5, typeWeights:[20,40,15,15,10,0], difficultyWeights:[20,20,25,25,10] },
-    { key:'standard-objective', name:'客观测验', scene:'自动判分', description:'全部使用可自动判分题型', count:20, knowledge:5, typeWeights:[25,40,20,15,0,0], difficultyWeights:[20,25,25,20,10] },
-    { key:'standard-mixed', name:'主客观结合', scene:'综合考查', description:'保留一定比例简答题', count:20, knowledge:5, typeWeights:[20,35,15,15,15,0], difficultyWeights:[15,20,30,25,10] },
-  ]},
+      { key:'standard-balanced', name:'综合均衡', scene:'日常测验', description:'题型与五级难度分布均衡', count:20, knowledge:5, typeWeights:[20,40,15,15,10,0], difficultyWeights:[20,20,25,25,10] },
+      { key:'standard-objective', name:'客观测验', scene:'自动判分', description:'全部使用可自动判分题型', count:20, knowledge:5, typeWeights:[25,40,20,15,0,0], difficultyWeights:[20,25,25,20,10] },
+      { key:'standard-mixed', name:'主客观结合', scene:'综合考查', description:'保留一定比例简答题', count:20, knowledge:5, typeWeights:[20,35,15,15,15,0], difficultyWeights:[15,20,30,25,10] },
+    ]},
   { key:'advanced', name:'难点提升卷', tag:'查漏补缺', description:'增加多选、简答和高难度题', detail:'提供难题突破、思维强化和综合挑战三套方案', variants:[
-    { key:'advanced-breakthrough', name:'难题突破', scene:'专项提高', description:'困难题为主，并纳入程序论述题', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[5,10,25,35,25] },
-    { key:'advanced-thinking', name:'思维强化', scene:'能力训练', description:'提高多选、简答和程序论述题占比', count:20, knowledge:6, typeWeights:[10,25,25,10,20,10], difficultyWeights:[5,10,25,35,25] },
-    { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[10,15,25,30,20] },
-  ]},
+      { key:'advanced-breakthrough', name:'难题突破', scene:'专项提高', description:'困难题为主，并纳入程序论述题', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[5,10,25,35,25] },
+      { key:'advanced-thinking', name:'思维强化', scene:'能力训练', description:'提高多选、简答和程序论述题占比', count:20, knowledge:6, typeWeights:[10,25,25,10,20,10], difficultyWeights:[5,10,25,35,25] },
+      { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[10,15,25,30,20] },
+    ]},
 ];
 const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classId: '' });
 const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), result = ref(null), aiResult = ref(false), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref('standard'), activePaperPreset = ref('standard'), activePaperVariant = ref('standard-balanced');
@@ -228,8 +235,8 @@ const configurationModeText = computed(() => {
 });
 const selectedChapterTitle = computed(() => form.chapters.length ? `已选择 ${form.chapters.length} 个章节` : '当前使用全部章节');
 const selectedChapterDetail = computed(() => form.chapters.length
-  ? [...form.chapters].sort((a,b)=>a-b).map(getChapterLabel).join('、')
-  : '第1章至第10章，共375道题');
+    ? [...form.chapters].sort((a,b)=>a-b).map(getChapterLabel).join('、')
+    : '第1章至第10章，共375道题');
 const sumClass = (sum) => sum === form.count ? 'sum-ok' : 'sum-bad';
 const toggleChapter = (chapter) => { const index=form.chapters.indexOf(chapter); index>=0 ? form.chapters.splice(index,1) : form.chapters.push(chapter); form.chapters.sort((a,b)=>a-b); };
 const clearChapters = () => { form.chapters = []; };
@@ -401,13 +408,177 @@ const handleSmartExam = async () => { errorMsg.value='';aiLoading.value=true;try
 </script>
 
 <style scoped>
-.exam-builder{display:flex;flex-direction:column;gap:16px;max-width:1120px;margin:0 auto;width:100%}.iq-page-header h2{margin:0;color:var(--iq-neutral-900)}.iq-page-header p,.section-title span,.result-head p{margin:4px 0 0;color:var(--iq-neutral-500);font-size:13px}.section-card{padding:22px 26px}.section-title,.result-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}.base-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}.base-grid label,.distribution-item{display:flex;flex-direction:column;gap:6px;font-size:13px}.inline-actions,.template-actions,.action-row{display:flex;gap:8px;margin-top:12px}.distribution-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.difficulty-grid{grid-template-columns:repeat(5,1fr)}.distribution-item{padding:12px;border:1px solid var(--iq-neutral-200);border-radius:8px}.distribution-item span{font-weight:600}.distribution-item small{font-weight:400;color:var(--iq-neutral-500)}.distribution-item b{font-size:12px;color:var(--iq-neutral-500)}.sum-ok,.ok{color:#059669!important}.sum-bad,.bad{color:#dc2626!important}.info-note,.error-note,.warning-note,.success-note,.strategy-note{padding:11px 13px;border-radius:8px;margin-top:12px;font-size:13px}.info-note{background:#eff6ff;color:#1d4ed8}.error-note{background:#fef2f2;color:#b91c1c}.success-note{background:#ecfdf5;color:#047857}.warning-note{background:#fffbeb;color:#92400e;display:flex;flex-direction:column;gap:4px}.check-list{display:flex;flex-wrap:wrap;gap:18px;font-size:13px}.ai-btn{background:#7c3aed;color:#fff;border-color:#7c3aed}.result-card{border-left:4px solid #10b981}.result-head h3{margin:0}.report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}.report-grid h4{margin:0 0 10px}.report-grid p{margin:5px 0;font-size:13px}.point-list{display:flex;flex-wrap:wrap;gap:5px}.point-list span{background:var(--iq-primary-50);color:var(--iq-primary-700);padding:3px 8px;border-radius:15px;font-size:12px}
+.exam-builder{display:flex;flex-direction:column;gap:16px;max-width:1240px;margin:0 auto;width:100%}
 
-.chapter-selector{margin-top:20px;padding:18px;border:1px solid #dbe3f0;border-radius:12px;background:#f8fafc}.chapter-selector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}.chapter-selector-head>div:first-child{display:flex;flex-direction:column;gap:3px}.chapter-selector-head b{font-size:14px;color:#172033}.chapter-selector-head small{font-size:12px;color:#64748b}.chapter-actions{display:flex;gap:8px}.chapter-action{padding:7px 12px;border:1px solid #c7d2fe;border-radius:7px;background:#fff;color:#4f46e5;font-size:12px;font-weight:600;cursor:pointer}.chapter-action:hover{background:#eef2ff}.selected-summary{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:12px;border:1px solid #a5b4fc;border-radius:9px;background:#eef2ff;color:#3730a3}.selected-summary.empty{border-color:#cbd5e1;background:#fff;color:#475569}.summary-icon{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;border-radius:50%;background:#4f46e5;color:#fff;font-weight:700}.selected-summary.empty .summary-icon{background:#94a3b8}.selected-summary>div{display:flex;flex-direction:column;gap:2px}.selected-summary b{font-size:13px}.selected-summary small{font-size:12px;color:#6366f1}.selected-summary.empty small{color:#64748b}.chapter-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.chapter-chip{position:relative;display:grid;grid-template-columns:24px 1fr;grid-template-rows:auto auto;align-items:center;column-gap:8px;min-height:64px;padding:10px 11px;border:2px solid #e2e8f0;border-radius:10px;background:#fff;color:#334155;text-align:left;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s,transform .15s}.chapter-chip:hover{border-color:#a5b4fc;background:#f8faff;transform:translateY(-1px)}.chapter-chip.active{border-color:#4f46e5;background:#eef2ff;color:#312e81;box-shadow:0 0 0 2px rgba(79,70,229,.1)}.chapter-check{grid-row:1/3;display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border:2px solid #cbd5e1;border-radius:6px;background:#fff;color:#fff;font-size:14px;font-weight:800}.chapter-chip.active .chapter-check{border-color:#4f46e5;background:#4f46e5}.chapter-name{font-size:13px;font-weight:700}.chapter-chip small{font-size:11px;color:#64748b}.chapter-chip.active small{color:#6366f1}.chapter-help{margin:10px 0 0;color:#64748b;font-size:12px}
-.feasibility-note{padding:14px;margin-top:12px;border:1px solid #fecaca;border-radius:9px;background:#fff7f7;color:#991b1b;font-size:13px}.feasibility-title{display:flex;justify-content:space-between;gap:12px}.feasibility-title span{color:#b91c1c}.feasibility-note ul{margin:9px 0 0;padding-left:20px}.feasibility-note li+li{margin-top:5px}.suggestion-box{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 12px;margin-top:12px;border-radius:8px;background:#fff;color:#334155}.suggestion-box>div{display:flex;flex-direction:column;gap:4px}.suggestion-box span{font-size:12px;color:#64748b}
-.paper-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:7px}.paper-preset{display:flex;flex-direction:column;gap:5px;padding:13px;border:2px solid #e2e8f0;border-radius:10px;background:#fff;text-align:left;color:#334155;cursor:pointer}.paper-preset:hover{border-color:#a5b4fc}.paper-preset.active{border-color:#4f46e5;background:#eef2ff}.manual-preset.active{border-color:#0f766e;background:#f0fdfa}.preset-name{display:flex;align-items:center;justify-content:space-between;font-weight:700}.preset-name small{padding:2px 7px;border-radius:12px;background:#eef2ff;color:#4f46e5;font-size:11px}.paper-preset.active .preset-name small{background:#fff}.preset-description{font-size:12px;color:#475569}.preset-detail,.preset-help{font-size:11px;color:#64748b}.preset-help{margin:0 0 8px}.mode-status{display:flex;align-items:center;gap:7px;padding:8px 11px;margin-bottom:8px;border-radius:8px;background:#f8fafc;color:#475569;font-size:12px}.mode-status span{color:#334155}.mode-status button{margin-left:auto;border:0;background:transparent;color:#4f46e5;font-size:12px;font-weight:600;cursor:pointer}.mode-status button:hover{text-decoration:underline}.preset-notice{padding:9px 11px;margin-bottom:14px;border-radius:8px;background:#f0fdf4;color:#047857;font-size:12px}.manual-mode-btn.selected{border-color:#0f766e;background:#f0fdfa;color:#0f766e}.alternative-section{margin-top:13px}.alternative-heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:9px}.alternative-heading span{font-size:12px;color:#64748b}.alternative-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.alternative-card{padding:11px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#334155}.alternative-card>div{display:flex;flex-direction:column;gap:2px}.alternative-card>div span,.alternative-card p{font-size:12px;color:#64748b}.alternative-card p{margin:7px 0}.alternative-card strong{color:#334155}.result-actions{display:flex;gap:8px}
-.variant-panel{padding:14px;margin:10px 0;border:1px solid #c7d2fe;border-radius:10px;background:#f8faff}.variant-panel-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px;color:#312e81}.variant-panel-head span{font-size:12px;color:#64748b}.variant-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.variant-card{display:flex;flex-direction:column;gap:6px;padding:12px;border:2px solid #e2e8f0;border-radius:9px;background:#fff;color:#475569;text-align:left;font-size:11px;cursor:pointer}.variant-card:hover{border-color:#a5b4fc}.variant-card.active{border-color:#4f46e5;background:#eef2ff}.variant-title{display:flex;align-items:center;justify-content:space-between;color:#1e293b;font-size:13px;font-weight:700}.variant-title small{padding:2px 6px;border-radius:10px;background:#f1f5f9;color:#64748b;font-size:10px}.variant-card b{color:#334155}.iq-input:disabled{background:#f1f5f9;color:#475569;cursor:not-allowed;opacity:1}.distribution-item:has(.iq-input:disabled){background:#f8fafc}.result-actions{display:flex;gap:8px}
+/* ===== 顶部横幅 ===== */
+.iq-page-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 34px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.25);
+}
+.hero-content .hero-badge {
+  font-size: 12px;
+  opacity: 0.8;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 4px;
+}
+.hero-content .hero-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+.hero-content .hero-desc {
+  font-size: 14px;
+  opacity: 0.85;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 4px 0 0;
+}
 
-@media(max-width:900px){.chapter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.difficulty-grid{grid-template-columns:repeat(3,1fr)}.variant-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:800px){.base-grid,.distribution-grid,.report-grid,.paper-presets,.alternative-grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.base-grid,.distribution-grid,.difficulty-grid,.report-grid,.paper-presets,.alternative-grid,.variant-grid{grid-template-columns:1fr}.chapter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-selector-head,.alternative-heading,.variant-panel-head,.result-head{flex-direction:column}.chapter-actions{width:100%}.chapter-action{flex:1}.result-actions{width:100%;flex-direction:column}}
+.section-card{padding:22px 26px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.section-title,.result-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
+.base-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.base-grid label,.distribution-item{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.inline-actions,.template-actions,.action-row{display:flex;gap:8px;margin-top:12px}
+.distribution-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.difficulty-grid{grid-template-columns:repeat(5,1fr)}
+.distribution-item{padding:12px;border:1px solid var(--iq-neutral-200);border-radius:8px}
+.distribution-item span{font-weight:600}
+.distribution-item small{font-weight:400;color:var(--iq-neutral-500)}
+.distribution-item b{font-size:12px;color:var(--iq-neutral-500)}
+.sum-ok,.ok{color:#059669!important}
+.sum-bad,.bad{color:#dc2626!important}
+.info-note,.error-note,.warning-note,.success-note,.strategy-note{padding:11px 13px;border-radius:8px;margin-top:12px;font-size:13px}
+.info-note{background:#eff6ff;color:#1d4ed8}
+.error-note{background:#fef2f2;color:#b91c1c}
+.success-note{background:#ecfdf5;color:#047857}
+.warning-note{background:#fffbeb;color:#92400e;display:flex;flex-direction:column;gap:4px}
+.check-list{display:flex;flex-wrap:wrap;gap:18px;font-size:13px}
+.ai-btn{background:#7c3aed;color:#fff;border-color:#7c3aed}
+.result-card{border-left:4px solid #10b981}
+.result-head h3{margin:0}
+.report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.report-grid h4{margin:0 0 10px}
+.report-grid p{margin:5px 0;font-size:13px}
+.point-list{display:flex;flex-wrap:wrap;gap:5px}
+.point-list span{background:var(--iq-primary-50);color:var(--iq-primary-700);padding:3px 8px;border-radius:15px;font-size:12px}
+
+.chapter-selector{margin-top:20px;padding:18px;border:1px solid #dbe3f0;border-radius:12px;background:#f8fafc}
+.chapter-selector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+.chapter-selector-head>div:first-child{display:flex;flex-direction:column;gap:3px}
+.chapter-selector-head b{font-size:14px;color:#172033}
+.chapter-selector-head small{font-size:12px;color:#64748b}
+.chapter-actions{display:flex;gap:8px}
+.chapter-action{padding:7px 12px;border:1px solid #c7d2fe;border-radius:7px;background:#fff;color:#4f46e5;font-size:12px;font-weight:600;cursor:pointer}
+.chapter-action:hover{background:#eef2ff}
+.selected-summary{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:12px;border:1px solid #a5b4fc;border-radius:9px;background:#eef2ff;color:#3730a3}
+.selected-summary.empty{border-color:#cbd5e1;background:#fff;color:#475569}
+.summary-icon{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;border-radius:50%;background:#4f46e5;color:#fff;font-weight:700}
+.selected-summary.empty .summary-icon{background:#94a3b8}
+.selected-summary>div{display:flex;flex-direction:column;gap:2px}
+.selected-summary b{font-size:13px}
+.selected-summary small{font-size:12px;color:#6366f1}
+.selected-summary.empty small{color:#64748b}
+.chapter-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.chapter-chip{position:relative;display:grid;grid-template-columns:24px 1fr;grid-template-rows:auto auto;align-items:center;column-gap:8px;min-height:64px;padding:10px 11px;border:2px solid #e2e8f0;border-radius:10px;background:#fff;color:#334155;text-align:left;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s,transform .15s}
+.chapter-chip:hover{border-color:#a5b4fc;background:#f8faff;transform:translateY(-1px)}
+.chapter-chip.active{border-color:#4f46e5;background:#eef2ff;color:#312e81;box-shadow:0 0 0 2px rgba(79,70,229,.1)}
+.chapter-check{grid-row:1/3;display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border:2px solid #cbd5e1;border-radius:6px;background:#fff;color:#fff;font-size:14px;font-weight:800}
+.chapter-chip.active .chapter-check{border-color:#4f46e5;background:#4f46e5}
+.chapter-name{font-size:13px;font-weight:700}
+.chapter-chip small{font-size:11px;color:#64748b}
+.chapter-chip.active small{color:#6366f1}
+.chapter-help{margin:10px 0 0;color:#64748b;font-size:12px}
+.feasibility-note{padding:14px;margin-top:12px;border:1px solid #fecaca;border-radius:9px;background:#fff7f7;color:#991b1b;font-size:13px}
+.feasibility-title{display:flex;justify-content:space-between;gap:12px}
+.feasibility-title span{color:#b91c1c}
+.feasibility-note ul{margin:9px 0 0;padding-left:20px}
+.feasibility-note li+li{margin-top:5px}
+.suggestion-box{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 12px;margin-top:12px;border-radius:8px;background:#fff;color:#334155}
+.suggestion-box>div{display:flex;flex-direction:column;gap:4px}
+.suggestion-box span{font-size:12px;color:#64748b}
+
+.paper-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:7px}
+.paper-preset{display:flex;flex-direction:column;gap:5px;padding:13px;border:2px solid #e2e8f0;border-radius:10px;background:#fff;text-align:left;color:#334155;cursor:pointer}
+.paper-preset:hover{border-color:#a5b4fc}
+.paper-preset.active{border-color:#4f46e5;background:#eef2ff}
+.manual-preset.active{border-color:#0f766e;background:#f0fdfa}
+.preset-name{display:flex;align-items:center;justify-content:space-between;font-weight:700}
+.preset-name small{padding:2px 7px;border-radius:12px;background:#eef2ff;color:#4f46e5;font-size:11px}
+.paper-preset.active .preset-name small{background:#fff}
+.preset-description{font-size:12px;color:#475569}
+.preset-detail,.preset-help{font-size:11px;color:#64748b}
+.preset-help{margin:0 0 8px}
+.mode-status{display:flex;align-items:center;gap:7px;padding:8px 11px;margin-bottom:8px;border-radius:8px;background:#f8fafc;color:#475569;font-size:12px}
+.mode-status span{color:#334155}
+.mode-status button{margin-left:auto;border:0;background:transparent;color:#4f46e5;font-size:12px;font-weight:600;cursor:pointer}
+.mode-status button:hover{text-decoration:underline}
+.preset-notice{padding:9px 11px;margin-bottom:14px;border-radius:8px;background:#f0fdf4;color:#047857;font-size:12px}
+.manual-mode-btn.selected{border-color:#0f766e;background:#f0fdfa;color:#0f766e}
+.alternative-section{margin-top:13px}
+.alternative-heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:9px}
+.alternative-heading span{font-size:12px;color:#64748b}
+.alternative-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.alternative-card{padding:11px;border:1px solid #fecaca;border-radius:8px;background:#fff;color:#334155}
+.alternative-card>div{display:flex;flex-direction:column;gap:2px}
+.alternative-card>div span,.alternative-card p{font-size:12px;color:#64748b}
+.alternative-card p{margin:7px 0}
+.alternative-card strong{color:#334155}
+.result-actions{display:flex;gap:8px}
+.variant-panel{padding:14px;margin:10px 0;border:1px solid #c7d2fe;border-radius:10px;background:#f8faff}
+.variant-panel-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px;color:#312e81}
+.variant-panel-head span{font-size:12px;color:#64748b}
+.variant-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.variant-card{display:flex;flex-direction:column;gap:6px;padding:12px;border:2px solid #e2e8f0;border-radius:9px;background:#fff;color:#475569;text-align:left;font-size:11px;cursor:pointer}
+.variant-card:hover{border-color:#a5b4fc}
+.variant-card.active{border-color:#4f46e5;background:#eef2ff}
+.variant-title{display:flex;align-items:center;justify-content:space-between;color:#1e293b;font-size:13px;font-weight:700}
+.variant-title small{padding:2px 6px;border-radius:10px;background:#f1f5f9;color:#64748b;font-size:10px}
+.variant-card b{color:#334155}
+.iq-input:disabled{background:#f1f5f9;color:#475569;cursor:not-allowed;opacity:1}
+.distribution-item:has(.iq-input:disabled){background:#f8fafc}
+.result-actions{display:flex;gap:8px}
+
+.iq-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.iq-btn-primary {
+  background: #6366F1;
+  color: #fff;
+  border-color: #6366F1;
+}
+.iq-btn-primary:hover {
+  background: #4F46E5;
+  border-color: #4F46E5;
+}
+.iq-btn-secondary {
+  background: #FFFFFF;
+  color: #64748B;
+  border-color: #E2E8F0;
+}
+.iq-btn-secondary:hover {
+  background: #F1F5F9;
+}
+.iq-btn-sm { padding: 6px 12px; font-size: 13px; }
+
+@media(max-width:900px){.chapter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.difficulty-grid{grid-template-columns:repeat(3,1fr)}.variant-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:800px){.base-grid,.distribution-grid,.report-grid,.paper-presets,.alternative-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.base-grid,.distribution-grid,.difficulty-grid,.report-grid,.paper-presets,.alternative-grid,.variant-grid{grid-template-columns:1fr}.chapter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-selector-head,.alternative-heading,.variant-panel-head,.result-head{flex-direction:column}.chapter-actions{width:100%}.chapter-action{flex:1}.result-actions{width:100%;flex-direction:column}}
 .chapter-chip{grid-template-columns:24px minmax(0,1fr);min-height:78px}.chapter-name{display:grid;gap:2px;min-width:0}.chapter-name b{font-size:13px}.chapter-name em{font-size:12px;line-height:1.35;font-style:normal;font-weight:500;color:#475569;overflow-wrap:anywhere}.chapter-chip.active .chapter-name em{color:#4338ca}.selected-summary>div{min-width:0}.selected-summary small{line-height:1.6}
 </style>

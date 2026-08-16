@@ -1,413 +1,491 @@
 <template>
-  <!-- 未登录：显示登录页 -->
+  <!-- ===== 未登录：显示登录页 ===== -->
   <Login v-if="!currentUser" @success="handleLoginSuccess" @open-register="registerVisible = true" />
 
   <RegistrationDialog
-    v-if="!currentUser"
-    :visible="registerVisible"
-    @close="registerVisible = false"
-    @success="registerSuccess"
+      v-if="!currentUser"
+      :visible="registerVisible"
+      @close="registerVisible = false"
+      @success="registerSuccess"
   />
 
-  <!-- 已登录：Sidebar + Header + Main 三栏布局 -->
-  <div v-else id="app">
-    <!-- 左侧 Sidebar -->
-    <aside class="iq-layout-sidebar" :class="{ open: sidebarOpen }">
-      <div class="iq-sidebar-brand">
-        <div class="iq-sidebar-logo">智</div>
-        <span class="iq-font-semibold iq-text-lg" style="color: var(--iq-neutral-900);">智能题库</span>
-      </div>
-      <nav class="iq-sidebar-nav">
-        <button
-          v-if="currentUser.role !== 'student'"
-          class="iq-nav-item"
-          :class="{ active: currentView === 'main' }"
-          @click="currentView = 'main'; sidebarOpen = false"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="16" y1="13" x2="8" y2="13"></line>
-            <line x1="16" y1="17" x2="8" y2="17"></line>
-          </svg>
-          题库管理
-        </button>
-        <button
-          v-if="currentUser.role !== 'admin'"
-          class="iq-nav-item"
-          :class="{ active: currentView === 'practice' && !standalonePracticeViews.includes(practiceView) }"
-          @click="onEnterPractice(); sidebarOpen = false"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20h9"></path>
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-          </svg>
-          {{ currentUser.role === 'student' ? '答题练习' : '出卷与学生管理' }}
-        </button>
-        <button v-if="currentUser.role === 'student'" class="iq-nav-item" :class="{ active: currentView === 'practice' && practiceView === 'adaptive' }" @click="openPracticeView('adaptive')">
-          <span class="iq-nav-symbol">↗</span>自适应练习
-        </button>
-        <button v-if="currentUser.role === 'student'" class="iq-nav-item" :class="{ active: currentView === 'practice' && practiceView === 'adaptive-progress' }" @click="openPracticeView('adaptive-progress')">
-          <span class="iq-nav-symbol">✓</span>我的自适应成果
-        </button>
-        <button class="iq-nav-item" :class="{ active: currentView === 'practice' && practiceView === 'learning-analysis' }" @click="openPracticeView('learning-analysis')">
-          <span class="iq-nav-symbol">▥</span>{{ currentUser.role === 'student' ? '我的学习分析' : '学生个性化分析' }}
-        </button>
-        <button v-if="currentUser.role === 'teacher' || currentUser.role === 'admin'" class="iq-nav-item" :class="{ active: currentView === 'practice' && practiceView === 'adaptive-overview' }" @click="openPracticeView('adaptive-overview')">
-          <span class="iq-nav-symbol">⌁</span>自适应学情
-        </button>
-        <button
-          v-if="currentUser.role === 'admin'"
-          class="iq-nav-item"
-          :class="{ active: currentView === 'users' }"
-          @click="currentView = 'users'; sidebarOpen = false"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          用户管理
-        </button>
-        <button
-          v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
-          class="iq-nav-item"
-          :class="{ active: currentView === 'audit' }"
-          @click="currentView = 'audit'; sidebarOpen = false"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 11l3 3L22 4"></path>
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-          </svg>
-          注册审核
-          <span v-if="pendingCount > 0" class="iq-nav-badge">{{ pendingCount }}</span>
-        </button>
-        <button
-          class="iq-nav-item"
-          :class="{ active: currentView === 'feedback' }"
-          @click="currentView = 'feedback'; sidebarOpen = false"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-          用户反馈
-        </button>
-        <button
-          class="iq-nav-item"
-          :class="{ active: currentView === 'profile' }"
-          @click="currentView = 'profile'; sidebarOpen = false"
-        >
-          <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="8" r="4"></circle>
-            <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path>
-          </svg>
-          个人中心
-        </button>
-      </nav>
-    </aside>
+  <!-- ============================================================== -->
+  <!-- 已登录：根据角色渲染不同布局                                    -->
+  <!-- ============================================================== -->
+  <div v-else>
+    <!-- ============================================================ -->
+    <!-- 学生端：顶部标签导航布局（5个标签 + 右上角下拉菜单）          -->
+    <!-- ============================================================ -->
+    <div v-if="currentUser.role === 'student'" class="student-layout">
+      <header class="student-header">
+        <div class="header-left">
+          <div class="brand">
+            <span class="brand-icon">📚</span>
+            <span class="brand-name">智能题库</span>
+          </div>
+        </div>
 
-    <div v-if="sidebarOpen" class="iq-sidebar-overlay" @click="sidebarOpen = false"></div>
-
-    <!-- 顶部 Header -->
-    <header class="iq-layout-header">
-      <button class="iq-sidebar-toggle" @click="sidebarOpen = !sidebarOpen" aria-label="打开菜单">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-      </button>
-      <div>
-        <nav class="iq-breadcrumb">
-          <a @click="currentView = 'main'; sidebarOpen = false">首页</a>
-          <span class="crumb-sep">/</span>
-          <span>{{ currentBreadcrumb }}</span>
+        <nav class="header-nav" ref="navContainer">
+          <button
+              v-for="tab in studentTabs"
+              :key="tab.key"
+              class="nav-tab"
+              :class="{ active: currentView === tab.key }"
+              @click="navigateTo(tab.key)"
+          >
+            {{ tab.icon }} {{ tab.label }}
+          </button>
         </nav>
-      </div>
-      <div class="iq-header-right">
-        <button class="iq-header-link" @click="pwdVisible = true">改密码</button>
-        <button class="iq-header-link" @click="handleLogout">退出</button>
-        <div class="iq-avatar-wrap">
-          <div class="iq-avatar">{{ avatarChar }}</div>
-          <div class="iq-avatar-info">
-            <div class="iq-avatar-name">{{ currentUser.nickname || currentUser.username }}</div>
-            <div class="iq-avatar-role">
-              <span class="role-badge" :class="currentUser.role">{{ roleMap[currentUser.role] }}</span>
+
+        <div class="header-right" ref="userMenuRef">
+          <div class="user-menu-trigger" :class="{ open: showUserMenu }" @click.stop="toggleUserMenu">
+            <span class="user-avatar">{{ avatarChar }}</span>
+            <span class="user-name">{{ currentUser.nickname || currentUser.username }}</span>
+            <span class="dropdown-arrow">▼</span>
+          </div>
+
+          <div v-if="showUserMenu" class="user-dropdown">
+            <div class="dropdown-header">
+              <span class="dropdown-avatar">{{ avatarChar }}</span>
+              <div class="dropdown-user-info">
+                <div class="dropdown-username">{{ currentUser.nickname || currentUser.username }}</div>
+                <div class="dropdown-role">学生</div>
+              </div>
+            </div>
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-item" @click="goToProfile">
+              <span>👤</span> 个人资料
+            </div>
+            <div class="dropdown-item" @click="openChangePasswordFromMenu">
+              <span>🔐</span> 修改密码
+            </div>
+            <div class="dropdown-item" @click="openFeedbackFromMenu">
+              <span>💬</span> 用户反馈
+            </div>
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-item logout" @click="handleLogout">
+              <span>🚪</span> 退出登录
+            </div>
+          </div>
+
+          <div v-if="showUserMenu" class="dropdown-overlay" @click="showUserMenu = false"></div>
+        </div>
+      </header>
+
+      <main class="student-main">
+        <ExamList
+            v-if="currentView === 'papers'"
+            :role="currentUser.role"
+            @start-exam="startExam"
+            @toast="handleToastFromChild"
+        />
+        <ExamPractice
+            v-if="currentView === 'practice' && activeExamId"
+            :examId="activeExamId"
+            @exit="exitExam"
+            @view-record="viewRecord"
+            @toast="handleToastFromChild"
+        />
+        <AdaptivePractice
+            v-if="currentView === 'adaptive'"
+            @toast="handleToastFromChild"
+        />
+        <WrongBook
+            v-if="currentView === 'wrongbook'"
+            @start-exam="startExam"
+            @toast="handleToastFromChild"
+        />
+        <PracticeRecords
+            v-if="currentView === 'records'"
+            @view-record="viewRecord"
+            @toast="handleToastFromChild"
+        />
+        <LearningAnalysis
+            v-if="currentView === 'analysis'"
+            :role="currentUser.role"
+            @practice="handlePracticeFromAnalysis"
+            @navigate="handleNavigateFromAnalysis"
+            @toast="handleToastFromChild"
+        />
+        <Profile v-if="currentView === 'profile'" />
+        <Feedback
+            v-if="currentView === 'feedback'"
+            :role="currentUser.role"
+            @toast="handleToastFromChild"
+        />
+      </main>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 教师/管理员端：侧边栏布局                                      -->
+    <!-- ============================================================ -->
+    <div v-else id="app">
+      <aside class="iq-layout-sidebar" :class="{ open: sidebarOpen }">
+        <div class="iq-sidebar-brand">
+          <div class="iq-sidebar-logo">📚</div>
+          <span class="brand-name">智能题库</span>
+          <span class="brand-role" v-if="currentUser.role === 'admin'">管理员</span>
+          <span class="brand-role" v-else>教师</span>
+        </div>
+
+        <nav class="iq-sidebar-nav">
+          <!-- ===== 教学管理 ===== -->
+          <div class="iq-nav-group">
+            <div class="iq-nav-group-label">教学管理</div>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'main' }"
+                @click="currentView = 'main'; sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">📚</span> 题库管理
+            </button>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'practice' && practiceView === 'generate' }"
+                @click="openPracticeView('generate'); sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">📝</span> 出卷管理
+            </button>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'practice' && practiceView === 'classes' }"
+                @click="openPracticeView('classes'); sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">🏫</span> 班级管理
+            </button>
+          </div>
+
+          <!-- ===== 教学数据 ===== -->
+          <div class="iq-nav-group">
+            <div class="iq-nav-group-label">教学数据</div>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'practice' && practiceView === 'admin-records' }"
+                @click="openPracticeView('admin-records'); sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">📊</span> 试卷分析
+            </button>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'practice' && practiceView === 'learning-analysis' }"
+                @click="openPracticeView('learning-analysis'); sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">📈</span> 学情分析
+            </button>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'practice' && practiceView === 'adaptive-overview' }"
+                @click="openPracticeView('adaptive-overview'); sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">📊</span> 自适应学情
+            </button>
+          </div>
+
+          <!-- ===== 系统管理（仅管理员） ===== -->
+          <div v-if="currentUser.role === 'admin'" class="iq-nav-group">
+            <div class="iq-nav-group-label">系统管理</div>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'users' }"
+                @click="currentView = 'users'; sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">👥</span> 用户管理
+            </button>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'audit' }"
+                @click="currentView = 'audit'; sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">✅</span> 注册审核
+              <span v-if="pendingCount > 0" class="iq-nav-badge">{{ pendingCount }}</span>
+            </button>
+          </div>
+        </nav>
+
+        <!-- ===== 左下角用户菜单 ===== -->
+        <div class="iq-sidebar-footer">
+          <div class="sidebar-user-trigger" @click.stop="toggleSidebarUserMenu">
+            <div class="user-info">
+              <div class="user-avatar">{{ avatarChar }}</div>
+              <div class="user-detail">
+                <div class="user-name">{{ currentUser.nickname || currentUser.username }}</div>
+                <div class="user-role">
+                  <span class="role-badge" :class="currentUser.role">{{ roleMap[currentUser.role] }}</span>
+                </div>
+              </div>
+            </div>
+            <span class="dropdown-arrow" :class="{ open: showSidebarUserMenu }">▼</span>
+          </div>
+
+          <div v-if="showSidebarUserMenu" class="sidebar-user-dropdown">
+            <div class="dropdown-item" @click="goToProfile">
+              <span>👤</span> 个人中心
+            </div>
+            <div class="dropdown-item" @click="openChangePasswordFromMenu">
+              <span>🔐</span> 修改密码
+            </div>
+            <div class="dropdown-item" @click="openFeedbackFromMenu">
+              <span>💬</span> 用户反馈
+            </div>
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-item logout" @click="handleLogout">
+              <span>🚪</span> 退出登录
             </div>
           </div>
         </div>
-      </div>
-    </header>
+      </aside>
 
-    <!-- 主内容区 -->
-    <main class="iq-layout-main">
-      <!-- 题库管理视图 -->
-      <template v-if="currentView === 'main' && currentUser.role !== 'student'">
-        <div class="iq-page-titlebar">
-          <h1>题库管理</h1>
-          <div v-if="canEdit" class="iq-page-actions">
-            <button class="iq-btn iq-btn-secondary" @click="aiVisible = true">🤖 AI 出题</button>
-            <button class="iq-btn iq-btn-secondary" @click="ocrVisible = true">🖼 图片识别</button>
-            <button class="iq-btn iq-btn-secondary" @click="importVisible = true">📥 批量导入</button>
-            <button class="iq-btn iq-btn-primary" @click="openAddDialog">+ 新增题目</button>
+      <div v-if="sidebarOpen" class="iq-sidebar-overlay" @click="sidebarOpen = false"></div>
+
+      <!-- ===== 顶部 Header（已移除改密码和退出按钮） ===== -->
+      <header class="iq-layout-header">
+        <div class="header-left">
+          <button class="iq-sidebar-toggle" @click="sidebarOpen = !sidebarOpen" aria-label="打开菜单">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <nav class="iq-breadcrumb">
+            <span class="breadcrumb-home" @click="goHome">首页</span>
+            <span class="crumb-sep">/</span>
+            <span class="breadcrumb-current">{{ currentBreadcrumb }}</span>
+          </nav>
+        </div>
+        <!-- 右上角只保留头像和姓名，功能移至左下角下拉菜单 -->
+        <div class="iq-header-right">
+          <div class="iq-avatar-wrap">
+            <div class="iq-avatar">{{ avatarChar }}</div>
+            <div class="iq-avatar-info">
+              <div class="iq-avatar-name">{{ currentUser.nickname || currentUser.username }}</div>
+              <div class="iq-avatar-role">
+                <span class="role-badge" :class="currentUser.role">{{ roleMap[currentUser.role] }}</span>
+              </div>
+            </div>
           </div>
         </div>
+      </header>
 
-        <div v-if="stats" class="iq-stat-grid">
-          <div class="iq-card iq-stat-card">
-            <div class="iq-stat-label">题库总量</div>
-            <div class="iq-stat-value">{{ stats.total }}</div>
-          </div>
-          <div class="iq-card iq-stat-card">
-            <div class="iq-stat-label">章节数</div>
-            <div class="iq-stat-value">{{ stats.byChapter?.length || 0 }}</div>
-          </div>
-        </div>
+      <!-- ===== 主内容区 ===== -->
+      <main class="iq-layout-main">
+        <!-- ===== 题库管理（与学情分析宽度一致） ===== -->
+        <template v-if="currentView === 'main'">
+          <div class="question-bank-page">
+            <!-- 顶部横幅 -->
+            <header class="iq-page-hero">
+              <div class="hero-content">
+                <span class="hero-badge">📚 教学管理</span>
+                <h1 class="hero-title">题库管理</h1>
+                <p class="hero-desc">管理所有题目，支持 AI 出题和批量导入</p>
+              </div>
+              <div v-if="canEdit" class="hero-actions">
+                <button class="iq-btn iq-btn-secondary-light" @click="aiVisible = true">🤖 AI 出题</button>
+                <button class="iq-btn iq-btn-secondary-light" @click="importVisible = true">📥 批量导入</button>
+                <button class="iq-btn iq-btn-primary" @click="openAddDialog">+ 新增题目</button>
+              </div>
+            </header>
 
-        <SearchBar
-          :initialFilters="filters"
+            <!-- 统计卡片 -->
+            <div v-if="stats" class="iq-stat-grid">
+              <div class="iq-card iq-stat-card">
+                <div class="iq-stat-label">📊 题库总量</div>
+                <div class="iq-stat-value">{{ stats.total }}</div>
+              </div>
+              <div class="iq-card iq-stat-card">
+                <div class="iq-stat-label">📂 章节数</div>
+                <div class="iq-stat-value">{{ stats.byChapter?.length || 0 }}</div>
+              </div>
+            </div>
+
+            <!-- 筛选栏 -->
+            <SearchBar
+                :initialFilters="filters"
+                :role="currentUser.role"
+                :subjects="currentUser.subjects || []"
+                @search="handleSearch"
+                @reset="handleReset"
+            />
+
+            <!-- 表格 -->
+            <QuestionTable
+                :list="list"
+                :loading="loading"
+                :role="currentUser.role"
+                :compact="currentUser.role === 'admin' || currentUser.role === 'teacher'"
+                v-model="selectedIds"
+                @view="openViewDialog"
+                @edit="openEditDialog"
+                @delete="handleDelete"
+            />
+
+            <!-- 分页 -->
+            <Pagination
+                v-model:page="page"
+                v-model:pageSize="pageSize"
+                :total="total"
+                @change="handlePageChange"
+            />
+          </div>
+        </template>
+
+        <!-- ===== 用户管理（仅管理员） ===== -->
+        <template v-if="currentView === 'users' && currentUser.role === 'admin'">
+          <div class="iq-page-titlebar"><h1>👥 用户管理</h1></div>
+          <UserManagement @toast="handleToastFromChild" />
+        </template>
+
+        <!-- ===== 注册审核（仅管理员） ===== -->
+        <template v-if="currentView === 'audit' && currentUser.role === 'admin'">
+          <div class="iq-page-titlebar"><h1>✅ 注册审核</h1></div>
+          <RegistrationAudit @toast="handleToastFromChild" @update:pending="loadPendingCount" />
+        </template>
+
+        <!-- ===== 个人中心 ===== -->
+        <template v-if="currentView === 'profile'">
+          <Profile />
+        </template>
+
+        <!-- ===== 用户反馈 ===== -->
+        <template v-if="currentView === 'feedback'">
+          <div class="iq-page-titlebar"><h1>💬 用户反馈</h1></div>
+          <Feedback :role="currentUser.role" @toast="handleToastFromChild" />
+        </template>
+
+        <!-- ===== 出卷与学生管理 ===== -->
+        <template v-if="currentView === 'practice'">
+          <!-- 只在非独立视图且不是 generate 时显示标题（generate 自己显示横幅） -->
+          <div v-if="!standalonePracticeViews.includes(practiceView) && practiceView !== 'generate'" class="iq-page-titlebar">
+            <h1>{{ pageTitle }}</h1>
+          </div>
+
+          <!-- 子导航：只在试卷列表和智能组卷显示 -->
+          <div v-if="!standalonePracticeViews.includes(practiceView)" class="iq-practice-subnav">
+            <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
+            <button v-if="currentUser.role === 'teacher' || currentUser.role === 'admin'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
+          </div>
+
+          <ExamList
+              v-if="practiceView === 'exams'"
+              :role="currentUser.role"
+              @generate="practiceView = 'generate'"
+              @start-exam="startExam"
+              @toast="handleToastFromChild"
+          />
+
+          <GenerateExam
+              v-if="practiceView === 'generate' && (currentUser.role === 'teacher' || currentUser.role === 'admin')"
+              :role="currentUser.role"
+              :subjects="currentUser.subjects || []"
+              @start-exam="startExam"
+              @toast="handleToastFromChild"
+          />
+
+          <ClassManagement
+              v-if="practiceView === 'classes'"
+              @toast="handleToastFromChild"
+          />
+
+          <LearningAnalysis
+              v-if="practiceView === 'learning-analysis'"
+              :role="currentUser.role"
+              @practice="handlePracticeFromAnalysis"
+              @navigate="handleNavigateFromAnalysis"
+              @toast="handleToastFromChild"
+          />
+
+          <AdaptiveOverview
+              v-if="practiceView === 'adaptive-overview'"
+              @toast="handleToastFromChild"
+          />
+
+          <AdminRecords
+              v-if="practiceView === 'admin-records'"
+              :role="currentUser.role"
+              @toast="handleToastFromChild"
+          />
+        </template>
+      </main>
+
+      <!-- ===== 弹窗层 ===== -->
+      <QuestionForm
+          :visible="dialogVisible"
+          :data="formData"
+          :isEdit="isEdit"
           :role="currentUser.role"
           :subjects="currentUser.subjects || []"
-          :selectedCount="selectedIds.length"
-          @search="handleSearch"
-          @reset="handleReset"
-          @add="openAddDialog"
-          @batch-delete="handleBatchDelete"
-          @batch-import="importVisible = true"
-          @ai-generate="aiVisible = true"
-        />
+          @close="dialogVisible = false"
+          @submit="handleSubmit"
+      />
 
-        <div style="margin-top: 16px;"></div>
-        <QuestionTable
-          :list="list"
-          :loading="loading"
-          :role="currentUser.role"
-          :compact="currentUser.role === 'admin' || currentUser.role === 'teacher'"
-          v-model="selectedIds"
-          @view="openViewDialog"
-          @edit="openEditDialog"
-          @delete="handleDelete"
-        />
+      <QuestionDetail
+          :visible="viewVisible"
+          :data="viewData"
+          @close="viewVisible = false"
+      />
 
-        <Pagination
-          v-model:page="page"
-          v-model:pageSize="pageSize"
-          :total="total"
-          @change="handlePageChange"
-        />
-      </template>
+      <ChangePassword
+          :visible="pwdVisible"
+          @close="pwdVisible = false"
+          @success="handlePwdChanged"
+      />
 
-      <!-- 用户管理视图 -->
-      <template v-if="currentView === 'users' && currentUser.role === 'admin'">
-        <div class="iq-page-titlebar">
-          <h1>用户管理</h1>
-        </div>
-        <UserManagement @toast="handleToastFromChild" />
-      </template>
-
-      <!-- 注册审核视图 -->
-      <template v-if="currentView === 'audit' && (currentUser.role === 'admin' || currentUser.role === 'teacher')">
-        <div class="iq-page-titlebar">
-          <h1>注册审核</h1>
-        </div>
-        <RegistrationAudit @toast="handleToastFromChild" @update:pending="loadPendingCount" />
-      </template>
-
-      <!-- 用户反馈视图 -->
-      <template v-if="currentView === 'feedback'">
-        <div class="iq-page-titlebar">
-          <h1>用户反馈</h1>
-        </div>
-        <Feedback :role="currentUser.role" @toast="handleToastFromChild" />
-      </template>
-
-      <!-- 个人中心视图 -->
-      <Profile v-if="currentView === 'profile'" />
-
-      <!-- 答题练习视图 -->
-      <template v-if="currentView === 'practice'">
-        <div class="iq-page-titlebar">
-          <h1>{{ pageTitle }}</h1>
-        </div>
-
-        <!-- 练习子导航 -->
-        <div v-if="!standalonePracticeViews.includes(practiceView)" class="iq-practice-subnav">
-          <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-          <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
-          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'wrong-book' }" @click="practiceView = 'wrong-book'">📕 错题本</button>
-          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 我的答题记录</button>
-          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 我的统计</button>
-          <button
-            v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
-            class="iq-subnav-btn"
-            :class="{ active: practiceView === 'admin-records' }"
-            @click="practiceView = 'admin-records'"
-          >📊 试卷分析</button>
-          <button
-            v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
-            class="iq-subnav-btn"
-            :class="{ active: practiceView === 'classes' }"
-            @click="practiceView = 'classes'"
-          >🏫 班级管理</button>
-        </div>
-
-        <!-- 试卷列表 -->
-        <ExamList
-          v-if="practiceView === 'exams'"
-          :role="currentUser.role"
-          @generate="practiceView = 'generate'"
-          @start-exam="startExam"
-          @toast="handleToastFromChild"
-        />
-
-        <!-- 智能组卷 -->
-        <GenerateExam
-          v-if="practiceView === 'generate' && currentUser.role === 'teacher'"
+      <ImportQuestions
+          :visible="importVisible"
           :role="currentUser.role"
           :subjects="currentUser.subjects || []"
-          @start-exam="startExam"
-          @toast="handleToastFromChild"
-        />
+          @close="importVisible = false"
+          @success="handleImportSuccess"
+      />
 
+      <AiGenerate
+          :visible="aiVisible"
+          @close="aiVisible = false"
+          @success="handleAiSuccess"
+      />
 
-        <!-- 错题本 -->
-        <WrongBook
-          v-if="practiceView === 'wrong-book' && currentUser.role === 'student'"
-          @start-exam="startExam"
-          @toast="handleToastFromChild"
-        />
-
-        <!-- 班级管理 -->
-        <ClassManagement
-          v-if="practiceView === 'classes' && (currentUser.role === 'admin' || currentUser.role === 'teacher')"
-          @toast="handleToastFromChild"
-        />
-
-        <AdaptivePractice
-          v-if="practiceView === 'adaptive' && currentUser.role === 'student'"
-          :initial-filters="analysisPracticeFilters"
-          @toast="handleToastFromChild"
-        />
-
-        <LearningAnalysis
-          v-if="practiceView === 'learning-analysis'"
-          :role="currentUser.role"
-          @practice="openRecommendedPractice"
-          @navigate="practiceView = $event"
-          @toast="handleToastFromChild"
-        />
-
-        <AdaptiveOverview
-          v-if="practiceView === 'adaptive-overview' && (currentUser.role === 'teacher' || currentUser.role === 'admin')"
-          @toast="handleToastFromChild"
-        />
-
-        <AdaptiveProgress
-          v-if="practiceView === 'adaptive-progress' && currentUser.role === 'student'"
-          @practice="practiceView = 'adaptive'"
-
-          @toast="handleToastFromChild"
-        />
-
-        <!-- 答题页面 -->
-        <ExamPractice
-          v-if="practiceView === 'practice' && activeExamId"
-          :examId="activeExamId"
-          @exit="exitExam"
-          @view-record="viewRecord"
-          @update-question-id="currentQuestionId = $event"
-          @update-question="currentQuestion = $event"
-          @update-exam-id="currentExamId = $event"
-          @toast="handleToastFromChild"
-        />
-
-        <!-- 答题记录列表 -->
-        <PracticeRecords
-          v-if="practiceView === 'records'"
-          @view-record="viewRecord"
-          @toast="handleToastFromChild"
-        />
-
-        <!-- 答题记录详情 -->
-        <RecordDetail
-          v-if="practiceView === 'record-detail' && activeRecordId"
-          :recordId="activeRecordId"
-          @back="practiceView = 'records'"
-          @toast="handleToastFromChild"
-        />
-
-        <!-- 统计分析 -->
-        <PracticeStats
-          v-if="practiceView === 'stats'"
-          @toast="handleToastFromChild"
-        />
-
-        <!-- 做题管理 -->
-        <AdminRecords
-          v-if="practiceView === 'admin-records' && (currentUser.role === 'admin' || currentUser.role === 'teacher')"
-          :role="currentUser.role"
-          @toast="handleToastFromChild"
-        />
-      </template>
-    </main>
-
-    <!-- 弹窗层 -->
-    <QuestionForm
-      :visible="dialogVisible"
-      :data="formData"
-      :isEdit="isEdit"
-      :role="currentUser.role"
-      :subjects="currentUser.subjects || []"
-      @close="dialogVisible = false"
-      @submit="handleSubmit"
-    />
-
-    <QuestionDetail
-      :visible="viewVisible"
-      :data="viewData"
-      @close="viewVisible = false"
-    />
-
-    <ChangePassword
-      :visible="pwdVisible"
-      @close="pwdVisible = false"
-      @success="handlePwdChanged"
-    />
-
-    <ImportQuestions
-      :visible="importVisible"
-      :role="currentUser.role"
-      :subjects="currentUser.subjects || []"
-      @close="importVisible = false"
-      @success="handleImportSuccess"
-    />
-
-    <ImageRecognition
-      :visible="ocrVisible"
-      :role="currentUser.role"
-      :subjects="currentUser.subjects || []"
-      @close="ocrVisible = false"
-      @success="handleOcrSuccess"
-    />
-
-    <AiGenerate
-      :visible="aiVisible"
-      @close="aiVisible = false"
-      @success="handleAiSuccess"
-    />
-
-    <Toast :message="toastMessage" :type="toastType" />
-
-    <AIAssistant
-      v-if="currentUser?.role === 'student'"
-      @start-exam="startExam"
-    />
+      <Toast :message="toastMessage" :type="toastType" />
+    </div>
   </div>
+
+  <!-- ===== Toast ===== -->
+  <Toast :message="toastMessage" :type="toastType" v-if="currentUser" />
 </template>
 
 <script setup>
 import { ref, reactive, computed, provide, onMounted, onUnmounted, watch } from 'vue';
+
+// ===== 组件导入 =====
+import Login from '@/components/Login.vue';
+import RegistrationDialog from '@/components/RegistrationDialog.vue';
+import Toast from '@/components/Toast.vue';
+import SearchBar from '@/components/SearchBar.vue';
+import QuestionTable from '@/components/QuestionTable.vue';
+import QuestionForm from '@/components/QuestionForm.vue';
+import QuestionDetail from '@/components/QuestionDetail.vue';
+import Pagination from '@/components/Pagination.vue';
+import UserManagement from '@/components/UserManagement.vue';
+import RegistrationAudit from '@/components/RegistrationAudit.vue';
+import ChangePassword from '@/components/ChangePassword.vue';
+import ImportQuestions from '@/components/ImportQuestions.vue';
+import ImageRecognition from '@/components/ImageRecognition.vue';
+import AiGenerate from '@/components/AiGenerate.vue';
+import Feedback from '@/components/Feedback.vue';
+import Profile from '@/components/Profile.vue';
+
+// ===== Practice 组件 =====
+import ExamList from '@/components/practice/ExamList.vue';
+import ExamPractice from '@/components/practice/ExamPractice.vue';
+import AdaptivePractice from '@/components/practice/AdaptivePractice.vue';
+import WrongBook from '@/components/practice/WrongBook.vue';
+import PracticeRecords from '@/components/practice/PracticeRecords.vue';
+import LearningAnalysis from '@/components/practice/LearningAnalysis.vue';
+import AdaptiveOverview from '@/components/practice/AdaptiveOverview.vue';
+import GenerateExam from '@/components/practice/GenerateExam.vue';
+import ClassManagement from '@/components/practice/ClassManagement.vue';
+import AdminRecords from '@/components/practice/AdminRecords.vue';
+
+// ===== API =====
 import {
   getQuestions,
   addQuestion,
@@ -417,67 +495,77 @@ import {
   batchDeleteQuestions,
 } from '@/api/question';
 import { getRegistrations } from '@/api/auth';
-import SearchBar from '@/components/SearchBar.vue';
-import QuestionTable from '@/components/QuestionTable.vue';
-import QuestionForm from '@/components/QuestionForm.vue';
-import QuestionDetail from '@/components/QuestionDetail.vue';
-import Pagination from '@/components/Pagination.vue';
-import Toast from '@/components/Toast.vue';
-import Login from '@/components/Login.vue';
-import RegistrationDialog from '@/components/RegistrationDialog.vue';
-import UserManagement from '@/components/UserManagement.vue';
-import RegistrationAudit from '@/components/RegistrationAudit.vue';
-import ChangePassword from '@/components/ChangePassword.vue';
-import AIAssistant from '@/components/AIAssistant.vue';
-import ImportQuestions from '@/components/ImportQuestions.vue';
-import ImageRecognition from '@/components/ImageRecognition.vue';
-import AiGenerate from '@/components/AiGenerate.vue';
-import Feedback from '@/components/Feedback.vue';
-import Profile from '@/components/Profile.vue';
-import GenerateExam from '@/components/practice/GenerateExam.vue';
-import ExamList from '@/components/practice/ExamList.vue';
 
-import WrongBook from '@/components/practice/WrongBook.vue';
-import ClassManagement from '@/components/practice/ClassManagement.vue';
-
-import ExamPractice from '@/components/practice/ExamPractice.vue';
-import PracticeRecords from '@/components/practice/PracticeRecords.vue';
-import RecordDetail from '@/components/practice/RecordDetail.vue';
-import PracticeStats from '@/components/practice/PracticeStats.vue';
-import AdminRecords from '@/components/practice/AdminRecords.vue';
-import AdaptivePractice from '@/components/practice/AdaptivePractice.vue';
-import AdaptiveOverview from '@/components/practice/AdaptiveOverview.vue';
-import AdaptiveProgress from '@/components/practice/AdaptiveProgress.vue';
-import LearningAnalysis from '@/components/practice/LearningAnalysis.vue';
-import '@/components/practice/learning-analysis.css';
-
+// ================================================================
+// 常量
+// ================================================================
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
-// ===== 登录态管理 =====
+const studentTabs = [
+  { key: 'papers', label: '试卷列表', icon: '📋' },
+  { key: 'adaptive', label: '自适应练习', icon: '🎯' },
+  { key: 'wrongbook', label: '错题本', icon: '📕' },
+  { key: 'records', label: '答题记录', icon: '📊' },
+  { key: 'analysis', label: '学情分析', icon: '📈' },
+];
+
+// ================================================================
+// 登录态管理
+// ================================================================
 const currentUser = ref(null);
-const currentView = ref('main');
+const registerVisible = ref(false);
+const currentView = ref('papers');
 const sidebarOpen = ref(false);
 const pwdVisible = ref(false);
 
-// ===== 答题练习 =====
+// ================================================================
+// 答题练习状态
+// ================================================================
+// admin-records 已加入独立视图列表，试卷分析不显示子导航
 const practiceView = ref('exams');
-const currentQuestionId = ref(null);
-const currentQuestion = ref(null);
-const currentExamId = ref(null);
-const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview'];
+const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'classes', 'admin-records'];
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
 const analysisPracticeFilters = ref({});
+const currentQuestionId = ref(null);
+const currentExamId = ref(null);
+
 const openPracticeView = (view) => {
   practiceView.value = view;
   currentView.value = 'practice';
 };
+
+const handlePracticeFromAnalysis = (filters) => {
+  analysisPracticeFilters.value = filters || {};
+  currentView.value = 'practice';
+
+  if (filters?.adaptive) {
+    practiceView.value = 'adaptive';
+  } else if (filters?.questionTypes || filters?.chapters || filters?.knowledgeKeyword) {
+    practiceView.value = 'adaptive';
+    analysisPracticeFilters.value = filters;
+  } else {
+    practiceView.value = 'exams';
+  }
+
+  sidebarOpen.value = false;
+  showToast('已跳转到练习页面', 'success');
+};
+
+const handleNavigateFromAnalysis = (target) => {
+  if (target === 'generate') {
+    currentView.value = 'practice';
+    practiceView.value = 'generate';
+    sidebarOpen.value = false;
+    showToast('已跳转到智能组卷', 'success');
+  }
+};
+
 const openRecommendedPractice = (filters = {}) => {
   analysisPracticeFilters.value = { ...filters };
   practiceView.value = 'adaptive';
 };
 
-// 教师端进入出卷与学生管理：默认进入"试卷分析"；学生端仍为"试卷列表"
 const onEnterPractice = () => {
   if (currentUser.value?.role === 'teacher') {
     practiceView.value = 'admin-records';
@@ -498,26 +586,80 @@ provide('assistantState', {
   currentUser,
 });
 
-const canEdit = computed(() => currentUser.value?.role === 'admin' || currentUser.value?.role === 'teacher');
+// ================================================================
+// 导航
+// ================================================================
+const navigateTo = (view) => {
+  currentView.value = view;
+};
 
-// ===== 注册审核 =====
-const registerVisible = ref(false);
-const pendingCount = ref(0);
+const goHome = () => {
+  if (currentUser.value?.role === 'student') {
+    currentView.value = 'papers';
+  } else {
+    currentView.value = 'main';
+  }
+  sidebarOpen = false;
+};
 
-const loadPendingCount = async () => {
-  if (!currentUser.value || currentUser.value.role === 'student') return;
-  try {
-    const data = await getRegistrations({ status: 'pending', pageSize: 1 });
-    pendingCount.value = data.total;
-  } catch (e) {
-    pendingCount.value = 0;
+// ================================================================
+// 学生端下拉菜单
+// ================================================================
+const showUserMenu = ref(false);
+const userMenuRef = ref(null);
+
+const toggleUserMenu = () => {
+  showUserMenu.value = !showUserMenu.value;
+};
+
+const closeUserMenu = () => {
+  showUserMenu.value = false;
+};
+
+// ================================================================
+// 教师端侧边栏底部下拉菜单
+// ================================================================
+const showSidebarUserMenu = ref(false);
+
+const toggleSidebarUserMenu = () => {
+  showSidebarUserMenu.value = !showSidebarUserMenu.value;
+};
+
+const closeSidebarUserMenu = () => {
+  showSidebarUserMenu.value = false;
+};
+
+// ================================================================
+// 公共操作
+// ================================================================
+const goToProfile = () => {
+  currentView.value = 'profile';
+  closeUserMenu();
+  closeSidebarUserMenu();
+};
+
+const openChangePasswordFromMenu = () => {
+  pwdVisible.value = true;
+  closeUserMenu();
+  closeSidebarUserMenu();
+};
+
+const openFeedbackFromMenu = () => {
+  currentView.value = 'feedback';
+  closeUserMenu();
+  closeSidebarUserMenu();
+};
+
+const handleClickOutside = (event) => {
+  if (userMenuRef.value && !userMenuRef.value.contains(event.target)) {
+    showUserMenu.value = false;
   }
 };
 
-const registerSuccess = () => {
-  registerVisible.value = false;
-  showToast('✅ 注册申请已提交，请等待管理员审核', 'success');
-};
+// ================================================================
+// 计算属性
+// ================================================================
+const canEdit = computed(() => currentUser.value?.role === 'admin' || currentUser.value?.role === 'teacher');
 
 const avatarChar = computed(() => {
   const name = currentUser.value?.nickname || currentUser.value?.username || 'U';
@@ -537,7 +679,7 @@ const currentBreadcrumb = computed(() => {
       'wrong-book': '错题本',
       adaptive: '自适应练习',
       'adaptive-overview': '自适应学情',
-      'adaptive-progress': '我的自适应成果',
+      'adaptive-progress': '自适应成果',
       'learning-analysis': '学习分析',
       practice: '答题中',
       records: '答题记录',
@@ -546,29 +688,25 @@ const currentBreadcrumb = computed(() => {
       'admin-records': '试卷分析',
       classes: '班级管理',
     };
-    const parent = currentUser.value?.role === 'student' ? '答题练习' : '出卷与学生管理';
-    return parent + ' / ' + (map[practiceView.value] || '');
+    return '出卷与学生管理 / ' + (map[practiceView.value] || '');
   }
   return '';
 });
-
 
 const pageTitle = computed(() => {
   const map = {
     exams: '📋 试卷列表',
     generate: '📝 智能组卷',
-
     'wrong-book': '📕 错题本',
     adaptive: '🧭 自适应练习',
     'adaptive-overview': '📈 自适应学情',
-    'adaptive-progress': '🏅 我的自适应成果',
-    'learning-analysis': '学习分析',
-
+    'adaptive-progress': '🏅 自适应成果',
+    'learning-analysis': '📉 学习分析',
     practice: '✍️ 答题中',
     records: '📊 答题记录',
     'record-detail': '📝 答题详情',
     stats: '📈 统计分析',
-    'admin-records': '👥 做题管理',
+    'admin-records': '👥 试卷分析',
     classes: '🏫 班级管理',
   };
   return map[practiceView.value] || '';
@@ -576,12 +714,20 @@ const pageTitle = computed(() => {
 
 const startExam = (examId) => {
   activeExamId.value = examId;
-  practiceView.value = 'practice';
+  if (currentUser.value?.role === 'student') {
+    currentView.value = 'practice';
+  } else {
+    practiceView.value = 'practice';
+  }
 };
 
 const exitExam = () => {
   activeExamId.value = null;
-  practiceView.value = 'exams';
+  if (currentUser.value?.role === 'student') {
+    currentView.value = 'papers';
+  } else {
+    practiceView.value = 'exams';
+  }
 };
 
 const viewRecord = (recordId) => {
@@ -589,7 +735,29 @@ const viewRecord = (recordId) => {
   practiceView.value = 'record-detail';
 };
 
-// 从 localStorage 恢复登录态
+// ================================================================
+// 注册审核
+// ================================================================
+const pendingCount = ref(0);
+
+const loadPendingCount = async () => {
+  if (!currentUser.value || currentUser.value.role === 'student') return;
+  try {
+    const data = await getRegistrations({ status: 'pending', pageSize: 1 });
+    pendingCount.value = data.total;
+  } catch (e) {
+    pendingCount.value = 0;
+  }
+};
+
+const registerSuccess = () => {
+  registerVisible.value = false;
+  showToast('✅ 注册申请已提交，请等待管理员审核', 'success');
+};
+
+// ================================================================
+// 登录/退出
+// ================================================================
 const restoreSession = () => {
   const token = localStorage.getItem('token');
   const userStr = localStorage.getItem('user');
@@ -598,8 +766,9 @@ const restoreSession = () => {
       const user = JSON.parse(userStr);
       currentUser.value = user;
       if (user.role === 'student') {
-        currentView.value = 'practice';
-        practiceView.value = 'exams';
+        currentView.value = 'papers';
+      } else {
+        currentView.value = 'main';
       }
     } catch {
       localStorage.removeItem('token');
@@ -611,8 +780,7 @@ const restoreSession = () => {
 const handleLoginSuccess = (user) => {
   currentUser.value = user;
   if (user.role === 'student') {
-    currentView.value = 'practice';
-    practiceView.value = 'exams';
+    currentView.value = 'papers';
   } else {
     currentView.value = 'main';
   }
@@ -626,8 +794,10 @@ const handleLogout = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   currentUser.value = null;
-  currentView.value = 'main';
+  currentView.value = 'papers';
   pendingCount.value = 0;
+  closeUserMenu();
+  closeSidebarUserMenu();
 };
 
 const handlePwdChanged = () => {
@@ -642,120 +812,13 @@ const handlePwdChanged = () => {
 
 const handleAuthExpired = () => {
   currentUser.value = null;
-  currentView.value = 'main';
+  currentView.value = 'papers';
   showToast('登录已过期，请重新登录', 'warning');
 };
 
-// ===== 批量操作 =====
-const selectedIds = ref([]);
-const importVisible = ref(false);
-const ocrVisible = ref(false);
-const aiVisible = ref(false);
-
-// ===== 题库管理 =====
-const list = ref([]);
-const total = ref(0);
-const page = ref(1);
-const pageSize = ref(20);
-const loading = ref(false);
-
-watch(page, () => {
-  selectedIds.value = [];
-});
-
-watch(currentView, (val) => {
-  if (val === 'main' && currentUser.value?.role === 'student') {
-    currentView.value = 'practice';
-    practiceView.value = 'exams';
-  }
-});
-
-const handleBatchDelete = async () => {
-  if (selectedIds.value.length === 0) return;
-  if (!window.confirm(`确定要批量删除选中的 ${selectedIds.value.length} 条题目吗？`)) return;
-
-  loading.value = true;
-  try {
-    const result = await batchDeleteQuestions(selectedIds.value);
-    const deleted = result?.deleted ?? selectedIds.value.length;
-    showToast(`✅ 批量删除成功，共删除 ${deleted} 条`, 'success');
-    selectedIds.value = [];
-    const remainingInPage = list.value.length - deleted;
-    if (remainingInPage <= 0 && page.value > 1) {
-      page.value--;
-    }
-    await loadData();
-    await loadStats();
-  } catch (error) {
-    showToast(error.message || '批量删除失败', 'error');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const handleImportSuccess = (result) => {
-  const { inserted = 0, skipped = 0, invalid = 0 } = result || {};
-  const msg = `导入完成：成功 ${inserted} 条，跳过 ${skipped} 条，无效 ${invalid} 条`;
-  if (inserted > 0) {
-    loadData();
-    loadStats();
-  }
-  if (invalid > 0 || skipped > 0) {
-    showToast(msg, 'warning');
-  } else {
-    showToast(msg, 'success');
-  }
-};
-
-const handleOcrSuccess = (result) => {
-  const { inserted = 0, skipped = 0, invalid = 0 } = result || {};
-  const msg = `图片识别导入完成：成功 ${inserted} 条，跳过 ${skipped} 条，无效 ${invalid} 条`;
-  if (inserted > 0) {
-    loadData();
-    loadStats();
-  }
-  if (invalid > 0 || skipped > 0) {
-    showToast(msg, 'warning');
-  } else {
-    showToast(msg, 'success');
-  }
-  ocrVisible.value = false;
-};
-
-const handleAiSuccess = (result) => {
-  const { inserted = 0, skipped = 0 } = result || {};
-  const msg = `AI 出题入库完成：成功 ${inserted} 条，跳过 ${skipped} 条`;
-  if (inserted > 0) {
-    loadData();
-    loadStats();
-  }
-  if (skipped > 0) {
-    showToast(msg, 'warning');
-  } else {
-    showToast(msg, 'success');
-  }
-  aiVisible.value = false;
-};
-
-const filters = reactive({
-  id: '',
-  关键词: '',
-  题型: '',
-  难度: '',
-  章节: '',
-  出题人: '',
-  科目: '',
-});
-
-const dialogVisible = ref(false);
-const isEdit = ref(false);
-const formData = ref({});
-
-const viewVisible = ref(false);
-const viewData = ref({});
-
-const stats = ref(null);
-
+// ================================================================
+// Toast
+// ================================================================
 const toastMessage = ref('');
 const toastType = ref('info');
 
@@ -770,6 +833,45 @@ const showToast = (message, type = 'info') => {
 const handleToastFromChild = ({ message, type }) => {
   showToast(message, type);
 };
+
+// ================================================================
+// 题库管理
+// ================================================================
+const list = ref([]);
+const total = ref(0);
+const page = ref(1);
+const pageSize = ref(20);
+const loading = ref(false);
+const selectedIds = ref([]);
+const importVisible = ref(false);
+const aiVisible = ref(false);
+const stats = ref(null);
+
+const filters = reactive({
+  id: '',
+  关键词: '',
+  题型: '',
+  难度: '',
+  章节: '',
+  出题人: '',
+  科目: '',
+});
+
+const dialogVisible = ref(false);
+const isEdit = ref(false);
+const formData = ref({});
+const viewVisible = ref(false);
+const viewData = ref({});
+
+watch(page, () => {
+  selectedIds.value = [];
+});
+
+watch(currentView, (val) => {
+  if (val === 'main' && currentUser.value?.role === 'student') {
+    currentView.value = 'papers';
+  }
+});
 
 const loadData = async () => {
   loading.value = true;
@@ -903,7 +1005,61 @@ const handleDelete = async (item) => {
   }
 };
 
-// ===== 生命周期 =====
+const handleBatchDelete = async () => {
+  if (selectedIds.value.length === 0) return;
+  if (!window.confirm(`确定要批量删除选中的 ${selectedIds.value.length} 条题目吗？`)) return;
+
+  loading.value = true;
+  try {
+    const result = await batchDeleteQuestions(selectedIds.value);
+    const deleted = result?.deleted ?? selectedIds.value.length;
+    showToast(`✅ 批量删除成功，共删除 ${deleted} 条`, 'success');
+    selectedIds.value = [];
+    const remainingInPage = list.value.length - deleted;
+    if (remainingInPage <= 0 && page.value > 1) {
+      page.value--;
+    }
+    await loadData();
+    await loadStats();
+  } catch (error) {
+    showToast(error.message || '批量删除失败', 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleImportSuccess = (result) => {
+  const { inserted = 0, skipped = 0, invalid = 0 } = result || {};
+  const msg = `导入完成：成功 ${inserted} 条，跳过 ${skipped} 条，无效 ${invalid} 条`;
+  if (inserted > 0) {
+    loadData();
+    loadStats();
+  }
+  if (invalid > 0 || skipped > 0) {
+    showToast(msg, 'warning');
+  } else {
+    showToast(msg, 'success');
+  }
+};
+
+const handleAiSuccess = (result) => {
+  const { inserted = 0, skipped = 0 } = result || {};
+  const msg = `AI 出题入库完成：成功 ${inserted} 条，跳过 ${skipped} 条`;
+  if (inserted > 0) {
+    loadData();
+    loadStats();
+  }
+  if (skipped > 0) {
+    showToast(msg, 'warning');
+  } else {
+    showToast(msg, 'success');
+  }
+  aiVisible.value = false;
+};
+
+// ================================================================
+// 生命周期
+// ================================================================
 onMounted(() => {
   restoreSession();
   if (currentUser.value) {
@@ -911,47 +1067,820 @@ onMounted(() => {
     loadStats();
     loadPendingCount();
   }
+  document.addEventListener('click', handleClickOutside);
   window.addEventListener('auth-expired', handleAuthExpired);
 });
 
 onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside);
   window.removeEventListener('auth-expired', handleAuthExpired);
 });
 </script>
 
 <style scoped>
+/* ================================================================
+   学生端样式
+   ================================================================ */
+.student-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #F8FAFC;
+}
+
+.student-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  gap: 12px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1E293B;
+}
+.brand-icon {
+  font-size: 24px;
+}
+.brand-name {
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 0 8px;
+}
+
+.nav-tab {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.nav-tab:hover {
+  background: #F1F5F9;
+  color: #1E293B;
+}
+.nav-tab.active {
+  background: #EEF2FF;
+  color: #4338CA;
+}
+
+.header-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.user-menu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.user-menu-trigger:hover {
+  background: #F1F5F9;
+}
+
+.user-menu-trigger .user-avatar {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #EEF2FF;
+  color: #4338CA;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.user-menu-trigger .user-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1E293B;
+}
+
+.dropdown-arrow {
+  font-size: 10px;
+  color: #94A3B8;
+  transition: transform 0.2s;
+}
+
+.user-menu-trigger.open .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 220px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #F8FAFC;
+}
+
+.dropdown-avatar {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #EEF2FF;
+  color: #4338CA;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dropdown-user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-username {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.dropdown-role {
+  font-size: 12px;
+  color: #94A3B8;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #E2E8F0;
+  margin: 0 12px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dropdown-item:hover {
+  background: #F1F5F9;
+}
+
+.dropdown-item.logout {
+  color: #EF4444;
+}
+
+.dropdown-item.logout:hover {
+  background: #FEF2F2;
+}
+
+.dropdown-item span:first-child {
+  width: 20px;
+  text-align: center;
+}
+
+.dropdown-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+}
+
+.student-main {
+  flex: 1;
+  padding: 24px;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .student-header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .header-nav {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+  .nav-tab {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .student-main {
+    padding: 16px;
+  }
+  .user-menu-trigger .user-name {
+    display: none;
+  }
+}
+
+/* ================================================================
+   教师/管理员端样式
+   ================================================================ */
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.iq-layout-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 260px;
+  height: 100vh;
+  background: #FFFFFF;
+  border-right: 1px solid #E2E8F0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.25s ease;
+}
+
+.iq-sidebar-brand {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #E2E8F0;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.iq-sidebar-logo {
+  font-size: 28px;
+  line-height: 1;
+}
+.brand-name {
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.brand-role {
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #EEF2FF;
+  color: #4338CA;
+  font-weight: 500;
+  -webkit-text-fill-color: #4338CA;
+  margin-left: auto;
+}
+
+.iq-sidebar-nav {
+  flex: 1;
+  padding: 12px 0 8px;
+  overflow-y: auto;
+}
+
+.iq-nav-group {
+  margin-bottom: 4px;
+}
+.iq-nav-group-label {
+  padding: 8px 20px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.iq-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  margin: 1px 12px;
+  border-radius: 8px;
+  color: #64748B;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  width: calc(100% - 24px);
+}
+.iq-nav-item:hover {
+  background: #F1F5F9;
+  color: #1E293B;
+}
+.iq-nav-item.active {
+  background: #6366F1;
+  color: #FFFFFF;
+}
+.iq-nav-item .iq-nav-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.iq-nav-badge {
+  display: inline-block;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
+  background: #EF4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  border-radius: 9px;
+  margin-left: auto;
+}
+
+.iq-sidebar-footer {
+  border-top: 1px solid #E2E8F0;
+  padding: 12px 16px;
+  margin-top: auto;
+  position: relative;
+}
+
+.sidebar-user-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 4px 0;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.sidebar-user-trigger:hover {
+  background: #F1F5F9;
+}
+
+.iq-sidebar-footer .user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.iq-sidebar-footer .user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #EEF2FF;
+  color: #4338CA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.iq-sidebar-footer .user-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.iq-sidebar-footer .user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.iq-sidebar-footer .user-role {
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.sidebar-user-trigger .dropdown-arrow {
+  font-size: 10px;
+  color: #94A3B8;
+  transition: transform 0.2s;
+  margin-left: 4px;
+}
+
+.sidebar-user-trigger .dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.sidebar-user-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 8px;
+  right: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  z-index: 50;
+}
+
+.sidebar-user-dropdown .dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.sidebar-user-dropdown .dropdown-item:hover {
+  background: #F1F5F9;
+}
+
+.sidebar-user-dropdown .dropdown-item.logout {
+  color: #EF4444;
+}
+
+.sidebar-user-dropdown .dropdown-item.logout:hover {
+  background: #FEF2F2;
+}
+
+.sidebar-user-dropdown .dropdown-item span:first-child {
+  width: 20px;
+  text-align: center;
+}
+
+.sidebar-user-dropdown .dropdown-divider {
+  height: 1px;
+  background: #E2E8F0;
+  margin: 4px 12px;
+}
+
+.iq-layout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 64px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 260px;
+  z-index: 90;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.iq-sidebar-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #64748B;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.iq-sidebar-toggle:hover {
+  background: #F1F5F9;
+}
+
+.iq-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.breadcrumb-home {
+  color: #94A3B8;
+  cursor: pointer;
+}
+.breadcrumb-home:hover {
+  color: #6366F1;
+}
+.crumb-sep {
+  color: #CBD5E1;
+}
+.breadcrumb-current {
+  color: #1E293B;
+  font-weight: 500;
+}
+
+.iq-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iq-avatar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 2px 2px;
+  border-radius: 8px;
+}
+.iq-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #EEF2FF;
+  color: #4338CA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.iq-avatar-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1E293B;
+}
+.iq-avatar-role {
+  font-size: 11px;
+  color: #94A3B8;
+}
+
 .role-badge {
   display: inline-block;
-  padding: 1px 6px;
+  padding: 1px 8px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
 }
 .role-badge.admin {
-  background: var(--iq-state-error-bg);
-  color: var(--iq-state-error);
+  background: #FEF2F2;
+  color: #DC2626;
 }
 .role-badge.teacher {
-  background: var(--iq-state-info-bg);
-  color: var(--iq-state-info);
+  background: #DBEAFE;
+  color: #1D4ED8;
 }
 .role-badge.student {
-  background: var(--iq-state-success-bg);
-  color: var(--iq-state-success);
+  background: #DCFCE7;
+  color: #15803D;
 }
 
-.iq-nav-badge {
-  display: inline-block;
-  min-width: 20px;
-  height: 20px;
-  line-height: 20px;
-  padding: 0 6px;
-  background: #ef4444;
+.iq-layout-main {
+  margin-left: 260px;
+  padding: 88px 24px 24px;
+  min-height: 100vh;
+  background: #F8FAFC;
+}
+
+/* ===== 题库管理页面容器（与学情分析宽度一致） ===== */
+.question-bank-page {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+}
+
+/* ===== 统计卡片 ===== */
+.iq-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.iq-stat-card {
+  padding: 20px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.iq-stat-label {
+  font-size: 13px;
+  color: #94A3B8;
+  margin-bottom: 4px;
+}
+
+.iq-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #6366F1;
+}
+
+/* ===== 顶部横幅 ===== */
+.iq-page-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 34px;
+  border-radius: 16px;
   color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  border-radius: 10px;
-  margin-left: 4px;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.25);
+}
+
+.hero-content .hero-badge {
+  font-size: 12px;
+  opacity: 0.8;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.hero-content .hero-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.hero-content .hero-desc {
+  font-size: 14px;
+  opacity: 0.85;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 4px 0 0;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+/* 浅色背景按钮（用于深色横幅上） */
+.iq-btn-secondary-light {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+.iq-btn-secondary-light:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.iq-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.iq-btn-primary {
+  background: #6366F1;
+  color: #fff;
+  border-color: #6366F1;
+}
+.iq-btn-primary:hover {
+  background: #4F46E5;
+  border-color: #4F46E5;
+}
+
+.iq-btn-secondary {
+  background: #FFFFFF;
+  color: #64748B;
+  border-color: #E2E8F0;
+}
+.iq-btn-secondary:hover {
+  background: #F1F5F9;
+}
+
+/* ===== 子导航 ===== */
+.iq-practice-subnav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: #FFFFFF;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  flex-wrap: wrap;
+}
+.iq-subnav-btn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.iq-subnav-btn:hover {
+  background: #F1F5F9;
+}
+.iq-subnav-btn.active {
+  background: #6366F1;
+  color: #fff;
+}
+
+.iq-sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .iq-sidebar-toggle {
+    display: inline-flex;
+  }
+  .iq-layout-sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+  }
+  .iq-layout-sidebar.open {
+    transform: translateX(0);
+  }
+  .iq-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    z-index: 99;
+  }
+  .iq-layout-header {
+    left: 0;
+    padding: 0 12px;
+  }
+  .iq-layout-main {
+    margin-left: 0;
+    padding: 80px 12px 20px;
+  }
+  .iq-avatar-info {
+    display: none;
+  }
+  .iq-header-right {
+    gap: 6px;
+  }
+  .iq-sidebar-footer .user-detail {
+    display: none;
+  }
+  .brand-role {
+    display: none;
+  }
 }
 </style>
