@@ -89,9 +89,12 @@
 
         <div class="paper-card-footer">
           <span class="paper-date">{{ formatTime(exam.created_at) }}</span>
-          <button class="btn-start" @click.stop="handleStartExam(exam.id)">
-            {{ role === 'student' ? '📝 开始答题' : '查看题目' }}
-          </button>
+          <div class="footer-actions">
+            <button v-if="role === 'teacher' || role === 'admin'" class="btn-export" @click.stop="openExport(exam)">📥 导出</button>
+            <button class="btn-start" @click.stop="handleStartExam(exam.id)">
+              {{ role === 'student' ? '📝 开始答题' : '查看题目' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -138,6 +141,15 @@
         </div>
       </div>
     </div>
+
+    <!-- ===== 导出弹窗 ===== -->
+    <ExamExportDialog
+        :visible="exportVisible"
+        :exam-id="exportExamData?.id || null"
+        :title="exportExamData?.title || ''"
+        @close="exportVisible = false"
+        @toast="(e) => emit('toast', e)"
+    />
   </div>
 </template>
 
@@ -165,6 +177,15 @@ const loading = ref(false);
 const previewVisible = ref(false);
 const previewLoading = ref(false);
 const previewExam = ref({ questions: [] });
+
+// 导出相关
+const exportVisible = ref(false);
+const exportExamData = ref(null);
+
+const openExport = (exam) => {
+  exportExamData.value = exam;
+  exportVisible.value = true;
+};
 
 const loadExams = async () => {
   loading.value = true;
@@ -441,6 +462,29 @@ defineExpose({ loadExams });
 .btn-start:hover {
   background: #4F46E5;
   transform: scale(1.02);
+}
+
+.footer-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-export {
+  padding: 6px 14px;
+  background: #fff;
+  color: #6366F1;
+  border: 1px solid #C7D2FE;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-export:hover {
+  background: #EEF2FF;
+  border-color: #6366F1;
 }
 
 /* ===== 加载状态 ===== */

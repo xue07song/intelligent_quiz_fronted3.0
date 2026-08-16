@@ -282,6 +282,7 @@
               <div v-if="canEdit" class="hero-actions">
                 <button class="iq-btn iq-btn-secondary-light" @click="aiVisible = true">🤖 AI 出题</button>
                 <button class="iq-btn iq-btn-secondary-light" @click="importVisible = true">📥 批量导入</button>
+                <button class="iq-btn iq-btn-secondary-light" @click="imageRecognitionVisible = true">🖼️ 图片识别</button>
                 <button class="iq-btn iq-btn-primary" @click="openAddDialog">+ 新增题目</button>
               </div>
             </header>
@@ -444,6 +445,14 @@
           @success="handleAiSuccess"
       />
 
+      <ImageRecognition
+          :visible="imageRecognitionVisible"
+          :role="currentUser.role"
+          :subjects="currentUser.subjects || []"
+          @close="imageRecognitionVisible = false"
+          @success="handleImportSuccess"
+      />
+
       <Toast :message="toastMessage" :type="toastType" />
     </div>
   </div>
@@ -528,6 +537,7 @@ const activeExamId = ref(null);
 const activeRecordId = ref(null);
 const analysisPracticeFilters = ref({});
 const currentQuestionId = ref(null);
+const currentQuestion = ref(null);
 const currentExamId = ref(null);
 
 const openPracticeView = (view) => {
@@ -599,7 +609,7 @@ const goHome = () => {
   } else {
     currentView.value = 'main';
   }
-  sidebarOpen = false;
+  sidebarOpen.value = false;
 };
 
 // ================================================================
@@ -845,6 +855,7 @@ const loading = ref(false);
 const selectedIds = ref([]);
 const importVisible = ref(false);
 const aiVisible = ref(false);
+const imageRecognitionVisible = ref(false);
 const stats = ref(null);
 
 const filters = reactive({
