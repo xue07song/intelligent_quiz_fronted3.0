@@ -225,7 +225,7 @@ const props = defineProps({
   examId: { type: [Number, String], required: true },
 });
 
-const emit = defineEmits(['exit', 'view-record', 'update-question-id', 'update-exam-id', 'toast']);
+const emit = defineEmits(['exit', 'view-record', 'update-question-id', 'update-question', 'update-exam-id', 'toast']);
 
 const OBJECTIVE_TYPES = [1, 2, 3, 4];
 
@@ -305,6 +305,8 @@ const isAnswered = (q) => {
 const scrollToQuestion = (qid) => {
   activeQuestionId.value = qid;
   emit('update-question-id', qid);
+  const q = exam.value.questions.find((item) => String(item.id) === String(qid)) || null;
+  emit('update-question', q);
   const el = document.getElementById(`question-${qid}`);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
@@ -467,6 +469,7 @@ const loadExam = async () => {
     if (data.questions.length > 0) {
       activeQuestionId.value = data.questions[0].id;
       emit('update-question-id', data.questions[0].id);
+      emit('update-question', data.questions[0]);
       emit('update-exam-id', props.examId);
     }
     const restored = restoreDraft(data);
@@ -506,6 +509,7 @@ const handleSubmit = async () => {
     phase.value = 'result';
     if (timer) clearInterval(timer);
     emit('update-question-id', null);
+    emit('update-question', null);
     emit('update-exam-id', null);
     localStorage.removeItem(draftKey());
     draftSaved.value = false;
@@ -522,6 +526,7 @@ const handleExit = () => {
     if (!window.confirm('答题进度已自动保存，可稍后从试卷列表继续，确定退出吗？')) return;
   }
   emit('update-question-id', null);
+  emit('update-question', null);
   emit('update-exam-id', null);
   emit('exit');
 };

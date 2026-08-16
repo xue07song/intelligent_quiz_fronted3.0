@@ -98,7 +98,10 @@
                   </svg>
                   开始答题
                 </button>
-                <button v-else class="iq-btn iq-btn-secondary iq-btn-sm" @click="openPreview(exam.id)">查看题目</button>
+                <template v-else>
+                  <button class="iq-btn iq-btn-secondary iq-btn-sm" @click="openExport(exam)">导出</button>
+                  <button class="iq-btn iq-btn-secondary iq-btn-sm" @click="openPreview(exam.id)">查看题目</button>
+                </template>
               </td>
             </tr>
           </tbody>
@@ -114,6 +117,14 @@
     </div>
 
     <div v-if="previewVisible" class="preview-mask" @click.self="closePreview"><div class="preview-dialog"><div class="preview-head"><div><h2>{{ previewExam.title }}</h2><p>创建教师：{{ previewExam.creator_name || '-' }} · 共 {{ previewExam.questions?.length || 0 }} 题</p></div><button class="close" @click="closePreview">×</button></div><div v-if="previewLoading" class="preview-loading">正在读取试卷题目...</div><div v-else class="preview-body"><article v-for="(q,index) in previewExam.questions" :key="q.id" class="preview-question"><div class="number">{{ index+1 }}</div><div><div class="question-meta"><span>{{ getTypeName(q.题型) }}</span><span>难度{{ q.难度 }}</span><span>{{ q.知识点 || '未标注知识点' }}</span></div><h3>{{ q.题目 }}</h3><p v-if="q.选项">{{ q.选项 }}</p><details><summary>查看答案与解析</summary><p><b>答案：</b>{{ q.答案 }}</p><p v-if="q.解析"><b>解析：</b>{{ q.解析 }}</p></details></div></article></div></div></div>
+
+    <ExamExportDialog
+      :visible="exportVisible"
+      :exam-id="exportItem?.id || null"
+      :title="exportItem?.title || ''"
+      @close="exportVisible = false"
+      @toast="(e) => emit('toast', e)"
+    />
   </div>
 </template>
 
@@ -125,6 +136,7 @@ import { formatTime } from '@/utils/format';
 import { getSubjects } from '@/api/subject';
 import { getClasses } from '@/api/class';
 import Pagination from '@/components/Pagination.vue';
+import ExamExportDialog from '@/components/ExamExportDialog.vue';
 
 const emit = defineEmits(['generate', 'start-exam', 'toast']);
 defineProps({ role: { type: String, default: 'student' } });
@@ -139,6 +151,12 @@ const allSubjects = ref([]);
 const classList = ref([]);
 const subjectFilter = ref('');
 const classFilter = ref('');
+const exportVisible = ref(false);
+const exportItem = ref(null);
+const openExport = (exam) => {
+  exportItem.value = exam;
+  exportVisible.value = true;
+};
 const openPreview=async(id)=>{previewVisible.value=true;previewLoading.value=true;try{previewExam.value=await getExam(id)}catch(err){emit('toast',{message:err.message||'读取试卷失败',type:'error'});previewVisible.value=false}finally{previewLoading.value=false}};
 const closePreview=()=>{previewVisible.value=false;previewExam.value={questions:[]}};
 
