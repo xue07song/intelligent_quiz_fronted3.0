@@ -468,6 +468,7 @@ import UserManagement from '@/components/UserManagement.vue';
 import RegistrationAudit from '@/components/RegistrationAudit.vue';
 import ChangePassword from '@/components/ChangePassword.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
+import ImageRecognition from '@/components/ImageRecognition.vue';
 import AiGenerate from '@/components/AiGenerate.vue';
 import Feedback from '@/components/Feedback.vue';
 import Profile from '@/components/Profile.vue';
@@ -580,6 +581,7 @@ provide('assistantState', {
   currentView,
   practiceView,
   currentQuestionId,
+  currentQuestion,
   currentExamId,
   currentUser,
 });

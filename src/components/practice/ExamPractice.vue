@@ -284,7 +284,7 @@ const props = defineProps({
   examId: { type: [Number, String], required: true },
 });
 
-const emit = defineEmits(['exit', 'view-record', 'update-question-id', 'update-exam-id', 'toast']);
+const emit = defineEmits(['exit', 'view-record', 'update-question-id', 'update-question', 'update-exam-id', 'toast']);
 
 const OBJECTIVE_TYPES = [1, 2, 3, 4];
 
@@ -518,6 +518,7 @@ const loadExam = async () => {
     if (data.questions.length > 0) {
       activeQuestionId.value = data.questions[0].id;
       emit('update-question-id', data.questions[0].id);
+      emit('update-question', data.questions[0]);
       emit('update-exam-id', props.examId);
     }
     const restored = restoreDraft(data);
@@ -559,6 +560,7 @@ const handleSubmit = async () => {
     phase.value = 'result';
     if (timer) clearInterval(timer);
     emit('update-question-id', null);
+    emit('update-question', null);
     emit('update-exam-id', null);
     localStorage.removeItem(draftKey());
     draftSaved.value = false;
@@ -575,6 +577,7 @@ const handleExit = () => {
     if (!window.confirm('答题进度已保存，确定退出吗？')) return;
   }
   emit('update-question-id', null);
+  emit('update-question', null);
   emit('update-exam-id', null);
   emit('exit');
 };

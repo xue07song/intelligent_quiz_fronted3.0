@@ -147,6 +147,7 @@ import { getExams, getExam } from '@/api/practice';
 import { getTypeName, getDifficultyLabel } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
+import ExamExportDialog from '@/components/ExamExportDialog.vue';
 
 const props = defineProps({
   role: { type: String, default: 'student' },
