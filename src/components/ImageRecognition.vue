@@ -167,12 +167,18 @@
 import { ref, computed, watch } from 'vue';
 import { TYPE_OPTIONS, DIFFICULTY_OPTIONS } from '@/utils/constants';
 import { getSubjects } from '@/api/subject';
-import { recognizeQuestionImage, importRecognizedQuestions } from '@/api/formatRecognition';
+import {
+  recognizeQuestionImage,
+  importRecognizedQuestions,
+  recognizeStudentQuestionImage,
+  importStudentRecognizedQuestions,
+} from '@/api/formatRecognition';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   role: { type: String, default: '' },
   subjects: { type: Array, default: () => [] },
+  bank: { type: String, default: 'teacher' },
 });
 
 const emit = defineEmits(['close', 'success']);
@@ -194,6 +200,7 @@ const subjectOptions = computed(() => {
 });
 
 const selectedCount = computed(() => questions.value.filter((q) => q._selected).length);
+const isStudentBank = computed(() => props.bank === 'student');
 
 watch(
   () => props.visible,
@@ -270,14 +277,16 @@ const handleRecognize = async () => {
     errorMsg.value = '请先选择一张题目图片';
     return;
   }
-  if (!selectedSubject.value) {
+  if (!isStudentBank.value && !selectedSubject.value) {
     errorMsg.value = '请先选择导入科目';
     return;
   }
   recognizing.value = true;
   errorMsg.value = '';
   try {
-    const data = await recognizeQuestionImage(file.value);
+    const data = isStudentBank.value
+      ? await recognizeStudentQuestionImage(file.value)
+      : await recognizeQuestionImage(file.value);
     questions.value = (data.questions || []).map((q) => ({ ...q, _selected: true }));
     if (!questions.value.length) {
       errorMsg.value = data.rawText || '图片中未识别到有效题目';
@@ -302,7 +311,9 @@ const handleImport = async () => {
   importing.value = true;
   errorMsg.value = '';
   try {
-    const data = await importRecognizedQuestions(selected, selectedSubject.value);
+    const data = isStudentBank.value
+      ? await importStudentRecognizedQuestions(selected)
+      : await importRecognizedQuestions(selected, selectedSubject.value);
     emit('success', data);
   } catch (err) {
     errorMsg.value = err.message || '导入失败，请稍后重试';

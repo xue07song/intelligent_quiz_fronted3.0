@@ -48,7 +48,7 @@
         <div ref="messageListRef" class="ai-messages">
           <div v-if="messages.length === 0" class="ai-welcome">
             <p>你好，我是智能助手 👋</p>
-            <p>可以问我怎么开始做题、错题本/自适应练习/学习分析在哪，也可以帮你组卷、找同类题或浓缩错题。</p>
+            <p>可以问我怎么开始做题、错题本/我的题库/学习分析在哪，也可以帮你组卷、找同类题或浓缩错题。</p>
           </div>
           <div
             v-for="(msg, index) in messages"
@@ -134,6 +134,7 @@
             <button class="ai-quick-btn" @click="sendQuick('错题本在哪？')">错题本在哪？</button>
             <button class="ai-quick-btn" @click="sendQuick('自适应练习在哪？')">自适应练习在哪？</button>
             <button class="ai-quick-btn" @click="sendQuick('学习分析在哪？')">学习分析在哪？</button>
+            <button class="ai-quick-btn" @click="sendQuick('我的题库在哪？')">我的题库在哪？</button>
             <button class="ai-quick-btn" @click="toggleExamForm">生成一套试卷</button>
             <button class="ai-quick-btn" @click="sendQuick('帮我浓缩错题')">帮我浓缩错题</button>
           </div>
@@ -324,6 +325,14 @@ const CONTEXT_META = {
     actions: [
       { key: 'smart-exam', label: '生成练习卷' },
       { key: 'weakness', label: '分析薄弱点' },
+    ],
+  },
+  'student-bank': {
+    tip: '我的题库：管理题目、共享好题到同专业社区',
+    actions: [
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'smart-exam', label: '生成练习卷' },
+      { key: 'learning-analysis', label: '学习分析' },
     ],
   },
   main: {

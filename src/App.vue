@@ -52,6 +52,9 @@
         <button v-if="currentUser.role === 'student'" class="iq-nav-item" :class="{ active: currentView === 'practice' && practiceView === 'adaptive-progress' }" @click="openPracticeView('adaptive-progress')">
           <span class="iq-nav-symbol">✓</span>我的自适应成果
         </button>
+        <button v-if="currentUser.role === 'student'" class="iq-nav-item" :class="{ active: currentView === 'student-bank' }" @click="currentView = 'student-bank'; sidebarOpen = false">
+          <span class="iq-nav-symbol">📚</span>我的题库
+        </button>
         <button class="iq-nav-item" :class="{ active: currentView === 'practice' && practiceView === 'learning-analysis' }" @click="openPracticeView('learning-analysis')">
           <span class="iq-nav-symbol">▥</span>{{ currentUser.role === 'student' ? '我的学习分析' : '学生个性化分析' }}
         </button>
@@ -156,6 +159,12 @@
           </div>
         </div>
 
+        <div v-if="currentUser.role === 'admin'" class="iq-bank-tabs">
+          <button :class="{ active: bankTab === 'teacher' }" @click="bankTab = 'teacher'">教师题库</button>
+          <button :class="{ active: bankTab === 'student' }" @click="bankTab = 'student'">学生题库</button>
+        </div>
+
+        <template v-if="bankTab === 'teacher'">
         <div v-if="stats" class="iq-stat-grid">
           <div class="iq-card iq-stat-card">
             <div class="iq-stat-label">题库总量</div>
@@ -198,7 +207,16 @@
           :total="total"
           @change="handlePageChange"
         />
+        </template>
+        <StudentQuestionAdmin v-else @toast="handleToastFromChild" />
       </template>
+
+      <!-- 学生题库视图 -->
+      <StudentQuestionBank
+        v-if="currentView === 'student-bank' && currentUser.role === 'student'"
+        :user="currentUser"
+        @toast="handleToastFromChild"
+      />
 
       <!-- 用户管理视图 -->
       <template v-if="currentView === 'users' && currentUser.role === 'admin'">
@@ -436,6 +454,8 @@ import AIAssistant from '@/components/AIAssistant.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
 import ImageRecognition from '@/components/ImageRecognition.vue';
 import AiGenerate from '@/components/AiGenerate.vue';
+import StudentQuestionBank from '@/components/StudentQuestionBank.vue';
+import StudentQuestionAdmin from '@/components/StudentQuestionAdmin.vue';
 import Feedback from '@/components/Feedback.vue';
 import Profile from '@/components/Profile.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
@@ -534,6 +554,7 @@ const currentBreadcrumb = computed(() => {
   if (currentView.value === 'audit') return '注册审核';
   if (currentView.value === 'feedback') return '用户反馈';
   if (currentView.value === 'profile') return '个人中心';
+  if (currentView.value === 'student-bank') return '我的题库';
   if (currentView.value === 'practice') {
     const map = {
       exams: '试卷列表',
@@ -655,6 +676,7 @@ const selectedIds = ref([]);
 const importVisible = ref(false);
 const ocrVisible = ref(false);
 const aiVisible = ref(false);
+const bankTab = ref('teacher');
 
 // ===== 题库管理 =====
 const list = ref([]);
@@ -957,5 +979,28 @@ onUnmounted(() => {
   text-align: center;
   border-radius: 10px;
   margin-left: 4px;
+}
+
+.iq-bank-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.iq-bank-tabs button {
+  border: 1px solid var(--iq-border);
+  background: #fff;
+  color: var(--iq-neutral-600);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.iq-bank-tabs button.active {
+  background: var(--iq-primary-50);
+  border-color: var(--iq-primary-500);
+  color: var(--iq-primary-700);
+  font-weight: 600;
 }
 </style>
