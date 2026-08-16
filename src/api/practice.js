@@ -40,6 +40,15 @@ export const getExam = (id) => {
   return request.get(`/practice/exams/${id}`);
 };
 
+// 导出试卷：docx / xlsx，可带答案与解析
+export const exportExam = (id, params) => {
+  return request.get(`/practice/exams/${id}/export`, {
+    params,
+    responseType: 'blob',
+    timeout: 60000,
+  });
+};
+
 // 提交答卷（自动评分）
 // body: { answers: [{ questionId, userAnswer }], startedAt }
 export const submitExam = (id, data) => {

@@ -141,7 +141,7 @@
     </section>
 
     <section v-if="result" class="iq-card section-card result-card">
-      <div class="result-head"><div><h3>{{ aiResult ? 'AI 辅助组卷成功' : '智能组卷成功' }}</h3><p>{{ result.title }} · 共 {{ result.total }} 题 · 客观题 {{ result.objectiveCount }} 题</p></div><div class="result-actions"><button v-if="!aiResult" class="iq-btn iq-btn-secondary" :disabled="loading" @click="handleRegenerate">{{ loading ? '正在重新生成...' : '条件不变，换一套题' }}</button><button class="iq-btn iq-btn-primary" @click="emit('start-exam', result.examId)">开始答题</button></div></div>
+      <div class="result-head"><div><h3>{{ aiResult ? 'AI 辅助组卷成功' : '智能组卷成功' }}</h3><p>{{ result.title }} · 共 {{ result.total }} 题 · 客观题 {{ result.objectiveCount }} 题</p></div><div class="result-actions"><button v-if="!aiResult" class="iq-btn iq-btn-secondary" :disabled="loading" @click="handleRegenerate">{{ loading ? '正在重新生成...' : '条件不变，换一套题' }}</button><button v-if="result.examId" class="iq-btn iq-btn-secondary" @click="exportVisible = true">导出试卷</button><button class="iq-btn iq-btn-primary" @click="emit('start-exam', result.examId)">开始答题</button></div></div>
       <div v-if="!aiResult" class="info-note">如果对本次题目不满意，可以按相同章节、题型、难度和知识点要求重新抽取；新试卷会保留在试卷列表中。</div>
       <template v-if="result.report">
         <div class="report-grid">
@@ -154,6 +154,14 @@
       </template>
       <div v-else-if="result.strategy" class="strategy-note">{{ result.strategy }}</div>
     </section>
+
+    <ExamExportDialog
+      :visible="exportVisible"
+      :exam-id="result?.examId || null"
+      :title="result?.title || ''"
+      @close="exportVisible = false"
+      @toast="(e) => emit('toast', e)"
+    />
   </div>
 </template>
 
@@ -163,10 +171,9 @@ import { generateRuleExam, getExamInventory, previewRuleExam } from '@/api/pract
 import { smartExam } from '@/api/ai';
 
 import { TYPE_OPTIONS, getChapterLabel, getChapterName } from '@/utils/constants';
-=======
-import { TYPE_OPTIONS } from '@/utils/constants';
 import { getSubjects } from '@/api/subject';
 import { getClasses } from '@/api/class';
+import ExamExportDialog from '@/components/ExamExportDialog.vue';
 
 
 const props = defineProps({
@@ -197,6 +204,7 @@ const paperPresets = [
 ];
 const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classId: '' });
 const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), result = ref(null), aiResult = ref(false), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref('standard'), activePaperPreset = ref('standard'), activePaperVariant = ref('standard-balanced');
+const exportVisible = ref(false);
 const allSubjects = ref([]);
 const classList = ref([]);
 const chapterTotals = {1:43,2:40,3:40,4:29,5:30,6:35,7:37,8:44,9:40,10:37};

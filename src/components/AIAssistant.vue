@@ -1,7 +1,21 @@
 <template>
   <div class="ai-assistant">
-    <div v-if="hintVisible && !open" class="ai-hint" @click="hintVisible = false">
-      有问题？点我试试 👋
+    <div v-if="!open">
+      <div v-if="contextTip" class="ai-context-chip" @click="toggleOpen">
+        <span class="ai-chip-dot"></span>
+        <span>{{ contextTip }}</span>
+      </div>
+
+      <div class="ai-ball-actions">
+        <button
+          v-for="action in contextActions"
+          :key="action.key"
+          class="ai-ball-action"
+          @click="openAndRun(action.key)"
+        >
+          {{ action.label }}
+        </button>
+      </div>
     </div>
 
     <button
@@ -34,7 +48,7 @@
         <div ref="messageListRef" class="ai-messages">
           <div v-if="messages.length === 0" class="ai-welcome">
             <p>你好，我是智能助手 👋</p>
-            <p>可以问我怎么开始做题、错题本在哪，也可以帮你组卷、找同类题或浓缩错题。</p>
+            <p>可以问我怎么开始做题、错题本/自适应练习/学习分析在哪，也可以帮你组卷、找同类题或浓缩错题。</p>
           </div>
           <div
             v-for="(msg, index) in messages"
@@ -58,6 +72,22 @@
                 <div v-if="q.选项" class="ai-similar-options">{{ q.选项 }}</div>
               </div>
               <button v-if="msg.data?.examId" class="ai-action-btn" @click="$emit('start-exam', msg.data.examId)">去练习</button>
+            </div>
+
+            <div v-else-if="msg.type === 'weakness' && msg.data" class="ai-weakness">
+              <div class="ai-weak-summary">{{ msg.data.analysis?.summary || '这是你的学习分析结果' }}</div>
+              <div v-for="w in msg.data.analysis?.weakPoints || []" :key="w.知识点" class="ai-weak-point">
+                <b>{{ w.知识点 }}</b><span v-if="w.章节"> · 第{{ w.章节 }}章</span>
+                <p>{{ w.建议 || w.原因 || '' }}</p>
+              </div>
+              <div v-if="msg.data.analysis?.studyPlan?.length" class="ai-plan">
+                <b>建议计划</b>
+                <span v-for="(item, i) in msg.data.analysis.studyPlan" :key="i">{{ i + 1 }}. {{ item }}</span>
+              </div>
+              <div class="ai-actions">
+                <button class="ai-action-btn" @click="navigateTo('learning-analysis')">查看学习分析</button>
+                <button class="ai-action-btn" @click="generateSmartExam()">生成专项练习</button>
+              </div>
             </div>
           </div>
 
@@ -102,8 +132,22 @@
           <div class="ai-quick-row">
             <button class="ai-quick-btn" @click="sendQuick('怎么开始做题？')">怎么开始做题？</button>
             <button class="ai-quick-btn" @click="sendQuick('错题本在哪？')">错题本在哪？</button>
+            <button class="ai-quick-btn" @click="sendQuick('自适应练习在哪？')">自适应练习在哪？</button>
+            <button class="ai-quick-btn" @click="sendQuick('学习分析在哪？')">学习分析在哪？</button>
             <button class="ai-quick-btn" @click="toggleExamForm">生成一套试卷</button>
             <button class="ai-quick-btn" @click="sendQuick('帮我浓缩错题')">帮我浓缩错题</button>
+          </div>
+
+          <div class="ai-context-actions">
+            <span class="ai-context-label">当前场景</span>
+            <button
+              v-for="action in contextActions"
+              :key="action.key"
+              class="ai-context-action"
+              @click="runAction(action.key)"
+            >
+              {{ action.label }}
+            </button>
           </div>
 
           <div class="ai-input-row">
@@ -130,6 +174,8 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import request from '@/utils/request';
 import { TYPE_OPTIONS, DIFFICULTY_OPTIONS, getTypeName } from '@/utils/constants';
+import { askTutor as askTutorApi, getWeakness, smartExam } from '@/api/ai';
+import { createWrongExam } from '@/api/practice';
 
 const emit = defineEmits(['start-exam']);
 
@@ -137,6 +183,7 @@ const assistantState = inject('assistantState', {
   currentView: ref('practice'),
   practiceView: ref('exams'),
   currentQuestionId: ref(null),
+  currentQuestion: ref(null),
   currentExamId: ref(null),
   currentUser: ref(null),
 });
@@ -144,6 +191,7 @@ const assistantState = inject('assistantState', {
 const currentView = assistantState.currentView;
 const practiceView = assistantState.practiceView;
 const currentQuestionId = assistantState.currentQuestionId;
+const currentQuestion = assistantState.currentQuestion;
 const currentExamId = assistantState.currentExamId;
 const currentUser = assistantState.currentUser;
 
@@ -170,6 +218,134 @@ const currentPage = computed(() => {
   }
   return currentView.value;
 });
+
+const contextMode = computed(() => {
+  if (currentView.value !== 'practice') return currentView.value;
+  const p = practiceView.value;
+  return p === 'practice' ? 'exam' : p;
+});
+
+const CONTEXT_META = {
+  exam: {
+    tip: '这题不会？点我看思路',
+    actions: [
+      { key: 'hint', label: '看思路' },
+      { key: 'similar', label: '找同类题' },
+      { key: 'smart-exam', label: '生成练习卷' },
+    ],
+  },
+  'wrong-book': {
+    tip: '错题已自动收录，可以一键重练',
+    actions: [
+      { key: 'wrong-exam', label: '错题重练' },
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'learning-analysis', label: '学习分析' },
+    ],
+  },
+  stats: {
+    tip: '「我的统计」已生成，可以复盘薄弱环节和进步趋势',
+    actions: [
+      { key: 'weakness', label: 'AI 薄弱点分析' },
+      { key: 'learning-analysis', label: '学习分析' },
+      { key: 'wrong-exam', label: '错题重练' },
+    ],
+  },
+  records: {
+    tip: '「我的答题记录」已生成，可以复盘薄弱点',
+    actions: [
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'learning-analysis', label: '学习分析' },
+      { key: 'smart-exam', label: '生成练习卷' },
+    ],
+  },
+  'record-detail': {
+    tip: '逐题看看当时的作答，发现规律',
+    actions: [
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'wrong-exam', label: '错题重练' },
+      { key: 'learning-analysis', label: '学习分析' },
+    ],
+  },
+  adaptive: {
+    tip: '自适应练习中，可以让 AI 帮你分析薄弱点',
+    actions: [
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'smart-exam', label: '生成练习卷' },
+      { key: 'learning-analysis', label: '学习分析' },
+    ],
+  },
+  'adaptive-progress': {
+    tip: '「我的自适应成果」已生成，继续向上挑战',
+    actions: [
+      { key: 'adaptive', label: '继续自适应练习' },
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'smart-exam', label: '生成练习卷' },
+    ],
+  },
+  'learning-analysis': {
+    tip: '「我的学习分析」已生成，建议先看薄弱点',
+    actions: [
+      { key: 'weakness', label: 'AI 薄弱点分析' },
+      { key: 'smart-exam', label: '生成专项练习' },
+      { key: 'wrong-exam', label: '错题重练' },
+    ],
+  },
+  'adaptive-overview': {
+    tip: '从「自适应学情」总览中发现需要关注的班级',
+    actions: [
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'smart-exam', label: '生成练习卷' },
+    ],
+  },
+  exams: {
+    tip: '「试卷列表」已就绪，可以按薄弱点生成练习',
+    actions: [
+      { key: 'smart-exam', label: 'AI 智能组卷' },
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'wrong-exam', label: '错题重练' },
+    ],
+  },
+  generate: {
+    tip: '「智能组卷」可以按章节、题型、难度出题',
+    actions: [
+      { key: 'smart-exam', label: 'AI 智能组卷' },
+      { key: 'weakness', label: '分析薄弱点' },
+    ],
+  },
+  profile: {
+    tip: '「个人中心」可以查看历史题目、试卷和收藏',
+    actions: [
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'learning-analysis', label: '学习分析' },
+    ],
+  },
+  feedback: {
+    tip: '有问题或建议？可以直接在这里反馈',
+    actions: [
+      { key: 'smart-exam', label: '生成练习卷' },
+      { key: 'weakness', label: '分析薄弱点' },
+    ],
+  },
+  main: {
+    tip: '需要帮忙？告诉我你想练习什么',
+    actions: [
+      { key: 'smart-exam', label: '生成练习卷' },
+      { key: 'weakness', label: '分析薄弱点' },
+      { key: 'learning-analysis', label: '学习分析' },
+    ],
+  },
+  default: {
+    tip: '有问题？点我试试',
+    actions: [
+      { key: 'smart-exam', label: '生成练习卷' },
+      { key: 'weakness', label: '分析薄弱点' },
+    ],
+  },
+};
+
+const contextMeta = computed(() => CONTEXT_META[contextMode.value] || CONTEXT_META.default);
+const contextTip = computed(() => contextMeta.value.tip);
+const contextActions = computed(() => contextMeta.value.actions || []);
 
 const ballStyle = computed(() => {
   const style = {};
@@ -272,6 +448,124 @@ const sendMessage = async (text = inputText.value, examOptions = null) => {
   }
 };
 
+const pushUser = (text) => {
+  messages.value.push({ role: 'user', content: text });
+  inputText.value = '';
+  scrollToBottom();
+};
+
+const pushAssistant = (msg) => {
+  messages.value.push({ role: 'assistant', ...msg });
+  scrollToBottom();
+};
+
+const openAndRun = (key) => {
+  open.value = true;
+  hintVisible.value = false;
+  scrollToBottom();
+  runAction(key);
+};
+
+const navigateTo = (view) => {
+  currentView.value = 'practice';
+  practiceView.value = view;
+  closePanel();
+};
+
+const askCurrentQuestion = async () => {
+  const q = currentQuestion?.value;
+  if (!q) {
+    pushUser('这道题怎么做？');
+    pushAssistant({ type: 'text', content: '请先进入答题页并选中一道题，我才能结合题目给你思路。' });
+    return;
+  }
+  pushUser('这道题怎么做？给我一点思路');
+  sending.value = true;
+  try {
+    const data = await askTutorApi({
+      question: q.题目,
+      options: q.选项 || '',
+      questionType: Number(q.题型),
+      userQuestion: '请给我解题思路和关键提示，不要直接给答案。',
+      userAnswer: '',
+    });
+    pushAssistant({ type: 'text', content: data.reply || '（AI 未返回内容）' });
+  } catch (err) {
+    pushAssistant({ type: 'text', content: err.message || 'AI 调用失败，请稍后再试。' });
+  } finally {
+    sending.value = false;
+  }
+};
+
+const generateSmartExam = async () => {
+  if (sending.value) return;
+  pushUser('按我的薄弱点生成一套练习卷');
+  sending.value = true;
+  try {
+    const data = await smartExam({ count: 10, focusWeakPoints: true });
+    pushAssistant({
+      type: 'exam',
+      content: `已根据你的近期表现生成《${data.title}》，共 ${data.total} 题。`,
+      data: { examId: data.examId, total: data.total, title: data.title },
+    });
+  } catch (err) {
+    pushAssistant({ type: 'text', content: err.message || '智能组卷失败，请稍后再试。' });
+  } finally {
+    sending.value = false;
+  }
+};
+
+const analyzeWeakness = async () => {
+  if (sending.value) return;
+  pushUser('帮我分析一下我的薄弱点');
+  sending.value = true;
+  try {
+    const data = await getWeakness();
+    if (!data.hasData) {
+      pushAssistant({ type: 'text', content: data.message || '暂无答题记录，先做一套练习吧。' });
+    } else {
+      pushAssistant({ type: 'weakness', data });
+    }
+  } catch (err) {
+    pushAssistant({ type: 'text', content: err.message || '薄弱点分析失败，请稍后再试。' });
+  } finally {
+    sending.value = false;
+  }
+};
+
+const startWrongExam = async () => {
+  if (sending.value) return;
+  pushUser('用我的错题生成一套重练卷');
+  sending.value = true;
+  try {
+    const data = await createWrongExam({ count: 10 });
+    pushAssistant({
+      type: 'exam',
+      content: `已为你生成《${data.title}》，共 ${data.total} 题。`,
+      data: { examId: data.examId, total: data.total, title: data.title },
+    });
+  } catch (err) {
+    pushAssistant({ type: 'text', content: err.message || '错题重练生成失败，请稍后再试。' });
+  } finally {
+    sending.value = false;
+  }
+};
+
+const runAction = (key) => {
+  if (key === 'hint') return askCurrentQuestion();
+  if (key === 'similar') return sendMessage('帮我找同类题');
+  if (key === 'smart-exam') return generateSmartExam();
+  if (key === 'weakness') return analyzeWeakness();
+  if (key === 'wrong-exam') return startWrongExam();
+  if (key === 'adaptive') return navigateTo('adaptive');
+  if (key === 'adaptive-progress') return navigateTo('adaptive-progress');
+  if (key === 'learning-analysis') return navigateTo('learning-analysis');
+  if (key === 'records') return navigateTo('records');
+  if (key === 'stats') return navigateTo('stats');
+  if (key === 'wrong-book') return navigateTo('wrong-book');
+  return Promise.resolve();
+};
+
 const startDrag = (event) => {
   if (event.pointerType !== 'mouse') return;
   const panel = event.currentTarget.closest('.ai-panel');
@@ -314,6 +608,144 @@ onMounted(() => {
 <style scoped>
 .ai-assistant {
   position: relative;
+}
+.ai-context-chip {
+  position: fixed;
+  right: 88px;
+  bottom: calc(34px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 240px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.25);
+  color: #334155;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 999;
+}
+.ai-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6366f1;
+  flex: 0 0 auto;
+}
+.ai-ball-actions {
+  position: fixed;
+  right: 20px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 999;
+}
+.ai-assistant:hover .ai-ball-actions {
+  display: flex;
+}
+.ai-ball-action {
+  padding: 7px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 20px -10px rgba(15, 23, 42, 0.25);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-ball-action:hover {
+  color: #4338ca;
+  border-color: #a5b4fc;
+  background: #eef2ff;
+}
+.ai-context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: #eef2ff;
+  border: 1px solid #e0e7ff;
+  border-radius: 10px;
+}
+.ai-context-label {
+  font-size: 11px;
+  color: #6366f1;
+  font-weight: 700;
+  margin-right: 2px;
+}
+.ai-context-action {
+  padding: 5px 10px;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #fff;
+  color: #4338ca;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ai-context-action:hover {
+  background: #e0e7ff;
+}
+.ai-weakness {
+  width: 100%;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ai-weak-summary {
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.ai-weak-point {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.ai-weak-point b {
+  color: #1e293b;
+  font-size: 13px;
+}
+.ai-weak-point span {
+  color: #64748b;
+  font-size: 12px;
+}
+.ai-weak-point p {
+  margin: 6px 0 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.ai-plan {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+.ai-plan b {
+  font-size: 12px;
+  color: #334155;
+}
+.ai-plan span {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
 }
 .ai-ball {
   position: fixed;
@@ -661,6 +1093,15 @@ onMounted(() => {
   .ai-ball {
     right: 12px;
     bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+  .ai-context-chip {
+    right: 76px;
+    bottom: calc(22px + env(safe-area-inset-bottom));
+    max-width: 190px;
+  }
+  .ai-ball-actions {
+    right: 12px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
   }
   .ai-hint {
     right: 78px;

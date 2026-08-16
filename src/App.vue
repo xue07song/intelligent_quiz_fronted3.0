@@ -148,6 +148,7 @@
           <h1>题库管理</h1>
           <div v-if="canEdit" class="iq-page-actions">
             <button class="iq-btn iq-btn-secondary" @click="aiVisible = true">🤖 AI 出题</button>
+            <button class="iq-btn iq-btn-secondary" @click="ocrVisible = true">🖼 图片识别</button>
             <button class="iq-btn iq-btn-secondary" @click="importVisible = true">📥 批量导入</button>
             <button class="iq-btn iq-btn-primary" @click="openAddDialog">+ 新增题目</button>
           </div>
@@ -317,6 +318,7 @@
           @exit="exitExam"
           @view-record="viewRecord"
           @update-question-id="currentQuestionId = $event"
+          @update-question="currentQuestion = $event"
           @update-exam-id="currentExamId = $event"
           @toast="handleToastFromChild"
         />
@@ -382,6 +384,14 @@
       @success="handleImportSuccess"
     />
 
+    <ImageRecognition
+      :visible="ocrVisible"
+      :role="currentUser.role"
+      :subjects="currentUser.subjects || []"
+      @close="ocrVisible = false"
+      @success="handleOcrSuccess"
+    />
+
     <AiGenerate
       :visible="aiVisible"
       @close="aiVisible = false"
@@ -421,6 +431,7 @@ import RegistrationAudit from '@/components/RegistrationAudit.vue';
 import ChangePassword from '@/components/ChangePassword.vue';
 import AIAssistant from '@/components/AIAssistant.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
+import ImageRecognition from '@/components/ImageRecognition.vue';
 import AiGenerate from '@/components/AiGenerate.vue';
 import Feedback from '@/components/Feedback.vue';
 import Profile from '@/components/Profile.vue';
@@ -452,6 +463,7 @@ const pwdVisible = ref(false);
 // ===== 答题练习 =====
 const practiceView = ref('exams');
 const currentQuestionId = ref(null);
+const currentQuestion = ref(null);
 const currentExamId = ref(null);
 const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview'];
 const activeExamId = ref(null);
@@ -482,6 +494,7 @@ provide('assistantState', {
   currentView,
   practiceView,
   currentQuestionId,
+  currentQuestion,
   currentExamId,
   currentUser,
 });
@@ -638,6 +651,7 @@ const handleAuthExpired = () => {
 // ===== 批量操作 =====
 const selectedIds = ref([]);
 const importVisible = ref(false);
+const ocrVisible = ref(false);
 const aiVisible = ref(false);
 
 // ===== 题库管理 =====
@@ -693,6 +707,21 @@ const handleImportSuccess = (result) => {
   } else {
     showToast(msg, 'success');
   }
+};
+
+const handleOcrSuccess = (result) => {
+  const { inserted = 0, skipped = 0, invalid = 0 } = result || {};
+  const msg = `图片识别导入完成：成功 ${inserted} 条，跳过 ${skipped} 条，无效 ${invalid} 条`;
+  if (inserted > 0) {
+    loadData();
+    loadStats();
+  }
+  if (invalid > 0 || skipped > 0) {
+    showToast(msg, 'warning');
+  } else {
+    showToast(msg, 'success');
+  }
+  ocrVisible.value = false;
 };
 
 const handleAiSuccess = (result) => {
