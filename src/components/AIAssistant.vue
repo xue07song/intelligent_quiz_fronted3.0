@@ -328,7 +328,7 @@ const CONTEXT_META = {
     ],
   },
   'student-bank': {
-    tip: '我的题库：管理题目、共享好题到同专业社区',
+    tip: '我的题库：管理题目、共享好题到同学院社区',
     actions: [
       { key: 'weakness', label: '分析薄弱点' },
       { key: 'smart-exam', label: '生成练习卷' },

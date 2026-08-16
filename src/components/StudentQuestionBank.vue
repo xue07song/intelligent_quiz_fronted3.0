@@ -18,12 +18,13 @@
       <button :class="{ active: activeTab === 'review' }" @click="activeTab = 'review'">审核队列</button>
     </div>
 
+    <datalist id="student-subject-options">
+      <option v-for="s in subjectOptions" :key="s" :value="s"></option>
+    </datalist>
+
     <div class="iq-card bank-filters">
       <input v-model="filters.keyword" class="iq-input" placeholder="搜索题干 / 知识点" @keyup.enter="page = 1; load()" />
-      <select v-model="filters.subject" class="iq-select" @change="page = 1; load()">
-        <option value="">全部科目</option>
-        <option v-for="s in subjectOptions" :key="s" :value="s">{{ s }}</option>
-      </select>
+      <input v-model="filters.subject" class="iq-input" list="student-subject-options" placeholder="全部科目（可手动输入）" @keyup.enter="page = 1; load()" />
       <select v-if="activeTab === 'own'" v-model="filters.status" class="iq-select" @change="page = 1; load()">
         <option value="">全部状态</option>
         <option value="private">私密</option>
@@ -37,7 +38,7 @@
     <div class="iq-card">
       <div v-if="loading" class="bank-loading">加载中...</div>
       <div v-else-if="!list.length" class="bank-empty">
-        {{ activeTab === 'own' ? '还没有题目，可以用图片识别导入或手动新增' : '同专业暂时还没有已公开的题目' }}
+        {{ activeTab === 'own' ? '还没有题目，可以用图片识别导入或手动新增' : '同学院暂时还没有已公开的题目' }}
       </div>
       <div v-else class="bank-table-wrap">
         <table class="iq-table">
@@ -111,10 +112,7 @@
               </div>
               <div class="form-field">
                 <label class="form-label">科目（可选）</label>
-                <select v-model="form.科目" class="iq-select">
-                  <option value="">不限科目</option>
-                  <option v-for="s in subjectOptions" :key="s" :value="s">{{ s }}</option>
-                </select>
+                <input v-model="form.科目" type="text" class="iq-input" list="student-subject-options" placeholder="可手动输入或选择科目" />
               </div>
               <div class="form-field">
                 <label class="form-label">题目 <span class="required">*</span></label>
@@ -140,7 +138,7 @@
               </div>
               <label class="share-check">
                 <input type="checkbox" v-model="form.share" />
-                <span>同时申请共享到同专业社区（需版主/管理员审核）</span>
+                <span>同时申请共享到同学院社区（需版主/管理员审核）</span>
               </label>
               <div v-if="formError" class="form-error">{{ formError }}</div>
             </div>
@@ -295,14 +293,14 @@ const statusText = (status) => ({
 
 const tabTitle = computed(() => ({
   own: '我的题库',
-  community: '同专业社区',
+  community: '同学院社区',
   review: '审核队列',
 }[activeTab.value] || '学生题库'));
 
 const tabDescription = computed(() => ({
-  own: '管理自己收集和导入的题目，可共享到同专业社区',
-  community: '浏览同专业同学分享并通过审核的题目',
-  review: '审核同专业同学提交的共享题目（仅学生版主可见）',
+  own: '管理自己收集和导入的题目，可共享到同学院社区',
+  community: '浏览同学院同学分享并通过审核的题目',
+  review: '审核同学院同学提交的共享题目（仅学生版主可见）',
 }[activeTab.value] || ''));
 
 const load = async () => {
@@ -413,7 +411,7 @@ const handleDelete = async (item) => {
 };
 
 const handleShare = async (item) => {
-  if (!window.confirm('确定提交到同专业社区审核吗？')) return;
+  if (!window.confirm('确定提交到同学院社区审核吗？')) return;
   try {
     await shareStudentQuestion(item.id);
     emit('toast', { message: '已提交共享审核', type: 'success' });
@@ -465,7 +463,7 @@ const handleExport = async () => {
     });
     const suffix = exportFormat.value === 'xlsx' ? 'xlsx' : 'docx';
     const label = exportWithAnswers.value ? '含答案' : '不含答案';
-    const title = activeTab.value === 'community' ? '同专业共享题目' : '我的题库题目';
+    const title = activeTab.value === 'community' ? '同学院共享题目' : '我的题库题目';
     downloadBlob(blob, `${title}_${label}.${suffix}`);
     emit('toast', { message: '导出成功', type: 'success' });
     exportVisible.value = false;

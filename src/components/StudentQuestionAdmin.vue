@@ -3,7 +3,7 @@
     <div class="admin-head">
       <div>
         <h1>学生题库管理</h1>
-        <p>查看、审核和删除学生共享题目，并管理各专业的学生版主</p>
+        <p>查看、审核和删除学生共享题目，并管理各学院的学生版主</p>
       </div>
     </div>
 
@@ -21,7 +21,7 @@
           <option value="approved">已公开</option>
           <option value="rejected">未通过</option>
         </select>
-        <input v-model="filters.major" class="iq-input" placeholder="专业" @keyup.enter="page = 1; loadQuestions()" />
+        <input v-model="filters.college" class="iq-input" placeholder="学院" @keyup.enter="page = 1; loadQuestions()" />
         <input v-model="filters.keyword" class="iq-input" placeholder="搜索题干 / 知识点" @keyup.enter="page = 1; loadQuestions()" />
         <button class="iq-btn iq-btn-secondary iq-btn-sm" @click="resetFilters">重置</button>
       </div>
@@ -35,7 +35,7 @@
               <tr>
                 <th>ID</th>
                 <th>发布者</th>
-                <th>专业</th>
+                <th>学院</th>
                 <th>题型</th>
                 <th>题目</th>
                 <th>状态</th>
@@ -46,7 +46,7 @@
               <tr v-for="item in list" :key="item.id">
                 <td><span class="iq-id-chip">{{ item.id }}</span></td>
                 <td>{{ item.owner_nickname || item.owner_username || item.owner_id }}</td>
-                <td>{{ item.major || '-' }}</td>
+                <td>{{ item.college || '-' }}</td>
                 <td>{{ getTypeName(item.题型) }}</td>
                 <td class="q-cell">{{ item.题目 }}</td>
                 <td><span class="status-tag" :class="`status-${item.review_status}`">{{ statusText(item.review_status) }}</span></td>
@@ -65,20 +65,20 @@
 
     <template v-else>
       <div class="iq-card admin-filters">
-        <input v-model="moderatorKeyword" class="iq-input" placeholder="搜索用户名 / 昵称 / 专业" @keyup.enter="page = 1; loadModerators()" />
+        <input v-model="moderatorKeyword" class="iq-input" placeholder="搜索用户名 / 昵称 / 学院" @keyup.enter="page = 1; loadModerators()" />
         <button class="iq-btn iq-btn-secondary iq-btn-sm" @click="moderatorKeyword = ''; page = 1; loadModerators()">重置</button>
       </div>
 
       <div class="iq-card">
         <div class="moderator-add">
-          <div class="moderator-add-title"><b>添加学生版主</b><span>先搜索学生，再指定负责审核的专业</span></div>
+          <div class="moderator-add-title"><b>添加学生版主</b><span>先搜索学生，再指定负责审核的学院</span></div>
           <input v-model="studentKeyword" class="iq-input" placeholder="输入学生用户名 / 昵称搜索" @keyup.enter="searchStudents" />
           <button class="iq-btn iq-btn-secondary iq-btn-sm" :disabled="searching" @click="searchStudents">{{ searching ? '搜索中...' : '搜索' }}</button>
           <select v-if="studentOptions.length" v-model="selectedStudentId" class="iq-select">
             <option :value="null" disabled>请选择学生</option>
             <option v-for="s in studentOptions" :key="s.id" :value="s.id">{{ s.nickname || s.username }}（{{ s.username }}）</option>
           </select>
-          <input v-model="moderatorMajor" class="iq-input" placeholder="负责审核的专业，如 计算机科学与技术" />
+          <input v-model="moderatorCollege" class="iq-input" placeholder="负责审核的学院，如 计算机学院" />
           <button class="iq-btn iq-btn-primary iq-btn-sm" :disabled="addingModerator" @click="handleAddModerator">
             {{ addingModerator ? '添加中...' : '添加版主' }}
           </button>
@@ -94,7 +94,7 @@
               <tr>
                 <th>ID</th>
                 <th>学生</th>
-                <th>负责专业</th>
+                <th>负责学院</th>
                 <th>创建时间</th>
                 <th style="width: 90px;">操作</th>
               </tr>
@@ -103,7 +103,7 @@
               <tr v-for="m in moderators" :key="m.id">
                 <td><span class="iq-id-chip">{{ m.id }}</span></td>
                 <td>{{ m.nickname || m.username || m.user_id }}</td>
-                <td>{{ m.major }}</td>
+                <td>{{ m.college }}</td>
                 <td>{{ formatTime(m.created_at) }}</td>
                 <td><button class="iq-btn iq-btn-ghost iq-btn-sm danger" @click="handleRemoveModerator(m)">移除</button></td>
               </tr>
@@ -139,7 +139,7 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = ref(20);
 const loading = ref(false);
-const filters = reactive({ status: '', major: '', keyword: '' });
+const filters = reactive({ status: '', college: '', keyword: '' });
 
 const moderators = ref([]);
 const moderatorTotal = ref(0);
@@ -150,7 +150,7 @@ const moderatorKeyword = ref('');
 const studentKeyword = ref('');
 const studentOptions = ref([]);
 const selectedStudentId = ref(null);
-const moderatorMajor = ref('');
+const moderatorCollege = ref('');
 const searching = ref(false);
 const addingModerator = ref(false);
 
@@ -166,7 +166,7 @@ const loadQuestions = async () => {
   try {
     const params = { page: page.value, pageSize: pageSize.value };
     if (filters.status) params.status = filters.status;
-    if (filters.major) params.major = filters.major;
+    if (filters.college) params.college = filters.college;
     if (filters.keyword) params.keyword = filters.keyword;
     const data = await adminListStudentQuestions(params);
     list.value = data.list;
@@ -180,7 +180,7 @@ const loadQuestions = async () => {
 
 const resetFilters = () => {
   filters.status = '';
-  filters.major = '';
+  filters.college = '';
   filters.keyword = '';
   page.value = 1;
   loadQuestions();
@@ -248,17 +248,17 @@ const searchStudents = async () => {
 };
 
 const handleAddModerator = async () => {
-  if (!selectedStudentId.value || !moderatorMajor.value.trim()) {
-    emit('toast', { message: '请先选择学生并填写专业', type: 'warning' });
+  if (!selectedStudentId.value || !moderatorCollege.value.trim()) {
+    emit('toast', { message: '请先选择学生并填写学院', type: 'warning' });
     return;
   }
   addingModerator.value = true;
   try {
-    await adminCreateModerator({ userId: selectedStudentId.value, major: moderatorMajor.value.trim() });
+    await adminCreateModerator({ userId: selectedStudentId.value, college: moderatorCollege.value.trim() });
     emit('toast', { message: '学生版主已添加', type: 'success' });
     studentOptions.value = [];
     selectedStudentId.value = null;
-    moderatorMajor.value = '';
+    moderatorCollege.value = '';
     studentKeyword.value = '';
     loadModerators();
   } catch (err) {
@@ -269,7 +269,7 @@ const handleAddModerator = async () => {
 };
 
 const handleRemoveModerator = async (moderator) => {
-  if (!window.confirm(`确定移除 ${moderator.nickname || moderator.username || moderator.user_id} 的「${moderator.major}」版主身份吗？`)) return;
+  if (!window.confirm(`确定移除 ${moderator.nickname || moderator.username || moderator.user_id} 的「${moderator.college}」版主身份吗？`)) return;
   try {
     await adminRemoveModerator(moderator.id);
     emit('toast', { message: '版主已移除', type: 'success' });
