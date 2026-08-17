@@ -1,21 +1,1302 @@
-<template><div class="learning-page learning-dashboard">
-  <header class="hero"><div><span>{{role==='student'?'个人学习中心':'教学数据中心'}}</span><h2>{{role==='student'?'我的学习分析':'学生个性化分析'}}</h2><p>{{role==='student'?'把试卷和自适应练习放在一起，找出真正掌握的内容和下一步练习方向。':'汇总每名学生的试卷与自适应练习，快速找到需要帮助的学生和共同薄弱点。'}}</p></div><button class="refresh" @click="load" :disabled="loading">刷新数据</button></header>
-  <div v-if="loading" class="iq-card loading">正在整理学习数据...</div>
-  <template v-else-if="role!=='student'&&!selectedId">
-    <section class="overview-cards three"><div><b>{{overview.students.length}}</b><span>学生人数</span></div><div><b>{{startedCount}}</b><span>已有练习数据</span></div><div><b>{{attentionCount}}</b><span>需要关注</span></div></section>
-    <section class="iq-card section"><div class="section-head"><div><h3>学生学习状态</h3><p>点击学生即可查看试卷、自适应练习、章节表现和具体建议。</p></div></div><div class="student-list"><button v-for="s in overview.students" :key="s.id" @click="openStudent(s.id)"><span class="avatar">{{(s.nickname||s.username).slice(0,1)}}</span><span class="student-name"><b>{{s.nickname||s.username}}</b><em :class="statusClass(s)">{{statusText(s)}}</em><small v-if="s.concernReasons?.length">{{s.concernReasons.join('；')}}</small></span><span class="source">试卷 {{s.coverage.examAnswers}} 题</span><span class="source">自适应 {{s.coverage.adaptiveAnswers}} 题</span><strong>{{s.answered?s.accuracy+'%':'未开始'}}</strong><span class="arrow">›</span></button></div></section>
-    <section class="iq-card section"><div class="section-head"><div><div class="explain-title"><h3>班级共同薄弱点</h3><span class="explain-trigger" tabindex="0">?<span class="weak-tooltip"><b>计算说明</b><p>综合正确率 = 参与学生在该知识点答对的题数 ÷ 完成的总题数。至少有2名学生练习过该知识点才会展示。</p></span></span></div><p>汇总多人共同练习过且正确率较低的知识点。</p></div><button v-if="role==='teacher'" class="primary" @click="$emit('navigate','generate')">进入智能组卷</button></div><div v-if="!overview.commonWeaknesses.length" class="empty">目前还没有足够的多人练习数据。</div><div class="weak-grid"><article v-for="x in overview.commonWeaknesses" :key="x.key"><div><b>{{x.key}}</b><span>{{x.students}}名学生练习 · 共{{x.answered}}题</span></div><strong :class="scoreClass(x.accuracy)">{{x.accuracy}}%</strong></article></div></section>
-  </template>
-  <template v-else-if="data"><button v-if="role!=='student'" class="back" @click="selectedId=null;data=null">← 返回学生列表</button>
-    <section class="student-summary compact-summary"><div><span>{{role==='student'?'本次学习画像':data.student.nickname||data.student.username}}</span><h2>{{summaryTitle}}</h2><p>{{summarySentence}}</p></div><div class="score-pill"><b>{{data.summary.accuracy}}%</b><span>综合正确率</span></div></section>
-    <section class="source-board"><div><span>普通试卷</span><b>{{data.coverage.examAnswers}}题</b></div><div><span>自适应练习</span><b>{{data.coverage.adaptiveAnswers}}题</b></div><div><span>最近10题</span><b>{{data.summary.recentAccuracy}}%</b></div><div><span>已重新掌握错题</span><b>{{data.summary.recovered}}题</b></div></section>
-    <section class="iq-card section"><div class="section-head"><div><h3>章节完成情况</h3><p>分别展示普通试卷和自适应练习在各章节完成了多少题、答对多少题。</p></div></div><div class="chapter-completion"><article v-for="x in data.chapters" :key="x.key"><header><b>{{chapterLabel(x.key)}}</b><strong>{{masteryText(x)}}</strong></header><div><section><span>普通试卷</span><b>{{x.examAnswered||0}}题</b><em>答对{{x.examCorrect||0}}题</em></section><section><span>自适应练习</span><b>{{x.adaptiveAnswered||0}}题</b><em>答对{{x.adaptiveCorrect||0}}题</em></section></div><small>本章合计完成{{x.answered}}题，答对{{x.correct}}题</small></article></div></section>
-    <div class="split"><section class="iq-card section"><div class="section-head"><div><h3>题型表现</h3><p>看清自己在哪类题上更稳定。</p></div></div><div class="type-list"><article v-for="x in data.types" :key="x.key"><span class="type-icon">{{typeIcon(x.key)}}</span><div><b>{{typeName(x.key)}}</b><span>完成{{x.answered}}题，答对{{x.correct}}题</span></div><strong :class="scoreClass(x.accuracy)">{{x.accuracy}}%</strong></article></div></section>
-      <section class="iq-card section"><div class="section-head"><div><h3>难度适应情况</h3><p>显示每个星级的题量、正确率和样本校正后的掌握状态。</p></div></div><div class="level-list"><article v-for="n in 5" :key="n"><b>{{'★'.repeat(n)}}</b><span>{{levelItem(n)?`${levelItem(n).answered}题 · 正确率${levelItem(n).accuracy}%`:'还没有练习记录'}}</span><em :class="levelItem(n)?scoreClass(levelItem(n).masteryScore):''">{{levelItem(n)?masteryText(levelItem(n)):'待尝试'}}</em></article></div></section></div>
-    <section class="iq-card section"><div class="section-head"><div><h3>每日学习趋势</h3><p>截至当天的累计正确率，单位为%；累计口径可减少单日题量较少造成的大幅波动。</p></div><div class="legend"><span class="exam-line">普通试卷</span><span class="adaptive-line">自适应练习</span></div></div><div v-if="data.dailyTrend.length" class="line-chart"><svg viewBox="0 0 760 250" preserveAspectRatio="none"><line v-for="n in 5" :key="n" x1="45" :y1="n*40" x2="740" :y2="n*40" class="grid-line"/><text x="4" y="44">100%</text><text x="12" y="124">50%</text><text x="21" y="204">0%</text><polyline :points="data.dailyTrend.map((d,i)=>d.examCumulative===null?'':(55+i*(670/Math.max(1,data.dailyTrend.length-1)))+','+(200-d.examCumulative*1.6)).filter(Boolean).join(' ')" class="exam-poly"/><polyline :points="data.dailyTrend.map((d,i)=>d.adaptiveCumulative===null?'':(55+i*(670/Math.max(1,data.dailyTrend.length-1)))+','+(200-d.adaptiveCumulative*1.6)).filter(Boolean).join(' ')" class="adaptive-poly"/><g v-for="(d,i) in data.dailyTrend" :key="d.date"><circle v-if="d.examCumulative!==null" :cx="55+i*(670/Math.max(1,data.dailyTrend.length-1))" :cy="200-d.examCumulative*1.6" r="5" class="exam-dot"><title>{{d.date}} 普通试卷累计{{d.examTotal}}题，累计正确率{{d.examCumulative}}%</title></circle><circle v-if="d.adaptiveCumulative!==null" :cx="55+i*(670/Math.max(1,data.dailyTrend.length-1))" :cy="200-d.adaptiveCumulative*1.6" r="5" class="adaptive-dot"><title>{{d.date}} 自适应累计{{d.adaptiveTotal}}题，累计正确率{{d.adaptiveCumulative}}%</title></circle><text :x="55+i*(670/Math.max(1,data.dailyTrend.length-1))" y="232" class="date-label">{{d.date.slice(5)}}</text></g></svg></div><div v-else class="empty">还没有可展示的每日练习趋势。</div><div class="trend-notes"><span><b>近期状态：</b>{{trendText}}，{{trendExplanation}}</span><span><b>知识保持：</b>{{retentionText}}</span></div></section>
-    <section class="iq-card section wrong-book"><div class="section-head"><div><h3>待巩固错题</h3><p>普通试卷和自适应练习分开列出；再次答对后自动移出。</p></div></div><div class="wrong-columns"><section v-for="source in ['exam','adaptive']" :key="source"><h4>{{source==='exam'?'普通试卷错题':'自适应练习错题'}} <span>{{data.wrongQuestions?.[source]?.length||0}}道</span></h4><div v-if="!data.wrongQuestions?.[source]?.length" class="empty">当前没有待巩固错题。</div><article v-for="q in data.wrongQuestions?.[source]||[]" :key="q.questionId"><div><b>{{q.content}}</b><span>{{q.chapter?chapterLabel(q.chapter):'未标注章节'}} · {{q.knowledgePoint||'未标注知识点'}} · 错误{{q.wrongCount}}次</span></div><button v-if="role==='student'" class="secondary" @click="$emit('practice',{chapters:q.chapter?[Number(q.chapter)]:[],knowledgeKeyword:q.knowledgePoint||''})">针对练习</button><button v-else-if="role==='teacher'" class="secondary" @click="$emit('navigate','generate')">专项组卷</button></article></section></div></section>
-    <section class="iq-card section advice"><div class="section-head"><div><h3>{{role==='student'?'我的练习建议':'给这名学生的教学建议'}}</h3><p>每条建议都说明练什么，并连接到对应功能。</p></div></div><div v-if="!adviceList.length" class="empty">继续完成练习后，这里会给出更具体的建议。</div><article v-for="(r,i) in adviceList" :key="r.title"><span class="number">{{i+1}}</span><div><b>{{r.title}}</b><p>{{r.reason}}</p></div><button v-if="role==='student'" class="primary" @click="$emit('practice',r.filters)">开始这项练习</button><button v-else-if="role==='teacher'" class="secondary" @click="$emit('navigate','generate')">按建议组卷</button></article></section>
-  </template>
-</div></template>
-<script setup>import{computed,onMounted,ref}from'vue';import{getLearningAnalysis,getLearningAnalysisOverview,getStudentLearningAnalysis}from'@/api/practice';import{getChapterLabel,getTypeName}from'@/utils/constants';const props=defineProps({role:{type:String,required:true}}),emit=defineEmits(['toast','practice','navigate']);const loading=ref(false),overview=ref({students:[],commonWeaknesses:[]}),data=ref(null),selectedId=ref(null);const startedCount=computed(()=>overview.value.students.filter(x=>x.answered>0).length),enoughCount=computed(()=>overview.value.students.filter(x=>x.answered>=20).length),attentionCount=computed(()=>overview.value.students.filter(x=>x.answered>=5&&(x.accuracy<60||x.change<=-10)).length);const load=async()=>{loading.value=true;try{props.role==='student'?data.value=await getLearningAnalysis():overview.value=await getLearningAnalysisOverview()}catch(e){emit('toast',e.message||'读取分析失败','error')}finally{loading.value=false}};const openStudent=async id=>{loading.value=true;try{data.value=await getStudentLearningAnalysis(id);selectedId.value=id}catch(e){emit('toast',e.message||'读取学生分析失败','error')}finally{loading.value=false}};const statusText=s=>!s.answered?'尚未开始':s.answered<20?'数据积累中':s.change<=-10?'近期有波动':s.accuracy<60?'建议加强练习':s.change>=10?'近期进步明显':'学习表现稳定',statusClass=s=>!s.answered?'empty':s.answered<20?'building':s.accuracy<60||s.change<=-10?'attention':'stable',scoreClass=n=>n>=80?'good':n>=60?'medium':'weak',masteryText=x=>x.answered<3?'样本较少':x.accuracy>=80?'掌握良好':x.accuracy>=60?'基本掌握':'需要巩固',typeIcon=t=>({1:'✓',2:'○',3:'□',4:'—'}[t]||'•'),levelItem=n=>data.value?.difficulty.find(x=>Number(x.key)===n),chapterLabel=getChapterLabel,typeName=getTypeName;const summaryTitle=computed(()=>!data.value.summary.answered?'还没有练习记录':data.value.summary.accuracy>=80?'整体掌握良好':data.value.summary.accuracy>=60?'正在稳步掌握':'建议从基础内容开始巩固'),summarySentence=computed(()=>`分析依据：${data.value.coverage.examAnswers}道试卷题和${data.value.coverage.adaptiveAnswers}道自适应练习题。`),trendText=computed(()=>data.value.summary.change==null?'数据积累中':data.value.summary.change>=10?'近期进步':data.value.summary.change<=-10?'近期有波动':'表现较稳定'),trendExplanation=computed(()=>data.value.summary.change==null?'再完成一些题目后，可以比较前后变化。':`最近10题正确率为${data.value.summary.recentAccuracy}%，与此前10题相差${Math.abs(data.value.summary.change)}个百分点。`),retentionText=computed(()=>data.value.insights.retention.length?`${data.value.insights.retention.map(x=>x.key).join('、')}曾经掌握较好，但已有一段时间未练习。`:'已掌握较好的知识点目前没有明显的长期未练情况。'),migrationTitle=computed(()=>data.value.insights.migration.length?'已有跨场景记录':'还需积累两类练习'),migrationText=computed(()=>data.value.insights.migration.length?`已有${data.value.insights.migration.length}个知识点同时出现在试卷和自适应练习中，可用于判断掌握是否稳定。`:'同一知识点需要同时在普通试卷和自适应练习中出现，才能进行可靠比较。'),adviceList=computed(()=>{const list=[...data.value.recommendations];const weakType=data.value.types.find(x=>x.answered>=2&&x.accuracy<70);if(weakType)list.push({title:`加强${typeName(weakType.key)}练习`,reason:`已完成${weakType.answered}题，当前正确率${weakType.accuracy}%`,filters:{questionTypes:[Number(weakType.key)]}});if(data.value.insights.retention[0])list.push({title:`复习“${data.value.insights.retention[0].key}”`,reason:'这个知识点曾掌握较好，但已有一段时间没有练习',filters:{knowledgeKeyword:data.value.insights.retention[0].key}});return list.slice(0,5)});onMounted(load);</script>
-<style scoped>.learning-page{display:grid;gap:16px;max-width:1180px;margin:auto}.hero,.student-summary{display:flex;justify-content:space-between;align-items:center;padding:28px 32px;border-radius:8px;color:white;background:linear-gradient(125deg,#0756b8,#1684e8)}.hero h2,.student-summary h2{margin:5px 0;font-size:28px}.hero p,.student-summary p{margin:0;max-width:720px;color:#e8f3ff;line-height:1.6}.hero>div>span,.student-summary>div>span{font-size:12px;color:#bfdbfe}.refresh{padding:9px 15px;border:1px solid #bfdbfe;border-radius:6px;background:white;color:#0756b8}.loading,.empty{padding:36px;text-align:center;color:#64748b}.overview-cards,.source-board{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.overview-cards div,.source-board div{display:grid;gap:4px;padding:17px;border:1px solid #dbe7f5;border-radius:8px;background:white}.overview-cards b,.source-board b{font-size:24px;color:#0969c8}.overview-cards span,.source-board span{font-size:13px;color:#475569}.section{padding:22px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}.section-head h3{margin:0;color:#102a43}.section-head p{margin:5px 0 0;color:#52677e;font-size:13px}.student-list{display:grid;gap:8px}.student-list button{display:grid;grid-template-columns:38px minmax(150px,1fr) 120px 130px 70px 18px;align-items:center;gap:10px;padding:12px;border:1px solid #dbe7f5;border-radius:7px;background:white;text-align:left}.student-list button:hover{border-color:#1684e8;background:#f4f9ff}.avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#dcebff;color:#0756b8;font-weight:700}.student-name{display:grid}.student-name em{width:max-content;margin-top:3px;padding:2px 7px;border-radius:9px;font-size:11px;font-style:normal}.stable{background:#dcfce7;color:#15803d}.attention,.weak{background:#fee2e2;color:#b91c1c}.building,.medium{background:#fef3c7;color:#a16207}.empty{background:#f1f5f9;color:#64748b}.source{font-size:12px;color:#52677e}.student-list strong{color:#0969c8;text-align:right}.arrow{font-size:22px;color:#60a5fa}.weak-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.weak-grid article{display:flex;justify-content:space-between;align-items:center;padding:13px;background:#f4f9ff;border-left:3px solid #1684e8}.weak-grid div{display:grid}.weak-grid span{margin-top:3px;color:#52677e;font-size:12px}.weak-grid strong{font-size:20px}.primary,.secondary{padding:8px 12px;border-radius:6px;border:0}.primary{background:#0969c8;color:white}.secondary{background:#e7f1ff;color:#0756b8}.back{justify-self:start;border:0;background:none;color:#0969c8}.score-ring{--score:0;display:grid;place-items:center;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,#fff 55%,transparent 57%),conic-gradient(#60d5c4 calc(var(--score)*1%),#dbeafe 0);color:#0756b8}.score-ring b{font-size:25px}.score-ring span{font-size:11px;margin-top:-25px}.chapter-grid{display:grid;gap:12px}.chapter-item{position:relative;display:grid;grid-template-columns:minmax(190px,1fr) 2fr 45px;gap:12px;align-items:center;padding:7px}.chapter-item>div:first-child{display:flex;justify-content:space-between;gap:8px}.chapter-item strong{font-size:12px}.track{height:9px;border-radius:5px;background:#e4edf7;overflow:hidden}.track i{display:block;height:100%;background:#1684e8}.tooltip{display:none;position:absolute;z-index:3;left:15%;top:42px;width:330px;padding:13px;border:1px solid #9cc9f5;border-radius:7px;background:white;box-shadow:0 10px 25px #0f559c24}.tooltip p{margin:5px 0;line-height:1.55;color:#475569}.chapter-item:hover{background:#f4f9ff}.chapter-item:hover .tooltip{display:block}.split{display:grid;grid-template-columns:1fr 1fr;gap:16px}.type-list,.level-list{display:grid;gap:9px}.type-list article,.level-list article{display:flex;align-items:center;gap:10px;padding:11px;background:#f7faff;border-radius:7px}.type-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:6px;background:#dcebff;color:#0756b8}.type-list article>div{display:grid;flex:1}.type-list article span,.level-list span{font-size:12px;color:#52677e}.type-list strong,.level-list em{font-style:normal}.level-list b{min-width:76px;color:#eab308}.level-list span{flex:1}.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.summary-grid article{padding:16px;border:1px solid #dbe7f5;border-radius:7px;background:#f8fbff}.summary-grid span{font-size:12px;color:#0969c8}.summary-grid b{display:block;margin:5px 0}.summary-grid p{margin:0;color:#52677e;line-height:1.55;font-size:13px}.advice>article{display:grid;grid-template-columns:32px 1fr auto;gap:12px;align-items:center;padding:13px;margin-top:8px;border:1px solid #dbe7f5;border-radius:7px}.number{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#0969c8;color:white}.advice p{margin:4px 0;color:#52677e}.good{color:#15803d}.medium{color:#a16207}.weak{color:#b91c1c}@media(max-width:800px){.overview-cards,.source-board,.split,.summary-grid,.weak-grid{grid-template-columns:1fr 1fr}.student-list button{grid-template-columns:38px 1fr 70px 18px}.student-list .source{display:none}.hero,.student-summary{align-items:flex-start;flex-direction:column;gap:15px}.chapter-item{grid-template-columns:1fr 1.5fr 42px}.tooltip{left:5%;width:min(330px,85vw)}}@media(max-width:520px){.overview-cards,.source-board,.split,.summary-grid,.weak-grid{grid-template-columns:1fr}.advice>article{grid-template-columns:32px 1fr}.advice button{grid-column:2}.score-ring{width:100px;height:100px}}</style>
+<template>
+  <div class="learning-page learning-dashboard">
+    <!-- ===== 顶部横幅 ===== -->
+    <header class="hero">
+      <div>
+        <span>{{ role === 'student' ? '📊 个人学习中心' : '📊 教学数据中心' }}</span>
+        <h2>{{ role === 'student' ? '我的学习分析' : '学生个性化分析' }}</h2>
+        <p>{{ role === 'student' ? '把试卷和自适应练习放在一起，找出真正掌握的内容和下一步练习方向。' : '汇总每名学生的试卷与自适应练习，快速找到需要帮助的学生和共同薄弱点。' }}</p>
+      </div>
+      <button class="refresh" @click="load" :disabled="loading">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        刷新数据
+      </button>
+    </header>
+
+    <!-- ===== 加载状态 ===== -->
+    <div v-if="loading" class="iq-card loading">
+      <div class="loading-spinner"></div>
+      <p>正在整理学习数据...</p>
+    </div>
+
+    <!-- ===== 教师端：学生列表 ===== -->
+    <template v-else-if="role !== 'student' && !selectedId">
+      <section class="overview-cards three">
+        <div>
+          <b>{{ overview.students.length }}</b>
+          <span>👥 学生人数</span>
+        </div>
+        <div>
+          <b>{{ startedCount }}</b>
+          <span>📝 已有练习数据</span>
+        </div>
+        <div>
+          <b>{{ attentionCount }}</b>
+          <span>⚠️ 需要关注</span>
+        </div>
+      </section>
+
+      <section class="iq-card section">
+        <div class="section-head">
+          <div>
+            <h3>👥 学生学习状态</h3>
+            <p>点击学生即可查看试卷、自适应练习、章节表现和具体建议</p>
+          </div>
+        </div>
+        <div class="student-list">
+          <button v-for="s in overview.students" :key="s.id" @click="openStudent(s.id)">
+            <span class="avatar">{{ (s.nickname || s.username).slice(0, 1) }}</span>
+            <span class="student-name">
+              <b>{{ s.nickname || s.username }}</b>
+              <em :class="statusClass(s)">{{ statusText(s) }}</em>
+              <small v-if="s.concernReasons?.length">{{ s.concernReasons.join('；') }}</small>
+            </span>
+            <span class="source">📄 {{ s.coverage.examAnswers }} 题</span>
+            <span class="source">🎯 {{ s.coverage.adaptiveAnswers }} 题</span>
+            <strong>{{ s.answered ? s.accuracy + '%' : '未开始' }}</strong>
+            <span class="arrow">›</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="iq-card section">
+        <div class="section-head">
+          <div>
+            <div class="explain-title">
+              <h3>📉 班级共同薄弱点</h3>
+              <span class="explain-trigger" tabindex="0">
+                ?
+                <span class="weak-tooltip">
+                  <b>计算说明</b>
+                  <p>综合正确率 = 参与学生在该知识点答对的题数 ÷ 完成的总题数。至少有 2 名学生练习过该知识点才会展示。</p>
+                </span>
+              </span>
+            </div>
+            <p>汇总多人共同练习过且正确率较低的知识点</p>
+          </div>
+          <button v-if="role === 'teacher'" class="primary" @click="$emit('navigate', 'generate')">
+            进入智能组卷
+          </button>
+        </div>
+        <div v-if="!overview.commonWeaknesses.length" class="empty">目前还没有足够的多人练习数据</div>
+        <div class="weak-grid">
+          <article v-for="x in overview.commonWeaknesses" :key="x.key">
+            <div>
+              <b>{{ x.key }}</b>
+              <span>{{ x.students }} 名学生练习 · 共 {{ x.answered }} 题</span>
+            </div>
+            <strong :class="scoreClass(x.accuracy)">{{ x.accuracy }}%</strong>
+          </article>
+        </div>
+      </section>
+    </template>
+
+    <!-- ===== 学生端 / 学生详情 ===== -->
+    <template v-else-if="data">
+      <button v-if="role !== 'student'" class="back" @click="selectedId = null; data = null">← 返回学生列表</button>
+
+      <section class="student-summary compact-summary">
+        <div>
+          <span>{{ role === 'student' ? '📊 本次学习画像' : (data.student.nickname || data.student.username) }}</span>
+          <h2>{{ summaryTitle }}</h2>
+          <p>{{ summarySentence }}</p>
+        </div>
+        <div class="score-pill">
+          <b>{{ data.summary.accuracy }}%</b>
+          <span>综合正确率</span>
+        </div>
+      </section>
+
+      <section class="source-board">
+        <div>
+          <span>📄 普通试卷</span>
+          <b>{{ data.coverage.examAnswers }} 题</b>
+        </div>
+        <div>
+          <span>🎯 自适应练习</span>
+          <b>{{ data.coverage.adaptiveAnswers }} 题</b>
+        </div>
+        <div>
+          <span>📈 最近 10 题</span>
+          <b>{{ data.summary.recentAccuracy }}%</b>
+        </div>
+        <div>
+          <span>✅ 已重新掌握错题</span>
+          <b>{{ data.summary.recovered }} 题</b>
+        </div>
+      </section>
+
+      <!-- ===== 章节完成情况（2列 + 进度条） ===== -->
+      <section class="iq-card section">
+        <div class="section-head">
+          <div>
+            <h3>📚 章节完成情况</h3>
+            <p>分别展示普通试卷和自适应练习在各章节的完成情况</p>
+          </div>
+        </div>
+        <div class="chapter-grid-v2">
+          <div v-for="x in data.chapters" :key="x.key" class="chapter-card-v2">
+            <div class="chapter-header-v2">
+              <span class="chapter-name-v2">{{ getChapterLabel(x.key) }}</span>
+              <span class="chapter-status-v2" :class="masteryClass(x)">{{ masteryText(x) }}</span>
+            </div>
+            <div class="chapter-body-v2">
+              <div class="chapter-row">
+                <span class="chapter-row-label">📄 普通试卷</span>
+                <span class="chapter-row-num">{{ x.examAnswered || 0 }} 题 · 答对 {{ x.examCorrect || 0 }} 题</span>
+                <div class="chapter-progress">
+                  <div
+                      class="chapter-progress-fill"
+                      :style="{ width: (x.examAnswered > 0 ? (x.examCorrect / x.examAnswered * 100) : 0) + '%' }"
+                  ></div>
+                </div>
+                <span class="chapter-row-rate">{{ x.examAnswered > 0 ? Math.round(x.examCorrect / x.examAnswered * 100) : 0 }}%</span>
+              </div>
+              <div class="chapter-row">
+                <span class="chapter-row-label">🎯 自适应练习</span>
+                <span class="chapter-row-num">{{ x.adaptiveAnswered || 0 }} 题 · 答对 {{ x.adaptiveCorrect || 0 }} 题</span>
+                <div class="chapter-progress">
+                  <div
+                      class="chapter-progress-fill adaptive"
+                      :style="{ width: (x.adaptiveAnswered > 0 ? (x.adaptiveCorrect / x.adaptiveAnswered * 100) : 0) + '%' }"
+                  ></div>
+                </div>
+                <span class="chapter-row-rate">{{ x.adaptiveAnswered > 0 ? Math.round(x.adaptiveCorrect / x.adaptiveAnswered * 100) : 0 }}%</span>
+              </div>
+            </div>
+            <div class="chapter-footer-v2">
+              合计完成 <b>{{ x.answered }}</b> 题，答对 <b>{{ x.correct }}</b> 题
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 题型表现（雷达图）+ 难度适应（折线图） ===== -->
+      <div class="split">
+        <section class="iq-card section">
+          <div class="section-head">
+            <div>
+              <h3>📊 题型表现</h3>
+              <p>多维度对比各题型掌握情况，雷达图面积越大表示整体越均衡</p>
+            </div>
+          </div>
+          <div ref="radarChartRef" class="chart-container"></div>
+        </section>
+
+        <section class="iq-card section">
+          <div class="section-head">
+            <div>
+              <h3>⭐ 难度适应情况</h3>
+              <p>展示在不同难度等级上的表现变化趋势</p>
+            </div>
+          </div>
+          <div ref="lineChartRef" class="chart-container"></div>
+        </section>
+      </div>
+
+      <!-- ===== 每日学习趋势 ===== -->
+      <section class="iq-card section">
+        <div class="section-head">
+          <div>
+            <h3>📈 每日学习趋势</h3>
+            <p>截至当天的累计正确率，累计口径可减少单日题量较少造成的大幅波动</p>
+          </div>
+          <div class="legend">
+            <span class="exam-line">📄 普通试卷</span>
+            <span class="adaptive-line">🎯 自适应练习</span>
+          </div>
+        </div>
+        <div v-if="data.dailyTrend.length" class="line-chart">
+          <svg viewBox="0 0 760 250" preserveAspectRatio="none">
+            <line v-for="n in 5" :key="n" x1="45" :y1="n * 40" x2="740" :y2="n * 40" class="grid-line" />
+            <text x="4" y="44">100%</text>
+            <text x="12" y="124">50%</text>
+            <text x="21" y="204">0%</text>
+            <polyline
+                :points="data.dailyTrend.map((d, i) => d.examCumulative === null ? '' : (55 + i * (670 / Math.max(1, data.dailyTrend.length - 1))) + ',' + (200 - d.examCumulative * 1.6)).filter(Boolean).join(' ')"
+                class="exam-poly"
+            />
+            <polyline
+                :points="data.dailyTrend.map((d, i) => d.adaptiveCumulative === null ? '' : (55 + i * (670 / Math.max(1, data.dailyTrend.length - 1))) + ',' + (200 - d.adaptiveCumulative * 1.6)).filter(Boolean).join(' ')"
+                class="adaptive-poly"
+            />
+            <g v-for="(d, i) in data.dailyTrend" :key="d.date">
+              <circle
+                  v-if="d.examCumulative !== null"
+                  :cx="55 + i * (670 / Math.max(1, data.dailyTrend.length - 1))"
+                  :cy="200 - d.examCumulative * 1.6"
+                  r="5"
+                  class="exam-dot"
+              />
+              <circle
+                  v-if="d.adaptiveCumulative !== null"
+                  :cx="55 + i * (670 / Math.max(1, data.dailyTrend.length - 1))"
+                  :cy="200 - d.adaptiveCumulative * 1.6"
+                  r="5"
+                  class="adaptive-dot"
+              />
+              <text :x="55 + i * (670 / Math.max(1, data.dailyTrend.length - 1))" y="232" class="date-label">
+                {{ d.date.slice(5) }}
+              </text>
+            </g>
+          </svg>
+        </div>
+        <div v-else class="empty">还没有可展示的每日练习趋势</div>
+
+        <div class="trend-notes">
+          <span>
+            <b>📌 近期状态：</b>{{ trendText }}，{{ trendExplanation }}
+          </span>
+          <span>
+            <b>🧠 知识保持：</b>{{ retentionText }}
+          </span>
+        </div>
+      </section>
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { getLearningAnalysis, getLearningAnalysisOverview, getStudentLearningAnalysis } from '@/api/practice';
+import * as echarts from 'echarts';
+
+// ================================================================
+// 工具函数
+// ================================================================
+const CHAPTER_NAMES = {
+  1: '计算思维基础',
+  2: '计算机系统基础',
+  3: 'Python 程序设计',
+  4: '算法与问题求解',
+  5: '数字素养与数字化',
+  6: '人工智能基础',
+  7: '智能技术应用',
+  8: '智能技术与机器学习',
+  9: '大模型与办公实践',
+  10: '科技伦理与治理',
+};
+
+const TYPE_NAMES = {
+  1: '判断题',
+  2: '单选题',
+  3: '多选题',
+  4: '填空题',
+  5: '简答题',
+  6: '程序论述题',
+};
+
+const getChapterLabel = (id) => {
+  const num = Number(id);
+  return `第${num}章 ${CHAPTER_NAMES[num] || '未命名章节'}`;
+};
+
+const getTypeName = (id) => {
+  return TYPE_NAMES[id] || `题型${id}`;
+};
+
+// ================================================================
+// 组件逻辑
+// ================================================================
+const props = defineProps({
+  role: { type: String, required: true },
+});
+
+const emit = defineEmits(['toast', 'practice', 'navigate']);
+
+const loading = ref(false);
+const overview = ref({ students: [], commonWeaknesses: [] });
+const data = ref(null);
+const selectedId = ref(null);
+
+// ===== 图表引用 =====
+const radarChartRef = ref(null);
+const lineChartRef = ref(null);
+const chartResizeHandlers = [];
+
+// ===== 雷达图数据 =====
+const radarData = computed(() => {
+  if (!data.value) return { indicators: [], values: [] };
+  const types = data.value.types || [];
+  const indicators = types.map(t => getTypeName(t.key));
+  const values = types.map(t => t.accuracy || 0);
+  return { indicators, values };
+});
+
+// ===== 折线图数据 =====
+const lineData = computed(() => {
+  if (!data.value) return { levels: [], values: [] };
+  const levels = [1, 2, 3, 4, 5];
+  const values = levels.map(n => {
+    const item = data.value.difficulty?.find(d => Number(d.key) === n);
+    return item ? item.accuracy || 0 : 0;
+  });
+  return { levels, values };
+});
+
+// ===== 渲染雷达图 =====
+const initRadarChart = () => {
+  if (!radarChartRef.value) return;
+  const chart = echarts.init(radarChartRef.value);
+  const d = radarData.value;
+  if (!d.indicators.length) return;
+
+  const option = {
+    radar: {
+      indicator: d.indicators.map(name => ({ name, max: 100 })),
+      shape: 'polygon',
+      splitNumber: 4,
+      axisName: { color: '#475569', fontSize: 12 },
+      splitLine: { lineStyle: { color: '#E2E8F0' } },
+      splitArea: { areaStyle: { color: ['rgba(99,102,241,0.02)', 'rgba(99,102,241,0.05)'] } },
+      axisLine: { lineStyle: { color: '#CBD5E1' } },
+    },
+    series: [{
+      type: 'radar',
+      data: [{ value: d.values, name: '正确率' }],
+      areaStyle: { color: 'rgba(99,102,241,0.3)' },
+      lineStyle: { color: '#6366F1', width: 2 },
+      itemStyle: { color: '#6366F1' },
+    }],
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => {
+        const values = params.data.value;
+        const names = d.indicators;
+        let html = `<b>题型掌握情况</b><br/>`;
+        names.forEach((name, i) => {
+          html += `${name}: ${values[i] || 0}%<br/>`;
+        });
+        return html;
+      }
+    }
+  };
+
+  chart.setOption(option);
+  chartResizeHandlers.push(() => chart.resize());
+};
+
+// ===== 渲染折线图 =====
+const initLineChart = () => {
+  if (!lineChartRef.value) return;
+  const chart = echarts.init(lineChartRef.value);
+  const d = lineData.value;
+  if (!d.levels.length) return;
+
+  const levelLabels = ['⭐ 入门', '⭐⭐ 简单', '⭐⭐⭐ 中等', '⭐⭐⭐⭐ 困难', '⭐⭐⭐⭐⭐ 挑战'];
+
+  const option = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const p = params[0];
+        return `<b>${levelLabels[p.dataIndex]}</b><br/>正确率：${p.value || 0}%`;
+      }
+    },
+    grid: {
+      left: 40,
+      right: 20,
+      top: 20,
+      bottom: 30,
+    },
+    xAxis: {
+      type: 'category',
+      data: ['★1', '★2', '★3', '★4', '★5'],
+      axisLine: { lineStyle: { color: '#E2E8F0' } },
+      axisLabel: { color: '#94A3B8', fontSize: 12 },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      max: 100,
+      splitLine: { lineStyle: { color: '#F1F5F9', type: 'dashed' } },
+      axisLabel: { color: '#94A3B8', fontSize: 11, formatter: '{value}%' },
+      name: '正确率',
+      nameTextStyle: { color: '#94A3B8', fontSize: 11 },
+    },
+    series: [{
+      type: 'line',
+      data: d.values,
+      smooth: true,
+      lineStyle: { color: '#6366F1', width: 3 },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(99,102,241,0.3)' },
+            { offset: 1, color: 'rgba(99,102,241,0.02)' }
+          ]
+        }
+      },
+      itemStyle: { color: '#6366F1' },
+      symbol: 'circle',
+      symbolSize: 8,
+      markPoint: {
+        data: [
+          { type: 'max', name: '最高点' },
+          { type: 'min', name: '最低点' }
+        ]
+      },
+      markLine: {
+        data: [
+          { type: 'average', name: '平均正确率' },
+          { yAxis: 60, name: '及格线', lineStyle: { color: '#F59E0B', type: 'dashed' } }
+        ]
+      }
+    }]
+  };
+
+  chart.setOption(option);
+  chartResizeHandlers.push(() => chart.resize());
+};
+
+// ================================================================
+// 计算属性
+// ================================================================
+const startedCount = computed(() => overview.value.students.filter((x) => x.answered > 0).length);
+const attentionCount = computed(() =>
+    overview.value.students.filter((x) => x.answered >= 5 && (x.accuracy < 60 || x.change <= -10)).length
+);
+
+const load = async () => {
+  loading.value = true;
+  try {
+    if (props.role === 'student') {
+      data.value = await getLearningAnalysis();
+    } else {
+      overview.value = await getLearningAnalysisOverview();
+    }
+  } catch (e) {
+    emit('toast', { message: e.message || '读取分析失败', type: 'error' });
+  } finally {
+    loading.value = false;
+    setTimeout(() => {
+      initRadarChart();
+      initLineChart();
+    }, 300);
+  }
+};
+
+const openStudent = async (id) => {
+  loading.value = true;
+  try {
+    data.value = await getStudentLearningAnalysis(id);
+    selectedId.value = id;
+    setTimeout(() => {
+      initRadarChart();
+      initLineChart();
+    }, 300);
+  } catch (e) {
+    emit('toast', { message: e.message || '读取学生分析失败', type: 'error' });
+  } finally {
+    loading.value = false;
+  }
+};
+
+// ===== 状态判断 =====
+const statusText = (s) => {
+  if (!s.answered) return '尚未开始';
+  if (s.answered < 20) return '数据积累中';
+  if (s.change <= -10) return '近期有波动';
+  if (s.accuracy < 60) return '建议加强练习';
+  if (s.change >= 10) return '近期进步明显';
+  return '学习表现稳定';
+};
+
+const statusClass = (s) => {
+  if (!s.answered) return 'empty';
+  if (s.answered < 20) return 'building';
+  if (s.accuracy < 60 || s.change <= -10) return 'attention';
+  return 'stable';
+};
+
+const scoreClass = (n) => {
+  if (n >= 80) return 'good';
+  if (n >= 60) return 'medium';
+  return 'weak';
+};
+
+const masteryText = (x) => {
+  if (x.answered < 3) return '样本较少';
+  if (x.accuracy >= 80) return '掌握良好 ✅';
+  if (x.accuracy >= 60) return '基本掌握 📖';
+  return '需要巩固 ⚠️';
+};
+
+const masteryClass = (x) => {
+  if (x.answered < 3) return 'sample';
+  if (x.accuracy >= 80) return 'good';
+  if (x.accuracy >= 60) return 'medium';
+  return 'weak';
+};
+
+const summaryTitle = computed(() => {
+  if (!data.value?.summary?.answered) return '还没有练习记录';
+  if (data.value.summary.accuracy >= 80) return '🎉 整体掌握良好';
+  if (data.value.summary.accuracy >= 60) return '📖 正在稳步掌握';
+  return '💪 建议从基础内容开始巩固';
+});
+
+const summarySentence = computed(() =>
+    `分析依据：${data.value.coverage.examAnswers} 道试卷题和 ${data.value.coverage.adaptiveAnswers} 道自适应练习题。`
+);
+
+const trendText = computed(() => {
+  if (data.value.summary.change == null) return '数据积累中';
+  if (data.value.summary.change >= 10) return '近期进步 📈';
+  if (data.value.summary.change <= -10) return '近期有波动 📉';
+  return '表现较稳定 ✅';
+});
+
+const trendExplanation = computed(() => {
+  if (data.value.summary.change == null) return '再完成一些题目后，可以比较前后变化。';
+  return `最近 10 题正确率为 ${data.value.summary.recentAccuracy}%，与此前 10 题相差 ${Math.abs(data.value.summary.change)} 个百分点。`;
+});
+
+const retentionText = computed(() => {
+  if (data.value.insights.retention.length) {
+    return `${data.value.insights.retention.map((x) => x.key).join('、')} 曾经掌握较好，但已有一段时间未练习。`;
+  }
+  return '已掌握较好的知识点目前没有明显的长期未练情况。';
+});
+
+// ===== 生命周期 =====
+onMounted(() => {
+  load();
+  window.addEventListener('resize', () => {
+    chartResizeHandlers.forEach(fn => fn());
+  });
+});
+
+onUnmounted(() => {
+  chartResizeHandlers.length = 0;
+});
+</script>
+
+<style scoped>
+/* ================================================================
+   学情分析页面样式（紫色主题）
+   ================================================================ */
+.learning-page {
+  display: grid;
+  gap: 18px;
+  max-width: 1240px;
+  margin: 0 auto;
+  color: #1E293B;
+}
+
+/* ===== 顶部横幅 ===== */
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 34px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.25);
+}
+
+.hero h2 {
+  margin: 6px 0 4px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+}
+.hero p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  max-width: 760px;
+  line-height: 1.6;
+}
+.hero > div > span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 1px;
+}
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.refresh:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+.refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===== 加载状态 ===== */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  color: #94A3B8;
+}
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #E2E8F0;
+  border-top: 3px solid #6366F1;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 12px;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== 卡片 ===== */
+.iq-card {
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.section {
+  padding: 22px 24px;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.section-head h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #1E293B;
+}
+.section-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748B;
+}
+
+.empty {
+  padding: 36px;
+  text-align: center;
+  color: #94A3B8;
+}
+
+/* ===== 图表容器 ===== */
+.chart-container {
+  width: 100%;
+  height: 300px;
+}
+
+/* ===== 概览卡片 ===== */
+.overview-cards,
+.source-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.overview-cards > div,
+.source-board > div {
+  display: grid;
+  gap: 4px;
+  padding: 18px 20px;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  background: #fff;
+}
+.overview-cards b,
+.source-board b {
+  font-size: 26px;
+  font-weight: 700;
+  color: #6366F1;
+}
+.overview-cards span,
+.source-board span {
+  font-size: 13px;
+  color: #64748B;
+}
+
+.overview-cards.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* ===== 学生列表 ===== */
+.student-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.student-list > button {
+  display: grid;
+  grid-template-columns: 40px 1fr auto auto 60px 18px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #FAFCFF;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.student-list > button:hover {
+  border-color: #A5B4FC;
+  background: #F5F3FF;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #EEF2FF;
+  color: #4338CA;
+  font-weight: 700;
+}
+.student-name {
+  display: grid;
+  gap: 2px;
+}
+.student-name b {
+  font-size: 14px;
+  color: #1E293B;
+}
+.student-name em {
+  width: max-content;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-style: normal;
+}
+.student-name small {
+  font-size: 11px;
+  color: #B91C1C;
+  line-height: 1.3;
+}
+.source {
+  font-size: 12px;
+  color: #64748B;
+}
+.student-list strong {
+  color: #6366F1;
+  text-align: right;
+  font-size: 14px;
+}
+.arrow {
+  font-size: 20px;
+  color: #A5B4FC;
+}
+
+/* ===== 状态标签 ===== */
+.stable {
+  background: #DCFCE7;
+  color: #15803D;
+}
+.attention {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+.building {
+  background: #FEF3C7;
+  color: #A16207;
+}
+.empty-state {
+  background: #F1F5F9;
+  color: #64748B;
+}
+
+/* ===== 得分颜色 ===== */
+.good {
+  color: #059669;
+}
+.medium {
+  color: #B45309;
+}
+.weak {
+  color: #B91C1C;
+}
+.sample {
+  color: #94A3B8;
+}
+
+/* ===== 薄弱点网格 ===== */
+.weak-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.weak-grid article {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #F5F3FF;
+  border-left: 3px solid #6366F1;
+  border-radius: 6px;
+}
+.weak-grid article > div {
+  display: grid;
+  gap: 4px;
+}
+.weak-grid article b {
+  font-size: 14px;
+  color: #1E293B;
+}
+.weak-grid article span {
+  font-size: 12px;
+  color: #64748B;
+}
+.weak-grid article strong {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* ===== 学生摘要 ===== */
+.student-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 26px;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  background: #fff;
+}
+.student-summary > div > span {
+  font-size: 12px;
+  color: #6366F1;
+  letter-spacing: 1px;
+}
+.student-summary h2 {
+  margin: 4px 0 2px;
+  font-size: 24px;
+  color: #1E293B;
+}
+.student-summary p {
+  margin: 0;
+  color: #64748B;
+  font-size: 14px;
+}
+
+.score-pill {
+  display: grid;
+  min-width: 100px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: #EEF2FF;
+  text-align: center;
+}
+.score-pill b {
+  font-size: 26px;
+  color: #4338CA;
+}
+.score-pill span {
+  font-size: 11px;
+  color: #64748B;
+}
+
+/* ================================================================
+   章节完成情况（2列 + 进度条）
+   ================================================================ */
+.chapter-grid-v2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.chapter-card-v2 {
+  padding: 16px 18px;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  background: #FAFCFF;
+  transition: border-color 0.2s;
+}
+.chapter-card-v2:hover {
+  border-color: #A5B4FC;
+}
+
+.chapter-header-v2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.chapter-name-v2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.chapter-status-v2 {
+  font-size: 12px;
+  font-weight: 500;
+}
+.chapter-status-v2.good {
+  color: #059669;
+}
+.chapter-status-v2.medium {
+  color: #B45309;
+}
+.chapter-status-v2.weak {
+  color: #B91C1C;
+}
+.chapter-status-v2.sample {
+  color: #94A3B8;
+}
+
+.chapter-body-v2 {
+  display: grid;
+  gap: 8px;
+}
+
+.chapter-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 1fr 36px;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.chapter-row-label {
+  color: #64748B;
+  font-weight: 500;
+}
+
+.chapter-row-num {
+  color: #1E293B;
+  font-weight: 500;
+}
+
+.chapter-progress {
+  height: 6px;
+  background: #F1F5F9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chapter-progress-fill {
+  height: 100%;
+  background: #6366F1;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+.chapter-progress-fill.adaptive {
+  background: #10B981;
+}
+
+.chapter-row-rate {
+  font-weight: 600;
+  color: #1E293B;
+  text-align: right;
+}
+
+.chapter-footer-v2 {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #F1F5F9;
+  font-size: 13px;
+  color: #64748B;
+  text-align: right;
+}
+.chapter-footer-v2 b {
+  color: #1E293B;
+}
+
+/* ===== 两栏布局 ===== */
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+/* ===== 学习趋势 ===== */
+.legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: #64748B;
+}
+.legend span::before {
+  content: '';
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+.exam-line::before {
+  background: #6366F1;
+}
+.adaptive-line::before {
+  background: #10B981;
+}
+
+.line-chart {
+  height: 280px;
+  padding: 8px;
+  background: #FAFAFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+}
+.line-chart svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.grid-line {
+  stroke: #E2E8F0;
+  stroke-width: 1;
+}
+.line-chart text {
+  fill: #94A3B8;
+  font-size: 11px;
+}
+.exam-poly {
+  fill: none;
+  stroke: #6366F1;
+  stroke-width: 3;
+}
+.adaptive-poly {
+  fill: none;
+  stroke: #10B981;
+  stroke-width: 3;
+}
+.exam-dot {
+  fill: #6366F1;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.adaptive-dot {
+  fill: #10B981;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.date-label {
+  text-anchor: middle;
+  font-size: 10px !important;
+}
+
+.trend-notes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+}
+.trend-notes span {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #F5F3FF;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.trend-notes b {
+  color: #1E293B;
+}
+
+/* ===== 按钮 ===== */
+.primary,
+.secondary {
+  padding: 6px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.primary {
+  background: #6366F1;
+  color: #fff;
+}
+.primary:hover {
+  background: #4F46E5;
+}
+.secondary {
+  background: #EEF2FF;
+  color: #4338CA;
+  border: 1px solid #C7D2FE;
+}
+.secondary:hover {
+  background: #E0E7FF;
+}
+
+.back {
+  justify-self: start;
+  padding: 6px 16px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #fff;
+  color: #6366F1;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.back:hover {
+  background: #F5F3FF;
+}
+
+/* ===== 解释提示 ===== */
+.explain-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.explain-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #C7D2FE;
+  border-radius: 50%;
+  color: #6366F1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: help;
+}
+.weak-tooltip {
+  display: none !important;
+  position: absolute;
+  z-index: 12;
+  left: 26px;
+  top: -10px;
+  width: 320px;
+  padding: 14px;
+  border: 1px solid #C7D2FE;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.15);
+  color: #1E293B;
+  font-weight: 400;
+}
+.weak-tooltip b {
+  font-weight: 600;
+  color: #1E293B;
+}
+.weak-tooltip p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #64748B;
+  line-height: 1.6;
+}
+.explain-trigger:hover .weak-tooltip,
+.explain-trigger:focus .weak-tooltip {
+  display: block !important;
+}
+
+/* ================================================================
+   响应式
+   ================================================================ */
+@media (max-width: 1000px) {
+  .chapter-grid-v2 {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .student-list {
+    grid-template-columns: 1fr;
+  }
+  .student-list > button {
+    grid-template-columns: 40px 1fr auto auto 60px 18px;
+  }
+}
+
+@media (max-width: 800px) {
+  .hero {
+    flex-direction: column;
+    text-align: center;
+    padding: 22px 20px;
+  }
+  .overview-cards,
+  .source-board {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .overview-cards.three {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .chapter-grid-v2 {
+    grid-template-columns: 1fr !important;
+  }
+  .student-list > button {
+    grid-template-columns: 40px 1fr 60px 18px !important;
+  }
+  .student-list .source {
+    display: none;
+  }
+  .trend-notes {
+    grid-template-columns: 1fr;
+  }
+  .student-summary {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  .weak-grid {
+    grid-template-columns: 1fr;
+  }
+  .weak-tooltip {
+    left: auto;
+    right: -8px;
+    width: min(300px, 80vw);
+  }
+}
+
+@media (max-width: 540px) {
+  .overview-cards,
+  .source-board {
+    grid-template-columns: 1fr !important;
+  }
+  .overview-cards.three {
+    grid-template-columns: 1fr !important;
+  }
+  .section {
+    padding: 14px 16px;
+  }
+  .hero h2 {
+    font-size: 22px;
+  }
+  .score-pill b {
+    font-size: 22px;
+  }
+  .chart-container {
+    height: 250px;
+  }
+  .chapter-row {
+    grid-template-columns: 70px 1fr 1fr 32px;
+    gap: 6px;
+    font-size: 12px;
+  }
+}
+</style>
