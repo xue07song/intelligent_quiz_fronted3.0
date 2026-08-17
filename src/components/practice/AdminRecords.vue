@@ -1,15 +1,23 @@
 <template>
   <div class="iq-admin-records">
-    <!-- 视图：试卷列表 -->
+    <!-- ============================================================ -->
+    <!-- 视图：试卷列表（带横幅）                                      -->
+    <!-- ============================================================ -->
     <template v-if="view === 'exams'">
-      <div class="iq-page-header">
-        <div>
-          <h2 class="iq-text-xl iq-font-semibold" style="color: var(--iq-neutral-900); margin: 0;">📊 试卷分析</h2>
-          <p class="iq-text-sm iq-text-muted" style="margin: 4px 0 0;">选择一份试卷，查看各班级做题情况与题目维度分析</p>
+      <!-- ===== 顶部横幅（与自适应学情完全一致） ===== -->
+      <header class="iq-page-hero">
+        <div class="hero-content">
+          <span class="hero-badge">📊 教学数据</span>
+          <h1 class="hero-title">试卷分析</h1>
+          <p class="hero-desc">选择一份试卷，查看各班级做题情况与题目维度分析</p>
         </div>
-      </div>
+        <div class="hero-actions" style="min-width: 80px; visibility: hidden;">
+          <!-- 隐藏占位，保持高度一致 -->
+        </div>
+      </header>
 
-      <div class="iq-card" style="padding: 14px 20px; margin-bottom: 16px;">
+      <!-- 筛选栏 — 与横幅对齐 -->
+      <div class="iq-card filter-card">
         <div class="exam-filter-row">
           <div class="filter-item">
             <label class="filter-label">科目</label>
@@ -33,7 +41,7 @@
         <span class="iq-text-sm iq-text-muted">加载中...</span>
       </div>
 
-      <div v-else-if="examList.length === 0" class="iq-card">
+      <div v-else-if="examList.length === 0" class="iq-card content-card">
         <div class="iq-empty-row">
           <div class="iq-empty-box">
             <div class="iq-empty-icon">📋</div>
@@ -42,65 +50,68 @@
         </div>
       </div>
 
-      <div v-else class="iq-card">
+      <div v-else class="iq-card content-card">
         <div class="iq-table-wrap">
           <table class="iq-table">
             <thead>
-              <tr>
-                <th>ID</th>
-                <th>标题</th>
-                <th>科目</th>
-                <th>目标班级</th>
-                <th>题数</th>
-                <th>练习次数</th>
-                <th>创建时间</th>
-                <th style="width: 120px;">操作</th>
-              </tr>
+            <tr>
+              <th>ID</th>
+              <th>标题</th>
+              <th>科目</th>
+              <th>目标班级</th>
+              <th>题数</th>
+              <th>练习次数</th>
+              <th>创建时间</th>
+              <th style="width: 120px;">操作</th>
+            </tr>
             </thead>
             <tbody>
-              <tr v-for="exam in examList" :key="exam.id">
-                <td><span class="iq-id-chip">{{ exam.id }}</span></td>
-                <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ exam.title }}</td>
-                <td>
-                  <span v-if="exam.subject" class="iq-subject-tag">{{ exam.subject }}</span>
-                  <span v-else>--</span>
-                </td>
-                <td>
-                  <span v-if="exam.class_id || exam.classId" class="iq-tag iq-tag-warning">{{ exam.class_name || exam.className || '定向' }}</span>
-                  <span v-else class="iq-tag iq-tag-neutral">全开放</span>
-                </td>
-                <td>{{ exam.total_count }}</td>
-                <td><span class="iq-id-chip">{{ exam.attempt_count || 0 }}</span></td>
-                <td class="iq-text-sm iq-text-muted">{{ formatTime(exam.created_at) }}</td>
-                <td>
-                  <button class="iq-btn iq-btn-primary iq-btn-sm" @click="openExamAnalysis(exam)">📊 分析</button>
-                </td>
-              </tr>
+            <tr v-for="exam in examList" :key="exam.id">
+              <td><span class="iq-id-chip">{{ exam.id }}</span></td>
+              <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ exam.title }}</td>
+              <td>
+                <span v-if="exam.subject" class="iq-subject-tag">{{ exam.subject }}</span>
+                <span v-else>--</span>
+              </td>
+              <td>
+                <span v-if="exam.class_id || exam.classId" class="iq-tag iq-tag-warning">{{ exam.class_name || exam.className || '定向' }}</span>
+                <span v-else class="iq-tag iq-tag-neutral">全开放</span>
+              </td>
+              <td>{{ exam.total_count }}</td>
+              <td><span class="iq-id-chip">{{ exam.attempt_count || 0 }}</span></td>
+              <td class="iq-text-sm iq-text-muted">{{ formatTime(exam.created_at) }}</td>
+              <td>
+                <button class="iq-btn iq-btn-primary iq-btn-sm" @click="openExamAnalysis(exam)">📊 分析</button>
+              </td>
+            </tr>
             </tbody>
           </table>
         </div>
         <Pagination
-          v-model:page="page"
-          v-model:pageSize="pageSize"
-          :total="total"
-          @change="loadExams"
+            v-model:page="page"
+            v-model:pageSize="pageSize"
+            :total="total"
+            @change="loadExams"
         />
       </div>
     </template>
 
-
-    <!-- 视图：答题记录详情（复用 RecordDetail，管理端模式） -->
+    <!-- ============================================================ -->
+    <!-- 视图：答题记录详情（复用 RecordDetail，管理端模式）          -->
+    <!-- ============================================================ -->
     <template v-if="view === 'detail'">
       <RecordDetail
-        :recordId="activeRecordId"
-        adminMode
-        :reviewable="role==='teacher'"
-        @back="backFromDetail"
-        @toast="onToast"
+          :recordId="activeRecordId"
+          adminMode
+          :reviewable="role==='teacher'"
+          @back="backFromDetail"
+          @toast="onToast"
       />
     </template>
 
-    <!-- 视图：某用户的统计分析（复用 PracticeStats，传入 userId） -->
+    <!-- ============================================================ -->
+    <!-- 视图：某用户的统计分析（复用 PracticeStats，传入 userId）    -->
+    <!-- ============================================================ -->
     <template v-if="view === 'stats'">
       <div class="iq-sub-header">
         <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="backToUsers">
@@ -119,9 +130,10 @@
       <PracticeStats :userId="selectedUser.id" @toast="onToast" />
     </template>
 
-    <!-- 视图：试卷分析详情 -->
+    <!-- ============================================================ -->
+    <!-- 视图：试卷分析详情                                            -->
+    <!-- ============================================================ -->
     <template v-if="view === 'analysis'">
-
       <div class="iq-sub-header">
         <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="view = 'exams'">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -174,14 +186,14 @@
             <div class="pie-chart-wrap">
               <svg viewBox="0 0 200 200" class="pie-svg">
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.excellent" :stroke-width="40"
-                  :stroke-dasharray="pieDash.excellent" :stroke-dashoffset="pieOffset.excellent"
-                  transform="rotate(-90 100 100)" />
+                        :stroke-dasharray="pieDash.excellent" :stroke-dashoffset="pieOffset.excellent"
+                        transform="rotate(-90 100 100)" />
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.pass" :stroke-width="40"
-                  :stroke-dasharray="pieDash.pass" :stroke-dashoffset="pieOffset.pass"
-                  transform="rotate(-90 100 100)" />
+                        :stroke-dasharray="pieDash.pass" :stroke-dashoffset="pieOffset.pass"
+                        transform="rotate(-90 100 100)" />
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.fail" :stroke-width="40"
-                  :stroke-dasharray="pieDash.fail" :stroke-dashoffset="pieOffset.fail"
-                  transform="rotate(-90 100 100)" />
+                        :stroke-dasharray="pieDash.fail" :stroke-dashoffset="pieOffset.fail"
+                        transform="rotate(-90 100 100)" />
                 <text x="100" y="95" text-anchor="middle" class="pie-center-num">{{ analysis.totalAttempts }}</text>
                 <text x="100" y="115" text-anchor="middle" class="pie-center-label">总提交</text>
               </svg>
@@ -250,14 +262,14 @@
             <div class="pie-chart-wrap">
               <svg viewBox="0 0 200 200" class="pie-svg">
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.high" :stroke-width="40"
-                  :stroke-dasharray="accDash.high" :stroke-dashoffset="accOffset.high"
-                  transform="rotate(-90 100 100)" />
+                        :stroke-dasharray="accDash.high" :stroke-dashoffset="accOffset.high"
+                        transform="rotate(-90 100 100)" />
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.mid" :stroke-width="40"
-                  :stroke-dasharray="accDash.mid" :stroke-dashoffset="accOffset.mid"
-                  transform="rotate(-90 100 100)" />
+                        :stroke-dasharray="accDash.mid" :stroke-dashoffset="accOffset.mid"
+                        transform="rotate(-90 100 100)" />
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.low" :stroke-width="40"
-                  :stroke-dasharray="accDash.low" :stroke-dashoffset="accOffset.low"
-                  transform="rotate(-90 100 100)" />
+                        :stroke-dasharray="accDash.low" :stroke-dashoffset="accOffset.low"
+                        transform="rotate(-90 100 100)" />
                 <text x="100" y="95" text-anchor="middle" class="pie-center-num">{{ analysis.avgAccuracy }}%</text>
                 <text x="100" y="115" text-anchor="middle" class="pie-center-label">平均正确率</text>
               </svg>
@@ -283,7 +295,7 @@
         </div>
 
         <!-- 题目维度分析 -->
-        <div class="iq-card" style="padding: 20px;">
+        <div class="iq-card content-card" style="padding: 20px;">
           <div class="section-title-bar">
             <b>📝 题目维度分析</b>
             <span class="iq-text-sm iq-text-muted">每道题的全班作答情况</span>
@@ -299,45 +311,45 @@
           <div v-else class="iq-table-wrap">
             <table class="iq-table">
               <thead>
-                <tr>
-                  <th style="width: 40px;">#</th>
-                  <th>题目</th>
-                  <th>题型</th>
-                  <th>难度</th>
-                  <th>正确率</th>
-                  <th style="width: 200px;">正确率分布</th>
-                  <th>正确答案</th>
-                </tr>
+              <tr>
+                <th style="width: 40px;">#</th>
+                <th>题目</th>
+                <th>题型</th>
+                <th>难度</th>
+                <th>正确率</th>
+                <th style="width: 200px;">正确率分布</th>
+                <th>正确答案</th>
+              </tr>
               </thead>
               <tbody>
-                <tr v-for="(q, idx) in questionStats" :key="idx">
-                  <td><span class="iq-id-chip">{{ idx + 1 }}</span></td>
-                  <td class="question-cell" :title="q.title">{{ q.title }}</td>
-                  <td><span class="iq-type-tag" :class="`type-${q.type}`">{{ q.typeName }}</span></td>
-                  <td>
-                    <span class="iq-tag" :class="difficultyClass(q.difficulty)">{{ q.difficulty }}级</span>
-                  </td>
-                  <td>
+              <tr v-for="(q, idx) in questionStats" :key="idx">
+                <td><span class="iq-id-chip">{{ idx + 1 }}</span></td>
+                <td class="question-cell" :title="q.title">{{ q.title }}</td>
+                <td><span class="iq-type-tag" :class="`type-${q.type}`">{{ q.typeName }}</span></td>
+                <td>
+                  <span class="iq-tag" :class="difficultyClass(q.difficulty)">{{ q.difficulty }}级</span>
+                </td>
+                <td>
                     <span class="iq-font-semibold" :class="q.correctRate >= 80 ? 'text-good' : q.correctRate >= 60 ? 'text-mid' : 'text-bad'">
                       {{ q.correctRate }}%
                     </span>
-                  </td>
-                  <td>
-                    <div class="mini-bar-wrap">
-                      <div class="mini-bar mini-bar-correct" :style="{ width: q.correctRate + '%' }"></div>
-                      <div class="mini-bar mini-bar-wrong" :style="{ width: q.wrongRate + '%' }"></div>
-                      <div class="mini-bar mini-bar-skip" :style="{ width: q.skipRate + '%' }"></div>
-                    </div>
-                  </td>
-                  <td class="answer-cell" :title="q.answer">{{ q.answer }}</td>
-                </tr>
+                </td>
+                <td>
+                  <div class="mini-bar-wrap">
+                    <div class="mini-bar mini-bar-correct" :style="{ width: q.correctRate + '%' }"></div>
+                    <div class="mini-bar mini-bar-wrong" :style="{ width: q.wrongRate + '%' }"></div>
+                    <div class="mini-bar mini-bar-skip" :style="{ width: q.skipRate + '%' }"></div>
+                  </div>
+                </td>
+                <td class="answer-cell" :title="q.answer">{{ q.answer }}</td>
+              </tr>
               </tbody>
             </table>
           </div>
         </div>
 
         <!-- 所有提交记录 -->
-        <div class="iq-card" style="padding: 20px;">
+        <div class="iq-card content-card" style="padding: 20px;">
           <div class="section-title-bar">
             <b>📋 所有提交记录</b>
             <span class="iq-text-sm iq-text-muted">共 {{ recordsTotal }} 条</span>
@@ -353,42 +365,42 @@
           <div v-else class="iq-table-wrap">
             <table class="iq-table">
               <thead>
-                <tr>
-                  <th>提交人</th>
-                  <th>班级</th>
-                  <th>得分</th>
-                  <th>正确率</th>
-                  <th>正确/错误/未答</th>
-                  <th>用时</th>
-                  <th>提交时间</th>
-                </tr>
+              <tr>
+                <th>提交人</th>
+                <th>班级</th>
+                <th>得分</th>
+                <th>正确率</th>
+                <th>正确/错误/未答</th>
+                <th>用时</th>
+                <th>提交时间</th>
+              </tr>
               </thead>
               <tbody>
-                <tr v-for="r in recordsList" :key="r.id">
-                  <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ r.nickname || r.username || '-' }}</td>
-                  <td>
-                    <span v-if="r.class_name || r.className" class="iq-tag iq-tag-neutral">{{ r.class_name || r.className }}</span>
-                    <span v-else class="iq-text-sm iq-text-muted">--</span>
-                  </td>
-                  <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
-                  <td><span class="iq-font-semibold" :class="r.accuracy >= 80 ? 'text-good' : r.accuracy >= 60 ? 'text-mid' : 'text-bad'">{{ r.accuracy }}%</span></td>
-                  <td>
-                    <span class="bar-good-text">{{ r.correct_count }}</span> /
-                    <span class="bar-bad-text">{{ r.wrong_count }}</span> /
-                    <span class="iq-text-muted">{{ r.skipped_count }}</span>
-                  </td>
-                  <td class="iq-text-sm">{{ formatDuration(r.duration_seconds) }}</td>
-                  <td class="iq-text-sm iq-text-muted">{{ formatTime(r.submitted_at) }}</td>
-                </tr>
+              <tr v-for="r in recordsList" :key="r.id">
+                <td class="iq-font-medium" style="color: var(--iq-neutral-800);">{{ r.nickname || r.username || '-' }}</td>
+                <td>
+                  <span v-if="r.class_name || r.className" class="iq-tag iq-tag-neutral">{{ r.class_name || r.className }}</span>
+                  <span v-else class="iq-text-sm iq-text-muted">--</span>
+                </td>
+                <td><span class="score-tag" :class="scoreClass(r.score)">{{ r.score }}</span></td>
+                <td><span class="iq-font-semibold" :class="r.accuracy >= 80 ? 'text-good' : r.accuracy >= 60 ? 'text-mid' : 'text-bad'">{{ r.accuracy }}%</span></td>
+                <td>
+                  <span class="bar-good-text">{{ r.correct_count }}</span> /
+                  <span class="bar-bad-text">{{ r.wrong_count }}</span> /
+                  <span class="iq-text-muted">{{ r.skipped_count }}</span>
+                </td>
+                <td class="iq-text-sm">{{ formatDuration(r.duration_seconds) }}</td>
+                <td class="iq-text-sm iq-text-muted">{{ formatTime(r.submitted_at) }}</td>
+              </tr>
               </tbody>
             </table>
           </div>
           <Pagination
-            v-if="recordsTotal > 0"
-            v-model:page="recordsPage"
-            v-model:pageSize="recordsPageSize"
-            :total="recordsTotal"
-            @change="loadExamRecords"
+              v-if="recordsTotal > 0"
+              v-model:page="recordsPage"
+              v-model:pageSize="recordsPageSize"
+              :total="recordsTotal"
+              @change="loadExamRecords"
           />
         </div>
       </template>
@@ -398,12 +410,14 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { getExams, adminListRecords, getExam } from '@/api/practice';
+import { getExams, adminListRecords, getExamAnalytics } from '@/api/practice';
 import { getSubjects } from '@/api/subject';
 import { getClasses } from '@/api/class';
 import { getTypeName, getDifficultyLabel, DIFFICULTY_OPTIONS } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
+import RecordDetail from '@/components/practice/RecordDetail.vue';
+import PracticeStats from '@/components/practice/PracticeStats.vue';
 
 const props = defineProps({
   role: { type: String, required: true },
@@ -424,6 +438,8 @@ const classList = ref([]);
 const subjectFilter = ref('');
 const classFilter = ref('');
 
+const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
+
 const loadExams = async () => {
   examsLoading.value = true;
   try {
@@ -431,7 +447,6 @@ const loadExams = async () => {
     if (subjectFilter.value) params.subject = subjectFilter.value;
     if (classFilter.value) params.classId = classFilter.value;
     const data = await getExams(params);
-    // 兼容：后端可能直接返回数组或 {list,total}
     if (Array.isArray(data)) {
       examList.value = data;
       total.value = data.length;
@@ -456,6 +471,7 @@ const recordsTotal = ref(0);
 const recordsPage = ref(1);
 const recordsPageSize = ref(50);
 const questionStats = ref([]);
+const analysisData = ref(null);
 
 const analysis = reactive({
   totalAttempts: 0,
@@ -477,12 +493,43 @@ const openExamAnalysis = async (exam) => {
   recordsPage.value = 1;
 
   try {
-    await Promise.all([loadExamRecords(), loadQuestionStats()]);
+    await Promise.all([loadExamAnalysis(), loadExamRecords()]);
     computeAnalysis();
   } catch (err) {
     onToast({ message: err.message || '加载分析数据失败', type: 'error' });
   } finally {
     analysisLoading.value = false;
+  }
+};
+
+const loadExamAnalysis = async () => {
+  analysisLoading.value = true;
+  questionsLoading.value = true;
+  try {
+    analysisData.value = await getExamAnalytics(selectedExam.value.id);
+    const stats = analysisData.value?.questionStats || [];
+    questionStats.value = stats.map((q, idx) => {
+      const typeNum = Number(q.question_type || 0);
+      const answered = Number(q.answered_count) || 0;
+      const wrong = Number(q.wrong_count) || 0;
+      const skipped = Number(q.skipped_count) || 0;
+      return {
+        index: idx + 1,
+        title: String(q.question_text || '').substring(0, 60) || `第${idx + 1}题`,
+        type: typeNum,
+        typeName: getTypeName(typeNum) || '未知',
+        difficulty: 0,
+        answer: q.correct_answer || '--',
+        correctRate: Math.round(Number(q.accuracy) || 0),
+        wrongRate: answered ? Math.round(wrong * 100 / answered) : 0,
+        skipRate: answered ? Math.round(skipped * 100 / answered) : 0,
+      };
+    });
+  } catch (err) {
+    onToast({ message: err.message || '加载分析数据失败', type: 'error' });
+  } finally {
+    analysisLoading.value = false;
+    questionsLoading.value = false;
   }
 };
 
@@ -496,7 +543,6 @@ const loadExamRecords = async () => {
     };
     if (props.role === 'teacher') params.role = 'student';
     const data = await adminListRecords(params);
-    // 兼容：后端可能直接返回数组或 {list,total}
     if (Array.isArray(data)) {
       recordsList.value = data;
       recordsTotal.value = data.length;
@@ -504,7 +550,6 @@ const loadExamRecords = async () => {
       recordsList.value = data?.list || [];
       recordsTotal.value = data?.total || 0;
     }
-    if (recordsPage.value === 1) computeAnalysis();
   } catch (err) {
     onToast({ message: err.message || '加载记录失败', type: 'error' });
   } finally {
@@ -512,7 +557,6 @@ const loadExamRecords = async () => {
   }
 };
 
-// 从对象中按多个字段名取第一个有效值（兼容多种契约）
 const pick = (obj, fields, fallback = '') => {
   if (!obj) return fallback;
   for (const f of fields) {
@@ -521,36 +565,9 @@ const pick = (obj, fields, fallback = '') => {
   return fallback;
 };
 
-const loadQuestionStats = async () => {
-  questionsLoading.value = true;
-  try {
-    const examData = await getExam(selectedExam.value.id);
-    const questions = examData?.questions || examData?.data?.questions || [];
-    questionStats.value = questions.map((q, idx) => {
-      const typeNum = Number(pick(q, ['题型', 'type', 'questionType', 'question_type'], 0));
-      const titleRaw = pick(q, ['题目', 'title', 'question', 'stem'], '');
-      return {
-        index: idx + 1,
-        title: String(titleRaw).substring(0, 60) || `第${idx + 1}题`,
-        type: typeNum,
-        typeName: getTypeName(typeNum) || '未知',
-        difficulty: Number(pick(q, ['难度', 'difficulty', 'level'], 0)),
-        answer: pick(q, ['答案', 'answer', 'correctAnswer', 'correct_answer'], '--'),
-        correctRate: 0,
-        wrongRate: 0,
-        skipRate: 0,
-      };
-    });
-  } catch (err) {
-    onToast({ message: err.message || '加载题目数据失败', type: 'error' });
-  } finally {
-    questionsLoading.value = false;
-  }
-};
-
 const computeAnalysis = () => {
-  const records = recordsList.value;
-  if (records.length === 0) {
+  const data = analysisData.value;
+  if (!data) {
     Object.assign(analysis, {
       totalAttempts: 0, uniqueStudents: 0, avgScore: 0, passRate: 0, avgAccuracy: 0,
       scoreDist: { excellent: 0, pass: 0, fail: 0 },
@@ -560,16 +577,16 @@ const computeAnalysis = () => {
     return;
   }
 
-  const totalAttempts = recordsTotal.value || records.length;
-  const studentSet = new Set(records.map(r => r.user_id || r.userId || r.id));
-  const uniqueStudents = studentSet.size;
+  const overview = data.overview || {};
+  const studentResults = data.studentResults || [];
+  const totalAttempts = overview.participant_count || studentResults.length;
+  const uniqueStudents = totalAttempts;
 
-  const scores = records.map(r => Number(r.score) || 0);
+  const scores = studentResults.map(r => Number(r.score) || 0);
   const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-  const passCount = scores.filter(s => s >= 60).length;
-  const passRate = Math.round((passCount / scores.length) * 100);
+  const passRate = Math.round(Number(overview.pass_rate) || 0);
 
-  const accuracies = records.map(r => Number(r.accuracy) || 0);
+  const accuracies = studentResults.map(r => Number(r.accuracy) || 0);
   const avgAccuracy = Math.round(accuracies.reduce((a, b) => a + b, 0) / accuracies.length);
 
   const scoreDist = {
@@ -584,58 +601,21 @@ const computeAnalysis = () => {
     low: accuracies.filter(a => a < 60).length,
   };
 
-  // 班级分组统计
-  const classMap = {};
-  records.forEach(r => {
-    const clsName = r.class_name || r.className || '未分班';
-    if (!classMap[clsName]) classMap[clsName] = { scores: [], count: 0 };
-    classMap[clsName].scores.push(Number(r.score) || 0);
-    classMap[clsName].count++;
-  });
-  const classStats = Object.entries(classMap).map(([name, data]) => ({
-    name,
-    avgScore: Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length),
-    count: data.count,
-  })).sort((a, b) => b.avgScore - a.avgScore);
+  const classStats = (data.classBreakdown || []).map((c) => ({
+    name: c.class_name || '未分班',
+    avgScore: Math.round(Number(c.avg_score) || 0),
+    count: c.participant_count || 0,
+  }));
 
-  // 分数段
-  const segments = [
-    { label: '0-59', min: 0, max: 59, count: 0, color: '#ef4444' },
-    { label: '60-69', min: 60, max: 69, count: 0, color: '#f59e0b' },
-    { label: '70-79', min: 70, max: 79, count: 0, color: '#eab308' },
-    { label: '80-89', min: 80, max: 89, count: 0, color: '#22c55e' },
-    { label: '90-100', min: 90, max: 100, count: 0, color: '#10b981' },
-  ];
-  scores.forEach(s => {
-    const seg = segments.find(seg => s >= seg.min && s <= seg.max);
-    if (seg) seg.count++;
-  });
+  const segmentColors = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#10b981'];
+  const segments = (data.scoreDistribution || []).map((s) => ({
+    label: s.range_label || '--',
+    min: 0,
+    max: 100,
+    count: Number(s.count) || 0,
+    color: segmentColors[(Number(s.range_order) || 1) - 1] || '#10b981',
+  }));
   const maxSegment = Math.max(...segments.map(s => s.count), 1);
-
-  // 题目正确率（从记录中汇总）
-  if (questionStats.value.length > 0 && records.length > 0) {
-    // 从首批记录中估算每题正确率
-    const qCorrect = new Array(questionStats.value.length).fill(0);
-    const qWrong = new Array(questionStats.value.length).fill(0);
-    const qSkip = new Array(questionStats.value.length).fill(0);
-    const qTotal = new Array(questionStats.value.length).fill(0);
-
-    // 用整体正确/错误/未答数按比例估算
-    const totalCorrect = records.reduce((a, r) => a + (Number(r.correct_count) || 0), 0);
-    const totalWrong = records.reduce((a, r) => a + (Number(r.wrong_count) || 0), 0);
-    const totalSkip = records.reduce((a, r) => a + (Number(r.skipped_count) || 0), 0);
-    const totalQuestions = totalCorrect + totalWrong + totalSkip || 1;
-
-    questionStats.value.forEach((q, idx) => {
-      // 按比例分配
-      const estimatedCorrect = Math.round((totalCorrect / totalQuestions) * 100);
-      const estimatedWrong = Math.round((totalWrong / totalQuestions) * 100);
-      const estimatedSkip = 100 - estimatedCorrect - estimatedWrong;
-      q.correctRate = Math.min(estimatedCorrect, 100);
-      q.wrongRate = Math.min(Math.max(estimatedWrong, 0), 100);
-      q.skipRate = Math.min(Math.max(estimatedSkip, 0), 100);
-    });
-  }
 
   Object.assign(analysis, {
     totalAttempts, uniqueStudents, avgScore, passRate, avgAccuracy,
@@ -726,6 +706,14 @@ const difficultyClass = (d) => {
   return 'iq-tag-neutral';
 };
 
+const backFromDetail = () => {
+  view.value = 'exams';
+};
+
+const backToUsers = () => {
+  view.value = 'exams';
+};
+
 onMounted(async () => {
   try { allSubjects.value = await getSubjects(); } catch { /* ignore */ }
   try {
@@ -738,7 +726,70 @@ onMounted(async () => {
 
 <style scoped>
 .iq-admin-records { display: flex; flex-direction: column; gap: 16px; }
-.iq-page-header { display: flex; justify-content: space-between; align-items: flex-end; }
+
+/* ===== 顶部横幅（完全对齐自适应学情） ===== */
+.iq-page-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 34px;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.25);
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+.hero-content .hero-badge {
+  font-size: 12px;
+  opacity: 0.8;
+  letter-spacing: 1px;
+  display: block;
+  margin-bottom: 4px;
+}
+.hero-content .hero-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+.hero-content .hero-desc {
+  font-size: 14px;
+  opacity: 0.85;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 4px 0 0;
+}
+.hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ===== 筛选栏卡片（与横幅对齐） ===== */
+.filter-card {
+  padding: 14px 20px;
+  max-width: 1240px;
+  margin: 0 auto 16px auto;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid var(--iq-border);
+  border-radius: 12px;
+}
+
+/* ===== 内容卡片（表格、列表等，与横幅对齐） ===== */
+.content-card {
+  max-width: 1240px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid var(--iq-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
 
 .exam-filter-row { display: flex; flex-wrap: wrap; gap: 14px; }
 .exam-filter-row .filter-item { display: flex; flex-direction: column; gap: 5px; min-width: 170px; }
@@ -820,5 +871,19 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .charts-row { grid-template-columns: 1fr; }
   .stats-cards { grid-template-columns: repeat(2, 1fr); }
+  .iq-page-hero {
+    flex-direction: column;
+    text-align: center;
+    padding: 22px 20px;
+    gap: 16px;
+  }
+  .hero-content .hero-title {
+    font-size: 24px;
+  }
+  .filter-card,
+  .content-card {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
 }
 </style>

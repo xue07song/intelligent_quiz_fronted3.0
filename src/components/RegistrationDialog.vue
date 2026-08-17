@@ -80,6 +80,7 @@
               <div class="iq-form-field">
                 <label class="iq-form-label">学号 <span class="iq-form-required">*</span></label>
                 <input v-model="form.student_no" type="text" class="iq-input" placeholder="请输入学号" maxlength="20" />
+                <span class="iq-text-xs iq-text-muted">学号将用于注册后自动匹配对应年级/专业的必修班级；选修班级由任课教师在「班级管理」中添加</span>
               </div>
             </template>
 

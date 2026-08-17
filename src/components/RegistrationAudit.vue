@@ -73,7 +73,7 @@
               <td>{{ item.college || '--' }}</td>
               <td>
                 <span v-if="item.role === 'student'">{{ item.major || '--' }}</span>
-                <span v-else-if="item.role === 'teacher' && item.subjects && item.subjects.length" class="iq-subject-list">{{ item.subjects.join('、') }}</span>
+                <span v-else-if="item.role === 'teacher' && formatSubjects(item.subjects)" class="iq-subject-list">{{ formatSubjects(item.subjects) }}</span>
                 <span v-else>--</span>
               </td>
               <td>{{ (item.role === 'student' ? item.student_no : item.employee_no) || '--' }}</td>
@@ -198,6 +198,11 @@ const getRoleLabel = (role) => {
 const getStatusLabel = (status) => {
   const map = { pending: '待审核', approved: '已通过', rejected: '已拒绝' };
   return map[status] || status;
+};
+
+const formatSubjects = (subjects) => {
+  if (Array.isArray(subjects)) return subjects.filter(Boolean).join('、');
+  return String(subjects || '').split(',').map((item) => item.trim()).filter(Boolean).join('、');
 };
 
 const formatTime = (t) => {

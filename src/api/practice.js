@@ -55,6 +55,40 @@ export const submitExam = (id, data) => {
   return request.post(`/practice/exams/${id}/submit`, data);
 };
 
+// 学生开始作答（服务端记录开始时间）
+export const startExamApi = (id) => {
+  return request.post(`/practice/exams/${id}/start`);
+};
+
+// 试卷维度分析（每题正确率 + 学生成绩 + 整体统计 + 班级对比 + 分数段）
+export const getExamAnalytics = (id) => {
+  return request.get(`/practice/exams/${id}/analytics`);
+};
+
+// 试卷状态管理（教师本人/管理员）
+export const updateExamStatusApi = (id, status) => {
+  return request.patch(`/practice/exams/${id}/status`, { status });
+};
+
+// 试卷设置编辑（教师本人/管理员）
+export const updateExamApi = (id, data) => {
+  return request.put(`/practice/exams/${id}`, data);
+};
+
+// 删除试卷（仅无作答记录的试卷）
+export const deleteExamApi = (id) => {
+  return request.delete(`/practice/exams/${id}`);
+};
+
+// 答题草稿（服务端）
+export const getExamDraftApi = (id) => {
+  return request.get(`/practice/exams/${id}/draft`);
+};
+
+export const saveExamDraftApi = (id, data) => {
+  return request.put(`/practice/exams/${id}/draft`, data);
+};
+
 // 答题记录列表（分页）
 export const getRecords = (params = {}) => {
   return request.get('/practice/records', { params });
@@ -99,6 +133,10 @@ export const adminGetRecord = (id) => {
   return request.get(`/practice/admin/records/${id}`);
 };
 export const reviewSubjectiveAnswer = (answerId, data) => request.put(`/practice/admin/answers/${answerId}/review`, data);
+
+// 自适应主观题复核（教师）
+export const listAdaptiveAnswers = (params = {}) => request.get('/practice/admin/adaptive-answers', { params });
+export const reviewAdaptiveAnswerApi = (answerId, data) => request.put(`/practice/admin/adaptive-answers/${answerId}/review`, data);
 
 // 管理端：查看指定用户的答题记录列表
 export const adminListUserRecords = (userId, params = {}) => {

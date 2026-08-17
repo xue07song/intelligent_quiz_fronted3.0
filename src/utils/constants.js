@@ -21,7 +21,6 @@ const DIFFICULTY_MAP = {
   '容易': '⭐⭐',
   '一般': '⭐⭐⭐',
   '较难': '⭐⭐⭐⭐',
-  '困难': '⭐⭐⭐⭐⭐',
 };
 
 const CHAPTER_MAP = {

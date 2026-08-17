@@ -1,276 +1,143 @@
 <template>
   <div class="profile-page">
     <div class="iq-page-titlebar">
-      <h1>个人中心</h1>
+      <h1>👤 个人中心</h1>
     </div>
 
-    <el-tabs v-model="activeTab" class="profile-tabs">
-      <!-- 个人信息 -->
-      <el-tab-pane label="个人信息" name="info">
-        <div class="iq-card profile-card" v-loading="profileLoading">
-          <div class="profile-card-head">
-            <span class="profile-card-title">基本信息</span>
-            <el-button type="primary" plain size="small" @click="openEditDialog">
-              编辑资料
-            </el-button>
-          </div>
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="用户名">
-              {{ profile.username || '--' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="昵称">
-              {{ textValue(profile.nickname) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="角色">
-              {{ roleText(profile.role) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="注册时间">
-              {{ formatTime(profile.created_at) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="邮箱">
-              {{ textValue(profile.email) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="手机号">
-              {{ textValue(profile.phone) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="学校">
-              {{ textValue(profile.school) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="学院">
-              {{ textValue(profile.college) }}
-            </el-descriptions-item>
-            <el-descriptions-item v-if="profile.role === 'student'" label="所在班级">
-              <template v-if="profile.className || profile.class_name">
-                <el-tag type="success" effect="light">{{ profile.className || profile.class_name }}</el-tag>
-              </template>
-              <span v-else class="iq-text-muted">未分班</span>
-            </el-descriptions-item>
-            <el-descriptions-item v-if="profile.role === 'teacher'" label="所教科目" :span="2">
-              <template v-if="profile.subjects && profile.subjects.length > 0">
-                <el-tag
-                  v-for="(s, idx) in profile.subjects"
-                  :key="idx"
-                  type="primary"
-                  effect="light"
-                  style="margin-right: 6px; margin-bottom: 4px;"
-                >
-                  {{ s }}
-                </el-tag>
-              </template>
-              <span v-else class="iq-text-muted">暂未设置</span>
-            </el-descriptions-item>
-          </el-descriptions>
+    <!-- ===== 个人信息卡片 ===== -->
+    <div class="iq-card profile-card" v-loading="profileLoading">
+      <div class="profile-card-head">
+        <span class="profile-card-title">基本信息</span>
+        <el-button type="primary" plain size="small" @click="openEditDialog">
+          编辑资料
+        </el-button>
+      </div>
+
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="用户名">
+          {{ profile.username || '--' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="昵称">
+          {{ textValue(profile.nickname) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="角色">
+          {{ roleText(profile.role) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="注册时间">
+          {{ formatTime(profile.created_at) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="邮箱">
+          {{ textValue(profile.email) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="手机号">
+          {{ textValue(profile.phone) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="学校">
+          {{ textValue(profile.school) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="学院">
+          {{ textValue(profile.college) }}
+        </el-descriptions-item>
+        <el-descriptions-item v-if="profile.role === 'student'" label="所在班级">
+          <template v-if="profile.className || profile.class_name">
+            <el-tag type="success" effect="light">{{ profile.className || profile.class_name }}</el-tag>
+          </template>
+          <span v-else class="iq-text-muted">未分班</span>
+        </el-descriptions-item>
+        <el-descriptions-item v-if="profile.role === 'teacher'" label="所教科目" :span="2">
+          <template v-if="profile.subjects && profile.subjects.length > 0">
+            <el-tag
+                v-for="(s, idx) in profile.subjects"
+                :key="idx"
+                type="primary"
+                effect="light"
+                style="margin-right: 6px; margin-bottom: 4px;"
+            >
+              {{ s }}
+            </el-tag>
+          </template>
+          <span v-else class="iq-text-muted">暂未设置</span>
+        </el-descriptions-item>
+      </el-descriptions>
+    </div>
+
+    <!-- ===== 功能入口 ===== -->
+    <div class="iq-card profile-card">
+      <div class="profile-actions-title">功能入口</div>
+      <div class="profile-actions-grid">
+        <div class="profile-action-item" @click="openChangePassword">
+          <span class="action-icon">🔐</span>
+          <span class="action-label">修改密码</span>
+          <span class="action-arrow">›</span>
         </div>
-      </el-tab-pane>
-
-      <!-- 历史题目 -->
-      <el-tab-pane label="历史题目" name="questions">
-        <div class="iq-card profile-table-card">
-          <el-table
-            :data="questionList"
-            v-loading="questionLoading"
-            border
-            class="profile-table"
-          >
-            <el-table-column prop="title" label="题目" min-width="280" show-overflow-tooltip />
-            <el-table-column label="题型" width="110">
-              <template #default="{ row }">
-                {{ typeText(row.questionType) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="userAnswer" label="用户答案" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="correctAnswer" label="正确答案" min-width="120" show-overflow-tooltip />
-            <el-table-column label="是否正确" width="100">
-              <template #default="{ row }">
-                <el-tag :type="correctTagType(row.isCorrect)" size="small">
-                  {{ correctText(row.isCorrect) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="答题时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.answeredAt) }}
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <el-pagination
-            v-model:current-page="questionPage"
-            v-model:page-size="questionSize"
-            class="profile-pagination"
-            :total="questionTotal"
-            :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="loadQuestions"
-            @size-change="handleQuestionSizeChange"
-          />
+        <div class="profile-action-item" @click="openFeedbackDialog">
+          <span class="action-icon">💬</span>
+          <span class="action-label">用户反馈</span>
+          <span class="action-arrow">›</span>
         </div>
-      </el-tab-pane>
+      </div>
+    </div>
 
-      <!-- 历史试卷 -->
-      <el-tab-pane label="历史试卷" name="exams">
-        <div class="iq-card profile-table-card">
-          <el-table
-            :data="examList"
-            v-loading="examLoading"
-            border
-            row-key="id"
-            class="profile-table"
-            @expand-change="handleExamExpand"
-          >
-            <el-table-column type="expand">
-              <template #default="{ row }">
-                <div class="exam-records-wrap" v-loading="recordsLoadingMap[row.id]">
-                  <el-table :data="recordsMap[row.id] || []" size="small" border>
-                    <el-table-column prop="score" label="得分" width="100">
-                      <template #default="{ row: rec }">
-                        {{ rec.score }} 分
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="correctCount" label="正确数" width="90" />
-                    <el-table-column prop="wrongCount" label="错误数" width="90" />
-                    <el-table-column prop="skippedCount" label="未答数" width="90" />
-                    <el-table-column label="提交时间" min-width="180">
-                      <template #default="{ row: rec }">
-                        {{ formatTime(rec.submittedAt) }}
-                      </template>
-                    </el-table-column>
-                  </el-table>
-                  <el-empty
-                    v-if="!recordsLoadingMap[row.id] && (recordsMap[row.id] || []).length === 0"
-                    description="暂无提交记录"
-                    :image-size="60"
-                  />
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="id" label="试卷ID" width="90" />
-            <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip />
-            <el-table-column prop="totalCount" label="总题数" width="90" />
-            <el-table-column label="提交次数" width="100">
-              <template #default="{ row }">
-                {{ row.attemptCount }}
-              </template>
-            </el-table-column>
-            <el-table-column label="最高分" width="100">
-              <template #default="{ row }">
-                {{ row.maxScore }}
-              </template>
-            </el-table-column>
-            <el-table-column label="生成时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.createdAt) }}
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <el-pagination
-            v-model:current-page="examPage"
-            v-model:page-size="examSize"
-            class="profile-pagination"
-            :total="examTotal"
-            :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="loadExams"
-            @size-change="handleExamSizeChange"
-          />
-        </div>
-      </el-tab-pane>
-
-      <!-- 标记题目 -->
-      <el-tab-pane label="标记题目" name="favorites">
-        <div class="iq-card profile-table-card">
-          <div class="favorite-add">
-            <el-input
-              v-model="favoriteQuestionId"
-              class="favorite-input"
-              placeholder="输入题目 ID 后收藏，如 Q001"
-              clearable
-              @keyup.enter="handleAddFavorite"
-            />
-            <el-button type="primary" :loading="addingFavorite" @click="handleAddFavorite">
-              收藏
-            </el-button>
-          </div>
-
-          <el-table
-            :data="favoriteList"
-            v-loading="favoriteLoading"
-            border
-            class="profile-table"
-          >
-            <el-table-column prop="questionId" label="题目ID" width="130" />
-            <el-table-column prop="title" label="题目" min-width="280" show-overflow-tooltip />
-            <el-table-column label="题型" width="110">
-              <template #default="{ row }">
-                {{ typeText(row.questionType) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="knowledgePoint" label="知识点" min-width="140" show-overflow-tooltip />
-            <el-table-column label="操作" width="130">
-              <template #default="{ row }">
-                <el-button
-                  size="small"
-                  type="danger"
-                  plain
-                  :loading="removingId === row.questionId"
-                  @click="handleRemoveFavorite(row)"
-                >
-                  取消标记
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <el-pagination
-            v-model:current-page="favoritePage"
-            v-model:page-size="favoriteSize"
-            class="profile-pagination"
-            :total="favoriteTotal"
-            :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="loadFavorites"
-            @size-change="handleFavoriteSizeChange"
-          />
-        </div>
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 编辑资料弹窗 -->
+    <!-- ===== 修改密码弹窗 ===== -->
     <el-dialog
-      v-model="editVisible"
-      title="编辑资料"
-      width="520px"
-      class="profile-edit-dialog"
-      destroy-on-close
+        v-model="changePasswordVisible"
+        title="修改密码"
+        width="420px"
+        class="profile-edit-dialog"
+        destroy-on-close
     >
       <el-form label-width="90px" class="profile-edit-form">
-        <el-form-item label="用户名">
-          <el-input :model-value="editForm.username" disabled />
+        <el-form-item label="旧密码">
+          <el-input v-model="passwordForm.oldPassword" type="password" placeholder="请输入旧密码" />
         </el-form-item>
-        <el-form-item label="角色">
-          <el-input :model-value="roleText(editForm.role)" disabled />
+        <el-form-item label="新密码">
+          <el-input v-model="passwordForm.newPassword" type="password" placeholder="请输入新密码（至少6位）" />
         </el-form-item>
-        <el-form-item label="昵称">
-          <el-input v-model="editForm.nickname" placeholder="请输入昵称" />
-        </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="editForm.email" placeholder="请输入邮箱" />
-        </el-form-item>
-        <el-form-item label="手机号">
-          <el-input v-model="editForm.phone" placeholder="请输入11位手机号" maxlength="11" />
-        </el-form-item>
-        <el-form-item label="学校">
-          <el-input v-model="editForm.school" placeholder="请输入学校" />
-        </el-form-item>
-        <el-form-item label="学院">
-          <el-input v-model="editForm.college" placeholder="请输入学院" />
+        <el-form-item label="确认密码">
+          <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请再次输入新密码" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editVisible = false">取消</el-button>
-        <el-button type="primary" :loading="editLoading" @click="handleSaveProfile">
-          保存
+        <el-button @click="changePasswordVisible = false">取消</el-button>
+        <el-button type="primary" :loading="changePasswordLoading" @click="handleChangePassword">
+          确认修改
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ===== 用户反馈弹窗 ===== -->
+    <el-dialog
+        v-model="feedbackVisible"
+        title="💬 用户反馈"
+        width="520px"
+        class="profile-edit-dialog"
+        destroy-on-close
+    >
+      <el-form label-width="80px" class="profile-edit-form">
+        <el-form-item label="反馈类型">
+          <el-select v-model="feedbackForm.type" placeholder="请选择反馈类型" style="width: 100%;">
+            <el-option label="功能建议" value="suggestion" />
+            <el-option label="问题报告" value="bug" />
+            <el-option label="使用疑问" value="question" />
+            <el-option label="其他" value="other" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="反馈内容">
+          <el-input
+              v-model="feedbackForm.content"
+              type="textarea"
+              placeholder="请详细描述你的建议或遇到的问题..."
+              :rows="5"
+          />
+        </el-form-item>
+        <el-form-item label="联系方式">
+          <el-input v-model="feedbackForm.contact" placeholder="选填，方便我们联系你" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="feedbackVisible = false">取消</el-button>
+        <el-button type="primary" :loading="feedbackLoading" @click="handleSubmitFeedback">
+          提交反馈
         </el-button>
       </template>
     </el-dialog>
@@ -278,20 +145,10 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
-import {
-  getStudentProfile,
-  updateProfile,
-  getHistoryQuestions,
-  getHistoryExams,
-  getExamRecords,
-  getFavorites,
-  addFavorite,
-  removeFavorite,
-} from '@/api/student';
-
-const activeTab = ref('info');
+import { getStudentProfile, updateProfile } from '@/api/student';
+import { createFeedback } from '@/api/feedback';
 
 // ===== 个人信息 =====
 const profile = ref({});
@@ -306,6 +163,24 @@ const editForm = ref({
   phone: '',
   school: '',
   college: '',
+});
+
+// ===== 修改密码 =====
+const changePasswordVisible = ref(false);
+const changePasswordLoading = ref(false);
+const passwordForm = ref({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+});
+
+// ===== 用户反馈 =====
+const feedbackVisible = ref(false);
+const feedbackLoading = ref(false);
+const feedbackForm = ref({
+  type: '',
+  content: '',
+  contact: '',
 });
 
 const loadProfile = async () => {
@@ -366,165 +241,84 @@ const handleSaveProfile = async () => {
   }
 };
 
-// ===== 历史题目 =====
-const questionList = ref([]);
-const questionTotal = ref(0);
-const questionPage = ref(1);
-const questionSize = ref(20);
-const questionLoading = ref(false);
+// ===== 修改密码 =====
+const openChangePassword = () => {
+  passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' };
+  changePasswordVisible.value = true;
+};
 
-const loadQuestions = async () => {
-  questionLoading.value = true;
-  try {
-    const data = await getHistoryQuestions({
-      page: questionPage.value,
-      size: questionSize.value,
-    });
-    questionList.value = data.list || [];
-    questionTotal.value = data.total || 0;
-  } catch (err) {
-    ElMessage.error(err.message || '加载历史题目失败');
-  } finally {
-    questionLoading.value = false;
+const handleChangePassword = async () => {
+  const { oldPassword, newPassword, confirmPassword } = passwordForm.value;
+  if (!oldPassword || !newPassword || !confirmPassword) {
+    ElMessage.warning('请完整填写所有密码字段');
+    return;
   }
-};
-
-const handleQuestionSizeChange = () => {
-  questionPage.value = 1;
-  loadQuestions();
-};
-
-// ===== 历史试卷 =====
-const examList = ref([]);
-const examTotal = ref(0);
-const examPage = ref(1);
-const examSize = ref(20);
-const examLoading = ref(false);
-const recordsMap = reactive({});
-const recordsLoadingMap = reactive({});
-
-const loadExams = async () => {
-  examLoading.value = true;
-  try {
-    const data = await getHistoryExams({
-      page: examPage.value,
-      size: examSize.value,
-    });
-    examList.value = data.list || [];
-    examTotal.value = data.total || 0;
-  } catch (err) {
-    ElMessage.error(err.message || '加载历史试卷失败');
-  } finally {
-    examLoading.value = false;
+  if (newPassword.length < 6) {
+    ElMessage.warning('新密码至少6位');
+    return;
   }
-};
-
-const handleExamSizeChange = () => {
-  examPage.value = 1;
-  loadExams();
-};
-
-const handleExamExpand = async (row, expandedRows) => {
-  const expanded = expandedRows.some((item) => item.id === row.id);
-  if (!expanded) return;
-  if (recordsMap[row.id]) return;
-
-  recordsLoadingMap[row.id] = true;
-  try {
-    const list = await getExamRecords(row.id);
-    recordsMap[row.id] = Array.isArray(list) ? list : (list.list || []);
-  } catch (err) {
-    ElMessage.error(err.message || '加载提交记录失败');
-    recordsMap[row.id] = [];
-  } finally {
-    recordsLoadingMap[row.id] = false;
-  }
-};
-
-// ===== 标记题目 =====
-const favoriteList = ref([]);
-const favoriteTotal = ref(0);
-const favoritePage = ref(1);
-const favoriteSize = ref(20);
-const favoriteLoading = ref(false);
-const favoriteQuestionId = ref('');
-const addingFavorite = ref(false);
-const removingId = ref('');
-
-const loadFavorites = async () => {
-  favoriteLoading.value = true;
-  try {
-    const data = await getFavorites({
-      page: favoritePage.value,
-      size: favoriteSize.value,
-    });
-    favoriteList.value = data.list || [];
-    favoriteTotal.value = data.total || 0;
-  } catch (err) {
-    ElMessage.error(err.message || '加载收藏题目失败');
-  } finally {
-    favoriteLoading.value = false;
-  }
-};
-
-const handleFavoriteSizeChange = () => {
-  favoritePage.value = 1;
-  loadFavorites();
-};
-
-const handleAddFavorite = async () => {
-  const questionId = favoriteQuestionId.value.trim();
-  if (!questionId) {
-    ElMessage.warning('请输入题目 ID');
+  if (newPassword !== confirmPassword) {
+    ElMessage.warning('两次输入的密码不一致');
     return;
   }
 
-  addingFavorite.value = true;
+  changePasswordLoading.value = true;
   try {
-    await addFavorite(questionId);
-    ElMessage.success('收藏成功');
-    favoriteQuestionId.value = '';
-    loadFavorites();
+    await updateProfile({ password: newPassword, oldPassword });
+    ElMessage.success('密码修改成功，请重新登录');
+    changePasswordVisible.value = false;
+    setTimeout(() => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.reload();
+    }, 1500);
   } catch (err) {
-    ElMessage.error(err.message || '收藏失败');
+    ElMessage.error(err.message || '密码修改失败');
   } finally {
-    addingFavorite.value = false;
+    changePasswordLoading.value = false;
   }
 };
 
-const handleRemoveFavorite = async (row) => {
-  removingId.value = row.questionId;
+// ===== 用户反馈 =====
+const openFeedbackDialog = () => {
+  feedbackForm.value = { type: '', content: '', contact: '' };
+  feedbackVisible.value = true;
+};
+
+const handleSubmitFeedback = async () => {
+  const { type, content, contact } = feedbackForm.value;
+  if (!type) {
+    ElMessage.warning('请选择反馈类型');
+    return;
+  }
+  if (!content || !content.trim()) {
+    ElMessage.warning('请填写反馈内容');
+    return;
+  }
+
+  feedbackLoading.value = true;
   try {
-    await removeFavorite(row.questionId);
-    ElMessage.success('已取消标记');
-    if (favoriteList.value.length === 1 && favoritePage.value > 1) {
-      favoritePage.value -= 1;
-    }
-    loadFavorites();
+    await createFeedback({
+      type,
+      content: content.trim(),
+      contact: contact.trim() || undefined,
+    });
+    ElMessage.success('反馈提交成功，感谢你的建议！');
+    feedbackVisible.value = false;
   } catch (err) {
-    ElMessage.error(err.message || '取消标记失败');
+    ElMessage.error(err.message || '反馈提交失败');
   } finally {
-    removingId.value = '';
+    feedbackLoading.value = false;
   }
 };
 
 // ===== 工具函数 =====
-const TYPE_MAP = {
-  1: '判断题',
-  2: '单选题',
-  3: '多选题',
-  4: '填空题',
-  5: '简答题',
-  6: '程序论述题',
-};
-
 const ROLE_MAP = {
   admin: '管理员',
   teacher: '教师',
   student: '学生',
 };
 
-const typeText = (type) => TYPE_MAP[Number(type)] || '未知';
 const roleText = (role) => ROLE_MAP[role] || role || '--';
 
 const textValue = (value) => {
@@ -532,16 +326,6 @@ const textValue = (value) => {
     return '暂未填写';
   }
   return value;
-};
-
-const correctText = (value) => {
-  const map = { 0: '错误', 1: '正确', 2: '未答', 3: '不判分' };
-  return map[Number(value)] || '--';
-};
-
-const correctTagType = (value) => {
-  const map = { 0: 'danger', 1: 'success', 2: 'info', 3: 'warning' };
-  return map[Number(value)] || 'info';
 };
 
 const formatTime = (value) => {
@@ -553,27 +337,6 @@ const formatTime = (value) => {
 };
 
 // ===== 生命周期 =====
-const loadedTabs = {
-  questions: false,
-  exams: false,
-  favorites: false,
-};
-
-watch(activeTab, (tab) => {
-  if (tab === 'questions' && !loadedTabs.questions) {
-    loadedTabs.questions = true;
-    loadQuestions();
-  }
-  if (tab === 'exams' && !loadedTabs.exams) {
-    loadedTabs.exams = true;
-    loadExams();
-  }
-  if (tab === 'favorites' && !loadedTabs.favorites) {
-    loadedTabs.favorites = true;
-    loadFavorites();
-  }
-});
-
 onMounted(() => {
   loadProfile();
 });
@@ -584,6 +347,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .profile-page {
@@ -594,19 +359,6 @@ onMounted(() => {
   --el-color-primary-light-8: var(--iq-primary-50);
   --el-color-primary-light-9: var(--iq-primary-50);
   --el-color-primary-dark-2: var(--iq-primary-600);
-}
-
-.profile-tabs :deep(.el-tabs__item) {
-  font-size: 14px;
-  color: var(--iq-neutral-600);
-}
-
-.profile-tabs :deep(.el-tabs__item.is-active) {
-  color: var(--iq-primary);
-}
-
-.profile-tabs :deep(.el-tabs__active-bar) {
-  background-color: var(--iq-primary);
 }
 
 .profile-card {
@@ -626,6 +378,52 @@ onMounted(() => {
   color: var(--iq-neutral-900);
 }
 
+/* ===== 功能入口 ===== */
+.profile-actions-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--iq-neutral-700);
+  margin-bottom: 12px;
+}
+
+.profile-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.profile-action-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid var(--iq-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #fff;
+}
+
+.profile-action-item:hover {
+  border-color: var(--iq-primary);
+  background: var(--iq-primary-50);
+}
+
+.action-icon {
+  font-size: 18px;
+  margin-right: 10px;
+}
+
+.action-label {
+  flex: 1;
+  font-size: 14px;
+  color: var(--iq-neutral-700);
+}
+
+.action-arrow {
+  font-size: 18px;
+  color: var(--iq-neutral-400);
+}
+
 .profile-edit-form :deep(.el-input__wrapper) {
   box-shadow: 0 0 0 1px var(--iq-border) inset;
 }
@@ -634,49 +432,9 @@ onMounted(() => {
   box-shadow: 0 0 0 1px var(--iq-primary) inset;
 }
 
-.profile-table-card {
-  padding: 20px;
-}
-
-.profile-table {
-  width: 100%;
-}
-
-.profile-table :deep(.el-table th.el-table__cell) {
-  background: var(--iq-neutral-50);
-  color: var(--iq-neutral-700);
-  font-weight: 600;
-}
-
-.profile-pagination {
-  margin-top: 16px;
-  justify-content: flex-end;
-}
-
-.exam-records-wrap {
-  padding: 12px 24px;
-  background: var(--iq-neutral-50);
-  min-height: 60px;
-}
-
-.favorite-add {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.favorite-input {
-  max-width: 320px;
-}
-
 @media (max-width: 768px) {
-  .favorite-add {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .favorite-input {
-    max-width: none;
+  .profile-actions-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
