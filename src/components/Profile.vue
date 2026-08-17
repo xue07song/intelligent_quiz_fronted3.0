@@ -4,6 +4,28 @@
       <h1>👤 个人中心</h1>
     </div>
 
+    <el-dialog
+        v-model="editVisible"
+        title="编辑资料"
+        width="520px"
+        class="profile-edit-dialog"
+        destroy-on-close
+    >
+      <el-form label-width="80px" class="profile-edit-form">
+        <el-form-item label="用户名"><el-input v-model="editForm.username" disabled /></el-form-item>
+        <el-form-item label="角色"><el-input :model-value="roleText(editForm.role)" disabled /></el-form-item>
+        <el-form-item label="昵称"><el-input v-model="editForm.nickname" placeholder="请输入昵称" /></el-form-item>
+        <el-form-item label="邮箱"><el-input v-model="editForm.email" placeholder="请输入常用邮箱" /></el-form-item>
+        <el-form-item label="手机号"><el-input v-model="editForm.phone" placeholder="请输入中国大陆手机号" maxlength="11" /></el-form-item>
+        <el-form-item label="学校"><el-input v-model="editForm.school" placeholder="请输入学校名称" /></el-form-item>
+        <el-form-item label="学院"><el-input v-model="editForm.college" placeholder="请输入学院名称" /></el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editLoading" @click="handleSaveProfile">保存资料</el-button>
+      </template>
+    </el-dialog>
+
     <!-- ===== 个人信息卡片 ===== -->
     <div class="iq-card profile-card" v-loading="profileLoading">
       <div class="profile-card-head">
@@ -115,14 +137,16 @@
     >
       <el-form label-width="80px" class="profile-edit-form">
         <el-form-item label="反馈类型">
-          <el-select v-model="feedbackForm.type" placeholder="请选择反馈类型" style="width: 100%;">
+          <el-select v-model="feedbackForm.category" placeholder="请选择反馈类型" style="width: 100%;">
             <el-option label="功能建议" value="suggestion" />
-            <el-option label="问题报告" value="bug" />
-            <el-option label="使用疑问" value="question" />
+            <el-option label="Bug 故障" value="bug" />
             <el-option label="其他" value="other" />
           </el-select>
         </el-form-item>
-        <el-form-item label="反馈内容">
+        <el-form-item label="标题">
+          <el-input v-model="feedbackForm.title" placeholder="简短描述问题或建议" maxlength="100" />
+        </el-form-item>
+        <el-form-item label="详细内容">
           <el-input
               v-model="feedbackForm.content"
               type="textarea"
@@ -130,8 +154,8 @@
               :rows="5"
           />
         </el-form-item>
-        <el-form-item label="联系方式">
-          <el-input v-model="feedbackForm.contact" placeholder="选填，方便我们联系你" />
+        <el-form-item label="联系方式" :error="feedbackContactError">
+          <el-input v-model="feedbackForm.contact" placeholder="填写邮箱或中国大陆手机号" @input="feedbackContactError = ''" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -148,6 +172,7 @@
 import { ref, onMounted } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getStudentProfile, updateProfile } from '@/api/student';
+import { changePassword } from '@/api/auth';
 import { createFeedback } from '@/api/feedback';
 
 // ===== 个人信息 =====
@@ -177,8 +202,10 @@ const passwordForm = ref({
 // ===== 用户反馈 =====
 const feedbackVisible = ref(false);
 const feedbackLoading = ref(false);
+const feedbackContactError = ref('');
 const feedbackForm = ref({
-  type: '',
+  category: 'suggestion',
+  title: '',
   content: '',
   contact: '',
 });
@@ -217,8 +244,8 @@ const handleSaveProfile = async () => {
     ElMessage.warning('邮箱格式不正确');
     return;
   }
-  if (phone && !/^\d{11}$/.test(phone)) {
-    ElMessage.warning('手机号必须是11位数字');
+  if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
+    ElMessage.warning('请填写正规的中国大陆手机号');
     return;
   }
 
@@ -233,7 +260,9 @@ const handleSaveProfile = async () => {
     });
     ElMessage.success('资料更新成功');
     editVisible.value = false;
-    loadProfile();
+    await loadProfile();
+    const current = JSON.parse(localStorage.getItem('user') || '{}');
+    localStorage.setItem('user', JSON.stringify({ ...current, ...profile.value }));
   } catch (err) {
     ElMessage.error(err.message || '资料更新失败');
   } finally {
@@ -264,7 +293,7 @@ const handleChangePassword = async () => {
 
   changePasswordLoading.value = true;
   try {
-    await updateProfile({ password: newPassword, oldPassword });
+    await changePassword({ oldPassword, newPassword });
     ElMessage.success('密码修改成功，请重新登录');
     changePasswordVisible.value = false;
     setTimeout(() => {
@@ -281,27 +310,40 @@ const handleChangePassword = async () => {
 
 // ===== 用户反馈 =====
 const openFeedbackDialog = () => {
-  feedbackForm.value = { type: '', content: '', contact: '' };
+  feedbackForm.value = { category: 'suggestion', title: '', content: '', contact: '' };
+  feedbackContactError.value = '';
   feedbackVisible.value = true;
 };
 
 const handleSubmitFeedback = async () => {
-  const { type, content, contact } = feedbackForm.value;
-  if (!type) {
+  const { category, title, content, contact } = feedbackForm.value;
+  if (!category) {
     ElMessage.warning('请选择反馈类型');
+    return;
+  }
+  if (!title || !title.trim()) {
+    ElMessage.warning('请填写反馈标题');
     return;
   }
   if (!content || !content.trim()) {
     ElMessage.warning('请填写反馈内容');
     return;
   }
+  const normalizedContact = contact.trim();
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedContact);
+  const validPhone = /^1[3-9]\d{9}$/.test(normalizedContact);
+  if (normalizedContact && !validEmail && !validPhone) {
+    feedbackContactError.value = '请填写正规手机号码或邮箱';
+    return;
+  }
 
   feedbackLoading.value = true;
   try {
     await createFeedback({
-      type,
+      category,
+      title: title.trim(),
       content: content.trim(),
-      contact: contact.trim() || undefined,
+      contact: normalizedContact || undefined,
     });
     ElMessage.success('反馈提交成功，感谢你的建议！');
     feedbackVisible.value = false;

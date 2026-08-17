@@ -133,6 +133,7 @@
           <div class="iq-nav-group">
             <div class="iq-nav-group-label">教学管理</div>
             <button
+                v-if="currentUser.role === 'teacher'"
                 class="iq-nav-item"
                 :class="{ active: currentView === 'main' }"
                 @click="currentView = 'main'; sidebarOpen = false"
@@ -141,10 +142,10 @@
             </button>
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'practice' && practiceView === 'generate' }"
-                @click="openPracticeView('generate'); sidebarOpen = false"
+                :class="{ active: currentView === 'practice' && (currentUser.role === 'admin' ? practiceView === 'exams' : practiceView === 'generate') }"
+                @click="openPracticeView(currentUser.role === 'admin' ? 'exams' : 'generate'); sidebarOpen = false"
             >
-              <span class="iq-nav-icon">📝</span> 出卷管理
+              <span class="iq-nav-icon">📝</span> {{ currentUser.role === 'admin' ? '试卷列表管理' : '出卷管理' }}
             </button>
             <button
                 class="iq-nav-item"
@@ -170,7 +171,7 @@
                 :class="{ active: currentView === 'practice' && practiceView === 'learning-analysis' }"
                 @click="openPracticeView('learning-analysis'); sidebarOpen = false"
             >
-              <span class="iq-nav-icon">📈</span> 学情分析
+              <span class="iq-nav-icon">📈</span> {{ currentUser.role === 'admin' ? '学生个性化分析' : '学情分析' }}
             </button>
             <button
                 class="iq-nav-item"
@@ -361,21 +362,21 @@
           </div>
 
           <!-- 子导航：只在试卷列表和智能组卷显示 -->
-          <div v-if="!standalonePracticeViews.includes(practiceView)" class="iq-practice-subnav">
+          <div v-if="!standalonePracticeViews.includes(practiceView) && currentUser.role !== 'admin'" class="iq-practice-subnav">
             <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-            <button v-if="currentUser.role === 'teacher' || currentUser.role === 'admin'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
+            <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
           </div>
 
           <ExamList
               v-if="practiceView === 'exams'"
               :role="currentUser.role"
-              @generate="practiceView = 'generate'"
+              @generate="currentUser.role === 'teacher' && (practiceView = 'generate')"
               @start-exam="startExam"
               @toast="handleToastFromChild"
           />
 
           <GenerateExam
-              v-if="practiceView === 'generate' && (currentUser.role === 'teacher' || currentUser.role === 'admin')"
+              v-if="practiceView === 'generate' && currentUser.role === 'teacher'"
               :role="currentUser.role"
               :subjects="currentUser.subjects || []"
               @start-exam="startExam"
@@ -606,6 +607,9 @@ const navigateTo = (view) => {
 const goHome = () => {
   if (currentUser.value?.role === 'student') {
     currentView.value = 'papers';
+  } else if (currentUser.value?.role === 'admin') {
+    currentView.value = 'practice';
+    practiceView.value = 'exams';
   } else {
     currentView.value = 'main';
   }
@@ -776,6 +780,9 @@ const restoreSession = () => {
       currentUser.value = user;
       if (user.role === 'student') {
         currentView.value = 'papers';
+      } else if (user.role === 'admin') {
+        currentView.value = 'practice';
+        practiceView.value = 'exams';
       } else {
         currentView.value = 'main';
       }
@@ -790,6 +797,9 @@ const handleLoginSuccess = (user) => {
   currentUser.value = user;
   if (user.role === 'student') {
     currentView.value = 'papers';
+  } else if (user.role === 'admin') {
+    currentView.value = 'practice';
+    practiceView.value = 'exams';
   } else {
     currentView.value = 'main';
   }

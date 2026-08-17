@@ -40,6 +40,11 @@ export const getExam = (id) => {
   return request.get(`/practice/exams/${id}`);
 };
 
+// 按班级查看一份试卷的练习与题目分析
+export const getExamAnalytics = (id, params = {}) => {
+  return request.get(`/practice/exams/${id}/analytics`, { params });
+};
+
 // 导出试卷：docx / xlsx，可带答案与解析
 export const exportExam = (id, params) => {
   return request.get(`/practice/exams/${id}/export`, {
