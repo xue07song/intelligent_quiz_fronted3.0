@@ -16,6 +16,7 @@
               共 {{ exam.questions.length }} 题 · 客观题 {{ objectiveCount }} 题 ·
               已答 <span class="iq-text-primary iq-font-semibold">{{ answeredCount }}</span> 题 ·
               用时 <span class="iq-font-mono iq-text-base iq-font-semibold" style="color: var(--iq-neutral-800);">{{ elapsedText }}</span>
+              <span v-if="draftSaved" class="iq-tag iq-tag-success draft-tag">草稿已保存</span>
             </p>
           </div>
           <button class="iq-btn iq-btn-ghost" @click="handleExit">
@@ -28,13 +29,47 @@
         </div>
       </div>
 
+      <div v-if="exam.questions.length > 4" class="iq-card answer-card-panel">
+        <div class="answer-card-head">
+          <b>答题卡</b>
+          <span class="iq-text-sm iq-text-muted">已答 {{ answeredCount }} / {{ exam.questions.length }}，点击编号快速跳转</span>
+        </div>
+        <div class="answer-card-grid">
+          <button
+            v-for="(q, idx) in exam.questions"
+            :key="q.id"
+            type="button"
+            class="answer-cell"
+            :class="{ answered: isAnswered(q), active: activeQuestionId === q.id }"
+            @click="scrollToQuestion(q.id)"
+          >
+            {{ idx + 1 }}
+          </button>
+        </div>
+      </div>
+
       <div class="question-list">
-        <div v-for="(q, idx) in exam.questions" :key="q.id" class="iq-card question-card">
+        <div v-for="(q, idx) in exam.questions" :key="q.id" :id="`question-${q.id}`" class="iq-card question-card">
           <div class="q-header">
             <span class="q-num">第 {{ idx + 1 }} 题</span>
             <span class="q-type-tag" :class="`type-${q.题型}`">{{ getTypeName(q.题型) }}</span>
             <span class="iq-tag iq-tag-neutral" style="font-size: 11px;">{{ getDifficultyLabel(q.难度) }}</span>
+
+            <span v-if="!isObjective(q.题型)" class="iq-tag iq-tag-warning" style="font-size: 11px;">📝 人工批阅</span>
+            <button
+              type="button"
+              class="favorite-btn"
+              :class="{ active: favoriteSet.has(String(q.id)) }"
+              :disabled="favoriteLoading[q.id]"
+              @click="toggleFavorite(q)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+              {{ favoriteSet.has(String(q.id)) ? '已收藏' : '收藏' }}
+            </button>
             <span v-if="Number(q.题型)>=4" class="iq-tag iq-tag-warning" style="font-size: 11px;">语义评阅 · 教师可复核</span>
+
           </div>
           <div class="q-title">{{ q.题目 }}</div>
           <div v-if="[2,3].includes(Number(q.题型)) && q.选项" class="q-options option-row"><label v-for="opt in parseOptions(q.选项)" :key="opt.key" :class="['option-choice',{selected:Number(q.题型)===3?(multiAnswers[q.id]||[]).includes(opt.key):answers[q.id]===opt.key}]"><input v-if="Number(q.题型)===2" type="radio" :name="`q-${q.id}`" :value="opt.key" v-model="answers[q.id]"><input v-else type="checkbox" :value="opt.key" v-model="multiAnswers[q.id]" @change="syncMulti(q.id)"><b>{{opt.key}}.</b> {{opt.text}}</label></div>
@@ -180,8 +215,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { getExam, submitExam } from '@/api/practice';
+import { getFavorites, addFavorite, removeFavorite } from '@/api/student';
 import { askTutor as askTutorApi } from '@/api/ai';
 import { getTypeName, getDifficultyLabel } from '@/utils/constants';
 
@@ -189,7 +225,7 @@ const props = defineProps({
   examId: { type: [Number, String], required: true },
 });
 
-const emit = defineEmits(['exit', 'view-record', 'toast']);
+const emit = defineEmits(['exit', 'view-record', 'update-question-id', 'update-exam-id', 'toast']);
 
 const OBJECTIVE_TYPES = [1, 2, 3, 4];
 
@@ -200,6 +236,10 @@ const exam = ref({ questions: [] });
 const answers = reactive({});
 const multiAnswers = reactive({});
 const result = ref(null);
+const favoriteSet = ref(new Set());
+const favoriteLoading = reactive({});
+const draftSaved = ref(false);
+const activeQuestionId = ref(null);
 
 const tutorOpen = reactive({});
 const tutorInput = reactive({});
@@ -254,6 +294,21 @@ const answeredCount = computed(() =>
 
 const elapsedText = computed(() => formatDuration(elapsedSeconds.value));
 
+const isAnswered = (q) => {
+  if (Number(q.题型) === 3) {
+    return (multiAnswers[q.id] || []).length > 0;
+  }
+  const value = answers[q.id];
+  return value !== undefined && value !== '';
+};
+
+const scrollToQuestion = (qid) => {
+  activeQuestionId.value = qid;
+  emit('update-question-id', qid);
+  const el = document.getElementById(`question-${qid}`);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
 function isObjective(type) {
   return OBJECTIVE_TYPES.includes(Number(type));
 }
@@ -294,6 +349,97 @@ function syncMulti(qid) {
   answers[qid] = arr.sort().join('');
 }
 
+const draftKey = () => `iq_exam_draft_${props.examId}`;
+let draftTimer = null;
+
+const saveDraft = () => {
+  if (!exam.value.questions || exam.value.questions.length === 0 || answeredCount.value === 0) return;
+  const payload = {
+    answers: { ...answers },
+    multiAnswers: Object.fromEntries(Object.entries(multiAnswers).map(([k, v]) => [k, [...v]])),
+    startedAt: startedAt.value ? startedAt.value.toISOString() : null,
+    elapsedSeconds: elapsedSeconds.value,
+    savedAt: Date.now(),
+  };
+  localStorage.setItem(draftKey(), JSON.stringify(payload));
+  draftSaved.value = true;
+};
+
+const restoreDraft = (loadedExam) => {
+  const raw = localStorage.getItem(draftKey());
+  if (!raw) return false;
+  try {
+    const draft = JSON.parse(raw);
+    if (!draft || !draft.answers) return false;
+    loadedExam.questions.forEach((q) => {
+      const qid = q.id;
+      if (Number(q.题型) === 3) {
+        const restored = Array.isArray(draft.multiAnswers?.[qid]) ? draft.multiAnswers[qid] : [];
+        multiAnswers[qid] = restored;
+        if (restored.length) answers[qid] = [...restored].sort().join('');
+      } else if (draft.answers[qid] !== undefined) {
+        answers[qid] = draft.answers[qid];
+      }
+    });
+    if (draft.startedAt) {
+      const start = new Date(draft.startedAt);
+      if (!Number.isNaN(start.getTime())) startedAt.value = start;
+    }
+    elapsedSeconds.value = Math.max(0, Number(draft.elapsedSeconds) || 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const loadFavorites = async () => {
+  try {
+    const ids = new Set();
+    let page = 1;
+    while (true) {
+      const data = await getFavorites({ page, size: 100 });
+      const rows = data.list || [];
+      rows.forEach((f) => ids.add(String(f.questionId)));
+      if (rows.length === 0 || ids.size >= Number(data.total || 0)) break;
+      page += 1;
+    }
+    favoriteSet.value = ids;
+  } catch {
+    // 收藏状态加载失败不影响答题
+  }
+};
+
+const toggleFavorite = async (q) => {
+  const qid = String(q.id);
+  if (favoriteLoading[qid]) return;
+  favoriteLoading[qid] = true;
+  try {
+    if (favoriteSet.value.has(qid)) {
+      await removeFavorite(qid);
+      const next = new Set(favoriteSet.value);
+      next.delete(qid);
+      favoriteSet.value = next;
+      emit('toast', { message: '已取消收藏', type: 'success' });
+    } else {
+      await addFavorite(qid);
+      const next = new Set(favoriteSet.value);
+      next.add(qid);
+      favoriteSet.value = next;
+      emit('toast', { message: '已收藏，可在个人中心查看', type: 'success' });
+    }
+  } catch (err) {
+    emit('toast', { message: err.message || '收藏操作失败', type: 'error' });
+  } finally {
+    favoriteLoading[qid] = false;
+  }
+};
+
+watch([answers, multiAnswers], () => {
+  if (!exam.value.questions?.length) return;
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(saveDraft, 400);
+}, { deep: true });
+
 function formatDuration(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
@@ -318,7 +464,17 @@ const loadExam = async () => {
         answers[q.id] = '';
       }
     });
-    startedAt.value = new Date();
+    if (data.questions.length > 0) {
+      activeQuestionId.value = data.questions[0].id;
+      emit('update-question-id', data.questions[0].id);
+      emit('update-exam-id', props.examId);
+    }
+    const restored = restoreDraft(data);
+    if (!startedAt.value) startedAt.value = new Date();
+    if (restored) {
+      emit('toast', { message: '已恢复上次答题草稿，可直接继续', type: 'info' });
+    }
+    loadFavorites();
     timer = setInterval(() => {
       elapsedSeconds.value = Math.floor((Date.now() - startedAt.value.getTime()) / 1000);
     }, 1000);
@@ -349,6 +505,10 @@ const handleSubmit = async () => {
     result.value = data;
     phase.value = 'result';
     if (timer) clearInterval(timer);
+    emit('update-question-id', null);
+    emit('update-exam-id', null);
+    localStorage.removeItem(draftKey());
+    draftSaved.value = false;
     emit('toast', { message: `提交成功！得分 ${data.score} 分`, type: 'success' });
   } catch (err) {
     emit('toast', { message: err.message || '提交失败', type: 'error' });
@@ -359,8 +519,10 @@ const handleSubmit = async () => {
 
 const handleExit = () => {
   if (answeredCount.value > 0) {
-    if (!window.confirm('答题进度将不会保存，确定退出吗？')) return;
+    if (!window.confirm('答题进度已自动保存，可稍后从试卷列表继续，确定退出吗？')) return;
   }
+  emit('update-question-id', null);
+  emit('update-exam-id', null);
   emit('exit');
 };
 
@@ -369,6 +531,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  clearTimeout(draftTimer);
+  if (phase.value === 'exam' && exam.value.questions?.length && answeredCount.value > 0) saveDraft();
   if (timer) clearInterval(timer);
 });
 </script>
@@ -757,4 +921,84 @@ onUnmounted(() => {
 .result-item.result-bad .value { color: #dc2626; }
 .iq-flex { display: flex; }
 .iq-gap-2 { gap: 10px; }
+
+.draft-tag {
+  margin-left: 10px;
+}
+.answer-card-panel {
+  padding: 16px 20px;
+}
+.answer-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.answer-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.answer-cell {
+  height: 40px;
+  border: 1px solid var(--iq-neutral-200);
+  border-radius: var(--iq-radius-medium);
+  background: var(--iq-neutral-50);
+  color: var(--iq-neutral-600);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+.answer-cell:hover {
+  border-color: var(--iq-primary-300);
+}
+.answer-cell.answered {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #047857;
+}
+.answer-cell.active {
+  background: var(--iq-primary);
+  border-color: var(--iq-primary);
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+}
+.question-card {
+  scroll-margin-top: 88px;
+}
+.q-header {
+  flex-wrap: wrap;
+}
+.favorite-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 5px 10px;
+  border: 1px solid var(--iq-neutral-200);
+  border-radius: var(--iq-radius-full);
+  background: var(--iq-neutral-50);
+  color: var(--iq-neutral-600);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+.favorite-btn:hover:not(:disabled) {
+  border-color: #fbbf24;
+  color: #b45309;
+  background: #fffbeb;
+}
+.favorite-btn.active {
+  background: #fef3c7;
+  border-color: #fbbf24;
+  color: #b45309;
+}
+.favorite-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 </style>

@@ -12,7 +12,7 @@
   <!-- 已登录：Sidebar + Header + Main 三栏布局 -->
   <div v-else id="app">
     <!-- 左侧 Sidebar -->
-    <aside class="iq-layout-sidebar">
+    <aside class="iq-layout-sidebar" :class="{ open: sidebarOpen }">
       <div class="iq-sidebar-brand">
         <div class="iq-sidebar-logo">智</div>
         <span class="iq-font-semibold iq-text-lg" style="color: var(--iq-neutral-900);">智能题库</span>
@@ -22,7 +22,7 @@
           v-if="currentUser.role !== 'student'"
           class="iq-nav-item"
           :class="{ active: currentView === 'main' }"
-          @click="currentView = 'main'"
+          @click="currentView = 'main'; sidebarOpen = false"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -35,13 +35,8 @@
         <button
           v-if="currentUser.role !== 'admin'"
           class="iq-nav-item"
-
           :class="{ active: currentView === 'practice' && !standalonePracticeViews.includes(practiceView) }"
-          @click="practiceView = 'exams'; currentView = 'practice'"
-=======
-          :class="{ active: currentView === 'practice' }"
-          @click="onEnterPractice"
-
+          @click="onEnterPractice(); sidebarOpen = false"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"></path>
@@ -65,7 +60,7 @@
           v-if="currentUser.role === 'admin'"
           class="iq-nav-item"
           :class="{ active: currentView === 'users' }"
-          @click="currentView = 'users'"
+          @click="currentView = 'users'; sidebarOpen = false"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -79,7 +74,7 @@
           v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
           class="iq-nav-item"
           :class="{ active: currentView === 'audit' }"
-          @click="currentView = 'audit'"
+          @click="currentView = 'audit'; sidebarOpen = false"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 11l3 3L22 4"></path>
@@ -91,7 +86,7 @@
         <button
           class="iq-nav-item"
           :class="{ active: currentView === 'feedback' }"
-          @click="currentView = 'feedback'"
+          @click="currentView = 'feedback'; sidebarOpen = false"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
@@ -101,7 +96,7 @@
         <button
           class="iq-nav-item"
           :class="{ active: currentView === 'profile' }"
-          @click="currentView = 'profile'"
+          @click="currentView = 'profile'; sidebarOpen = false"
         >
           <svg class="iq-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="8" r="4"></circle>
@@ -112,11 +107,20 @@
       </nav>
     </aside>
 
+    <div v-if="sidebarOpen" class="iq-sidebar-overlay" @click="sidebarOpen = false"></div>
+
     <!-- 顶部 Header -->
     <header class="iq-layout-header">
+      <button class="iq-sidebar-toggle" @click="sidebarOpen = !sidebarOpen" aria-label="打开菜单">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
       <div>
         <nav class="iq-breadcrumb">
-          <a @click="currentView = 'main'">首页</a>
+          <a @click="currentView = 'main'; sidebarOpen = false">首页</a>
           <span class="crumb-sep">/</span>
           <span>{{ currentBreadcrumb }}</span>
         </nav>
@@ -230,16 +234,17 @@
         <div v-if="!standalonePracticeViews.includes(practiceView)" class="iq-practice-subnav">
           <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
           <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
+          <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'wrong-book' }" @click="practiceView = 'wrong-book'">📕 错题本</button>
           <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'records' }" @click="practiceView = 'records'">📊 我的答题记录</button>
           <button v-if="currentUser.role === 'student'" class="iq-subnav-btn" :class="{ active: practiceView === 'stats' }" @click="practiceView = 'stats'">📈 我的统计</button>
           <button
-            v-if="currentUser.role === 'teacher'"
+            v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
             class="iq-subnav-btn"
             :class="{ active: practiceView === 'admin-records' }"
             @click="practiceView = 'admin-records'"
           >📊 试卷分析</button>
           <button
-            v-if="currentUser.role === 'teacher'"
+            v-if="currentUser.role === 'admin' || currentUser.role === 'teacher'"
             class="iq-subnav-btn"
             :class="{ active: practiceView === 'classes' }"
             @click="practiceView = 'classes'"
@@ -260,6 +265,14 @@
           v-if="practiceView === 'generate' && currentUser.role === 'teacher'"
           :role="currentUser.role"
           :subjects="currentUser.subjects || []"
+          @start-exam="startExam"
+          @toast="handleToastFromChild"
+        />
+
+
+        <!-- 错题本 -->
+        <WrongBook
+          v-if="practiceView === 'wrong-book' && currentUser.role === 'student'"
           @start-exam="startExam"
           @toast="handleToastFromChild"
         />
@@ -292,6 +305,7 @@
         <AdaptiveProgress
           v-if="practiceView === 'adaptive-progress' && currentUser.role === 'student'"
           @practice="practiceView = 'adaptive'"
+
           @toast="handleToastFromChild"
         />
 
@@ -301,6 +315,8 @@
           :examId="activeExamId"
           @exit="exitExam"
           @view-record="viewRecord"
+          @update-question-id="currentQuestionId = $event"
+          @update-exam-id="currentExamId = $event"
           @toast="handleToastFromChild"
         />
 
@@ -372,11 +388,16 @@
     />
 
     <Toast :message="toastMessage" :type="toastType" />
+
+    <AIAssistant
+      v-if="currentUser?.role === 'student'"
+      @start-exam="startExam"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, provide, onMounted, onUnmounted, watch } from 'vue';
 import {
   getQuestions,
   addQuestion,
@@ -397,13 +418,17 @@ import RegistrationDialog from '@/components/RegistrationDialog.vue';
 import UserManagement from '@/components/UserManagement.vue';
 import RegistrationAudit from '@/components/RegistrationAudit.vue';
 import ChangePassword from '@/components/ChangePassword.vue';
+import AIAssistant from '@/components/AIAssistant.vue';
 import ImportQuestions from '@/components/ImportQuestions.vue';
 import AiGenerate from '@/components/AiGenerate.vue';
 import Feedback from '@/components/Feedback.vue';
 import Profile from '@/components/Profile.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ExamList from '@/components/practice/ExamList.vue';
+
+import WrongBook from '@/components/practice/WrongBook.vue';
 import ClassManagement from '@/components/practice/ClassManagement.vue';
+
 import ExamPractice from '@/components/practice/ExamPractice.vue';
 import PracticeRecords from '@/components/practice/PracticeRecords.vue';
 import RecordDetail from '@/components/practice/RecordDetail.vue';
@@ -420,10 +445,13 @@ const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 // ===== 登录态管理 =====
 const currentUser = ref(null);
 const currentView = ref('main');
+const sidebarOpen = ref(false);
 const pwdVisible = ref(false);
 
 // ===== 答题练习 =====
 const practiceView = ref('exams');
+const currentQuestionId = ref(null);
+const currentExamId = ref(null);
 const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview'];
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
@@ -448,6 +476,14 @@ const onEnterPractice = () => {
   }
   currentView.value = 'practice';
 };
+
+provide('assistantState', {
+  currentView,
+  practiceView,
+  currentQuestionId,
+  currentExamId,
+  currentUser,
+});
 
 const canEdit = computed(() => currentUser.value?.role === 'admin' || currentUser.value?.role === 'teacher');
 
@@ -485,6 +521,7 @@ const currentBreadcrumb = computed(() => {
     const map = {
       exams: '试卷列表',
       generate: '智能组卷',
+      'wrong-book': '错题本',
       adaptive: '自适应练习',
       'adaptive-overview': '自适应学情',
       'adaptive-progress': '我的自适应成果',
@@ -493,7 +530,7 @@ const currentBreadcrumb = computed(() => {
       records: '答题记录',
       'record-detail': '记录详情',
       stats: '统计分析',
-      'admin-records': '做题管理',
+      'admin-records': '试卷分析',
       classes: '班级管理',
     };
     const parent = currentUser.value?.role === 'student' ? '答题练习' : '出卷与学生管理';
@@ -506,10 +543,13 @@ const pageTitle = computed(() => {
   const map = {
     exams: '📋 试卷列表',
     generate: '📝 智能组卷',
+
+    'wrong-book': '📕 错题本',
     adaptive: '🧭 自适应练习',
     'adaptive-overview': '📈 自适应学情',
     'adaptive-progress': '🏅 我的自适应成果',
     'learning-analysis': '学习分析',
+
     practice: '✍️ 答题中',
     records: '📊 答题记录',
     'record-detail': '📝 答题详情',
@@ -519,7 +559,6 @@ const pageTitle = computed(() => {
   };
   return map[practiceView.value] || '';
 });
-
 const startExam = (examId) => {
   activeExamId.value = examId;
   practiceView.value = 'practice';

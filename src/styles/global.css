@@ -264,6 +264,9 @@ a:hover {
 .iq-table tbody tr:hover {
   background: var(--iq-neutral-50);
 }
+.iq-table-wrap {
+  overflow-x: auto;
+}
 
 /* ========== Status Tags ========== */
 .iq-tag {
@@ -620,6 +623,71 @@ a:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ========== Responsive Shell ========== */
+.iq-sidebar-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--iq-border);
+  border-radius: var(--iq-radius-medium);
+  background: var(--iq-neutral-0);
+  color: var(--iq-neutral-600);
+  cursor: pointer;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.iq-sidebar-toggle:hover {
+  background: var(--iq-neutral-100);
+  color: var(--iq-neutral-900);
+}
+.iq-sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .iq-sidebar-toggle {
+    display: inline-flex;
+  }
+  .iq-layout-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: 0 0 40px rgba(15, 23, 42, 0.18);
+  }
+  .iq-layout-sidebar.open {
+    transform: translateX(0);
+  }
+  .iq-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.42);
+    z-index: 99;
+  }
+  .iq-layout-header {
+    left: 0;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .iq-layout-header > div {
+    min-width: 0;
+  }
+  .iq-layout-main {
+    margin-left: 0;
+    padding: calc(var(--iq-header-height) + 14px) 12px 20px;
+  }
+  .iq-header-right {
+    gap: 4px;
+  }
+  .iq-avatar-info {
+    display: none;
+  }
+  .iq-avatar-wrap {
+    gap: 4px;
+  }
 }
 
 /* ========== Scrollbar ========== */

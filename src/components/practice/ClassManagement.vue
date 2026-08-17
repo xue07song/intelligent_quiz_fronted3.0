@@ -4,7 +4,7 @@
       <h1>班级管理</h1>
       <div class="iq-page-actions">
         <button class="iq-btn iq-btn-secondary" @click="openUnassignedDialog">
-          👥 未分班学生 ({{ unassignedCount }})
+          👥 可添加学生 ({{ unassignedCount }})
         </button>
         <button class="iq-btn iq-btn-primary" @click="openCreateClass">+ 新建班级</button>
       </div>
@@ -72,7 +72,7 @@
               </p>
             </div>
             <div class="iq-page-actions">
-              <button class="iq-btn iq-btn-secondary" @click="openAddStudents">+ 从未分班添加</button>
+              <button class="iq-btn iq-btn-secondary" @click="openAddStudents">+ 添加学生</button>
             </div>
           </div>
 
@@ -118,7 +118,7 @@
                     <div class="iq-empty-box" style="padding:40px 0;">
                       <div class="iq-empty-icon">👥</div>
                       <div class="iq-empty-text iq-text-sm iq-text-muted">班级还没有学生</div>
-                      <div class="iq-text-sm iq-text-muted">点击右上角「从未分班添加」</div>
+                      <div class="iq-text-sm iq-text-muted">点击右上角「添加学生」</div>
                     </div>
                   </td>
                 </tr>
@@ -196,7 +196,7 @@
       </Transition>
     </Teleport>
 
-    <!-- 添加学生（从未分班）弹窗 -->
+    <!-- 添加学生弹窗 -->
     <Teleport to="body">
       <Transition name="modal-fade">
         <div v-if="addDialogVisible" class="iq-modal-overlay" @click.self="addDialogVisible = false">
@@ -212,9 +212,10 @@
                   </svg>
                 </div>
                 <div>
-                  <h3 class="iq-modal-title">从未分班学生中添加</h3>
+                  <h3 class="iq-modal-title">添加学生到班级</h3>
                   <p class="iq-modal-subtitle">
-                    {{ selectedClassId ? '将选中的学生加入「' + (currentClass?.name || '') + '」' : '查看当前所有未分班的学生' }}
+                    {{ selectedClassId ? '将选中的学生加入「' + (currentClass?.name || '') + '」' : '查看当前可添加的学生' }}
+                    · 学生可同时属于多个班级，加入本班不影响其已加入的其他班级
                   </p>
                 </div>
               </div>
@@ -261,7 +262,7 @@
                       <td colspan="6" class="iq-empty-row">
                         <div class="iq-empty-box" style="padding:40px 0;">
                           <div class="iq-empty-icon">✅</div>
-                          <div class="iq-empty-text iq-text-sm iq-text-muted">没有未分班的学生</div>
+                          <div class="iq-empty-text iq-text-sm iq-text-muted">没有可添加的学生</div>
                         </div>
                       </td>
                     </tr>
