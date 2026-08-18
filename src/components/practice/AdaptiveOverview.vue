@@ -58,10 +58,16 @@
       <!-- ===== 学生表现表格 ===== -->
       <div class="iq-card table-card">
         <div class="card-title">
-          <h3>👥 学生表现</h3>
-          <span>按最近有效练习时间排序</span>
+          <h3>👥 {{ selectedClass ? selectedClass + '学生表现' : '班级与学生表现' }}</h3>
+          <button v-if="selectedClass" class="iq-btn iq-btn-secondary" @click="selectedClass = ''">← 返回班级列表</button>
         </div>
-        <table>
+        <div v-if="!selectedClass" class="class-overview-grid">
+          <button v-for="c in classSummaries" :key="c.name" class="class-overview-card" @click="selectedClass = c.name">
+            <b>{{ c.name }}</b><span>{{ c.total }} 名学生</span><small>{{ c.active }} 人已练习 · 班级正确率 {{ c.accuracy }}%</small><em>查看班级 ›</em>
+          </button>
+          <div v-if="!classSummaries.length" class="empty-mini">尚未创建班级</div>
+        </div>
+        <table v-else>
           <thead>
           <tr>
             <th>学生</th>
@@ -74,7 +80,7 @@
           </tr>
           </thead>
           <tbody>
-          <tr v-for="u in data.users" :key="u.userId">
+          <tr v-for="u in filteredUsers" :key="u.userId">
             <td>
               <b>{{ u.nickname || u.username }}</b>
               <small>{{ u.username }}</small>
@@ -97,16 +103,16 @@
       </div>
 
       <!-- ===== 最近有效练习 ===== -->
-      <div class="iq-card recent-card">
+      <div v-if="selectedClass" class="iq-card recent-card">
         <div class="card-title">
           <h3>📋 最近有效练习</h3>
           <span>只展示至少完成 1 道题的记录</span>
         </div>
-        <div v-if="!data.recentSessions.length" class="empty-mini">
-          目前还没有学生成功提交自适应练习题
+        <div v-if="!filteredSessions.length" class="empty-mini">
+          当前班级还没有有效的自适应练习
         </div>
         <div v-else class="session-list">
-          <div v-for="s in data.recentSessions.slice(0, 12)" :key="s.id" class="session">
+          <div v-for="s in filteredSessions.slice(0, 12)" :key="s.id" class="session">
             <div>
               <b>{{ s.nickname || s.username }}</b>
               <span>{{ rangeText(s) }}</span>
@@ -130,7 +136,21 @@ import { getAdaptiveOverview } from '@/api/practice';
 const emit = defineEmits(['toast']);
 
 const loading = ref(false);
-const data = ref({ users: [], recentSessions: [] });
+const data = ref({ users: [], recentSessions: [], classes: [] });
+const selectedClass = ref('');
+const classSummaries = computed(() => {
+  const map = new Map((data.value.classes || []).map(c => [c.name, { name:c.name, total:Number(c.studentCount||0), active:0, answered:0, correct:0 }]));
+  data.value.users.forEach((u) => {
+    const name = u.className || '未分班';
+    const item = map.get(name) || { name, total: 0, active: 0, answered: 0, correct: 0 };
+    if (!map.has(name)) item.total += 1;
+    item.active += Number(u.sessionCount) > 0 ? 1 : 0;
+    item.answered += Number(u.answeredCount); item.correct += Number(u.correctCount); map.set(name, item);
+  });
+  return [...map.values()].map((c) => ({ ...c, accuracy: c.answered ? Math.round(c.correct * 100 / c.answered) : 0 }));
+});
+const filteredUsers = computed(() => data.value.users.filter((u) => (u.className || '未分班') === selectedClass.value));
+const filteredSessions = computed(() => data.value.recentSessions.filter((s) => (s.className || '未分班') === selectedClass.value));
 
 const load = async () => {
   loading.value = true;
@@ -213,6 +233,7 @@ onMounted(() => {
   margin: 0 auto;
   width: 100%;
 }
+.class-select { min-width: 320px; padding: 9px 12px; border: 1px solid #dbe3f0; border-radius: 6px; background: #fff; }
 
 /* ================================================================
    顶部横幅（与题库管理风格一致）
@@ -583,4 +604,10 @@ tbody tr:hover {
     text-align: center;
   }
 }
+.class-overview-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; padding:8px 0; }
+.class-overview-card { min-height:120px; padding:18px; border:1px solid #dbe5f5; background:#f8fbff; text-align:left; display:grid; gap:7px; cursor:pointer; }
+.class-overview-card:hover { border-color:#6d75ed; background:#f3f5ff; }
+.class-overview-card b { color:#14213d; font-size:16px; }
+.class-overview-card span,.class-overview-card small { color:#64748b; }
+.class-overview-card em { color:#4f46e5; font-style:normal; }
 </style>

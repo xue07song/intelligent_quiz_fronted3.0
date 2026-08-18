@@ -29,7 +29,7 @@
           <div class="filter-item">
             <label class="filter-label">班级</label>
             <select v-model="classFilter" class="iq-select" @change="page = 1; loadExams()">
-              <option value="">全部班级</option>
+              <option value="">全部班级（所有学生）</option>
               <option v-for="c in classList" :key="c.id" :value="String(c.id)">{{ c.name }}</option>
             </select>
           </div>
@@ -144,7 +144,7 @@
         </button>
         <div class="iq-sub-title">
           📊 <strong>{{ selectedExam?.title }}</strong>
-          <span class="iq-text-sm iq-text-muted" style="margin-left: 10px;">试卷分析</span>
+          <span class="iq-text-sm iq-text-muted" style="margin-left: 10px;">{{ selectedClassName }} · 试卷分析</span>
         </div>
       </div>
 
@@ -156,23 +156,23 @@
       <template v-else>
         <!-- 统计卡片 -->
         <div class="stats-cards">
-          <div class="iq-card stat-card">
+          <div class="iq-card stat-card" :title="attemptFormula">
             <div class="stat-label">练习总次数</div>
             <div class="stat-value">{{ analysis.totalAttempts }}</div>
           </div>
-          <div class="iq-card stat-card">
+          <div class="iq-card stat-card" :title="participantFormula">
             <div class="stat-label">参与人数</div>
             <div class="stat-value">{{ analysis.uniqueStudents }}</div>
           </div>
-          <div class="iq-card stat-card">
+          <div class="iq-card stat-card" :title="scoreFormula">
             <div class="stat-label">平均得分</div>
             <div class="stat-value" :class="scoreColor(analysis.avgScore)">{{ analysis.avgScore }}</div>
           </div>
-          <div class="iq-card stat-card">
+          <div class="iq-card stat-card" :title="passFormula">
             <div class="stat-label">及格率</div>
             <div class="stat-value" :class="analysis.passRate >= 60 ? 'text-good' : 'text-bad'">{{ analysis.passRate }}%</div>
           </div>
-          <div class="iq-card stat-card">
+          <div class="iq-card stat-card" :title="accuracyFormula">
             <div class="stat-label">平均正确率</div>
             <div class="stat-value" :class="analysis.avgAccuracy >= 80 ? 'text-good' : analysis.avgAccuracy >= 60 ? 'text-mid' : 'text-bad'">{{ analysis.avgAccuracy }}%</div>
           </div>
@@ -181,34 +181,34 @@
         <!-- 图表区 -->
         <div class="charts-row">
           <!-- 饼图：成绩分布 -->
-          <div class="iq-card chart-card">
+          <div class="iq-card chart-card chart-card-wide" :title="`统计范围：${statisticsScope}。按每次提交的最终得分分组：优秀≥80分，及格60-79分，不及格<60分。圆环中心为练习总次数。`">
             <div class="chart-title">📈 成绩分布</div>
             <div class="pie-chart-wrap">
               <svg viewBox="0 0 200 200" class="pie-svg">
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.excellent" :stroke-width="40"
                         :stroke-dasharray="pieDash.excellent" :stroke-dashoffset="pieOffset.excellent"
-                        transform="rotate(-90 100 100)" />
+                        transform="rotate(-90 100 100)"><title>{{ scoreSliceFormula('优秀', analysis.scoreDist.excellent, '得分≥80分') }}</title></circle>
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.pass" :stroke-width="40"
                         :stroke-dasharray="pieDash.pass" :stroke-dashoffset="pieOffset.pass"
-                        transform="rotate(-90 100 100)" />
+                        transform="rotate(-90 100 100)"><title>{{ scoreSliceFormula('及格', analysis.scoreDist.pass, '60分≤得分<80分') }}</title></circle>
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="pieColors.fail" :stroke-width="40"
                         :stroke-dasharray="pieDash.fail" :stroke-dashoffset="pieOffset.fail"
-                        transform="rotate(-90 100 100)" />
+                        transform="rotate(-90 100 100)"><title>{{ scoreSliceFormula('不及格', analysis.scoreDist.fail, '得分<60分') }}</title></circle>
                 <text x="100" y="95" text-anchor="middle" class="pie-center-num">{{ analysis.totalAttempts }}</text>
                 <text x="100" y="115" text-anchor="middle" class="pie-center-label">总提交</text>
               </svg>
               <div class="pie-legend">
-                <div class="legend-item">
+                <div class="legend-item" :title="scoreSliceFormula('优秀', analysis.scoreDist.excellent, '得分≥80分')">
                   <span class="legend-dot" :style="{ background: pieColors.excellent }"></span>
                   <span>优秀 (≥80)</span>
                   <b>{{ analysis.scoreDist.excellent }}</b>
                 </div>
-                <div class="legend-item">
+                <div class="legend-item" :title="scoreSliceFormula('及格', analysis.scoreDist.pass, '60分≤得分<80分')">
                   <span class="legend-dot" :style="{ background: pieColors.pass }"></span>
                   <span>及格 (60-79)</span>
                   <b>{{ analysis.scoreDist.pass }}</b>
                 </div>
-                <div class="legend-item">
+                <div class="legend-item" :title="scoreSliceFormula('不及格', analysis.scoreDist.fail, '得分<60分')">
                   <span class="legend-dot" :style="{ background: pieColors.fail }"></span>
                   <span>不及格 (<60)</span>
                   <b>{{ analysis.scoreDist.fail }}</b>
@@ -217,35 +217,16 @@
             </div>
           </div>
 
-          <!-- 柱状图：班级对比 -->
-          <div class="iq-card chart-card">
-            <div class="chart-title">📊 班级平均分对比</div>
-            <div v-if="analysis.classStats.length > 0" class="bar-chart-wrap">
-              <div class="bar-chart">
-                <div v-for="cls in analysis.classStats" :key="cls.name" class="bar-group">
-                  <div class="bar-value">{{ cls.avgScore }}</div>
-                  <div class="bar-track">
-                    <div class="bar-fill" :style="{ height: barHeight(cls.avgScore) + '%', background: barColor(cls.avgScore) }"></div>
-                  </div>
-                  <div class="bar-label" :title="cls.name">{{ cls.name }}</div>
-                  <div class="bar-meta">{{ cls.count }}人</div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="no-chart-data">
-              <span class="iq-text-sm iq-text-muted">暂无班级数据</span>
-            </div>
-          </div>
         </div>
 
         <!-- 第二行图表：正确率分布 + 题型分布 -->
         <div class="charts-row">
           <!-- 柱状图：各分数段人数 -->
-          <div class="iq-card chart-card">
+          <div class="iq-card chart-card" :title="`统计范围：${statisticsScope}。横轴为提交记录的得分区间，柱高为落入该区间的提交次数；同一学生多次提交会分别计入。`">
             <div class="chart-title">📊 分数段分布</div>
             <div class="bar-chart-wrap">
               <div class="bar-chart">
-                <div v-for="seg in analysis.scoreSegments" :key="seg.label" class="bar-group">
+                <div v-for="seg in analysis.scoreSegments" :key="seg.label" class="bar-group" :title="`${selectedClassName}：${seg.label}分共${seg.count}次提交，占${percentOf(seg.count, analysis.totalAttempts)}%`">
                   <div class="bar-value">{{ seg.count }}</div>
                   <div class="bar-track">
                     <div class="bar-fill" :style="{ height: barHeightRaw(seg.count, analysis.maxSegment) + '%', background: seg.color }"></div>
@@ -257,34 +238,34 @@
           </div>
 
           <!-- 饼图：答题正确率分布 -->
-          <div class="iq-card chart-card">
+          <div class="iq-card chart-card" :title="`统计范围：${statisticsScope}。先计算每次提交的正确率，再按高（≥80%）、中（60%-79%）、低（<60%）分组。圆环中心按全部答对题数÷全部题目数加权计算。`">
             <div class="chart-title">📈 答题正确率分布</div>
             <div class="pie-chart-wrap">
               <svg viewBox="0 0 200 200" class="pie-svg">
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.high" :stroke-width="40"
                         :stroke-dasharray="accDash.high" :stroke-dashoffset="accOffset.high"
-                        transform="rotate(-90 100 100)" />
+                        transform="rotate(-90 100 100)"><title>{{ accuracySliceFormula('高', analysis.accDist.high, '单次提交正确率≥80%') }}</title></circle>
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.mid" :stroke-width="40"
                         :stroke-dasharray="accDash.mid" :stroke-dashoffset="accOffset.mid"
-                        transform="rotate(-90 100 100)" />
+                        transform="rotate(-90 100 100)"><title>{{ accuracySliceFormula('中', analysis.accDist.mid, '60%≤单次提交正确率<80%') }}</title></circle>
                 <circle cx="100" cy="100" r="70" fill="none" :stroke="accColors.low" :stroke-width="40"
                         :stroke-dasharray="accDash.low" :stroke-dashoffset="accOffset.low"
-                        transform="rotate(-90 100 100)" />
+                        transform="rotate(-90 100 100)"><title>{{ accuracySliceFormula('低', analysis.accDist.low, '单次提交正确率<60%') }}</title></circle>
                 <text x="100" y="95" text-anchor="middle" class="pie-center-num">{{ analysis.avgAccuracy }}%</text>
                 <text x="100" y="115" text-anchor="middle" class="pie-center-label">平均正确率</text>
               </svg>
               <div class="pie-legend">
-                <div class="legend-item">
+                <div class="legend-item" :title="accuracySliceFormula('高', analysis.accDist.high, '单次提交正确率≥80%')">
                   <span class="legend-dot" :style="{ background: accColors.high }"></span>
                   <span>高 (≥80%)</span>
                   <b>{{ analysis.accDist.high }}</b>
                 </div>
-                <div class="legend-item">
+                <div class="legend-item" :title="accuracySliceFormula('中', analysis.accDist.mid, '60%≤单次提交正确率<80%')">
                   <span class="legend-dot" :style="{ background: accColors.mid }"></span>
                   <span>中 (60-79%)</span>
                   <b>{{ analysis.accDist.mid }}</b>
                 </div>
-                <div class="legend-item">
+                <div class="legend-item" :title="accuracySliceFormula('低', analysis.accDist.low, '单次提交正确率<60%')">
                   <span class="legend-dot" :style="{ background: accColors.low }"></span>
                   <span>低 (<60%)</span>
                   <b>{{ analysis.accDist.low }}</b>
@@ -298,7 +279,7 @@
         <div class="iq-card content-card" style="padding: 20px;">
           <div class="section-title-bar">
             <b>📝 题目维度分析</b>
-            <span class="iq-text-sm iq-text-muted">每道题的全班作答情况</span>
+            <span class="iq-text-sm iq-text-muted">{{ questionScopeLabel }}</span>
           </div>
           <div v-if="questionsLoading" class="iq-table-loading" style="padding: 30px 0;">
             <span class="iq-loading-spinner"></span>
@@ -335,7 +316,7 @@
                     </span>
                 </td>
                 <td>
-                  <div class="mini-bar-wrap">
+                  <div class="mini-bar-wrap" :title="`${selectedClassName}共作答${q.answeredCount}次：答对${q.correctCount}次，答错${q.wrongCount}次，未答${q.skippedCount}次。正确率 = 答对次数 ÷ 作答次数 × 100%。`">
                     <div class="mini-bar mini-bar-correct" :style="{ width: q.correctRate + '%' }"></div>
                     <div class="mini-bar mini-bar-wrong" :style="{ width: q.wrongRate + '%' }"></div>
                     <div class="mini-bar mini-bar-skip" :style="{ width: q.skipRate + '%' }"></div>
@@ -410,7 +391,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { getExams, adminListRecords, getExamAnalytics } from '@/api/practice';
+import { getExams, getExamAnalytics } from '@/api/practice';
 import { getSubjects } from '@/api/subject';
 import { getClasses } from '@/api/class';
 import { getTypeName, getDifficultyLabel, DIFFICULTY_OPTIONS } from '@/utils/constants';
@@ -437,6 +418,12 @@ const allSubjects = ref([]);
 const classList = ref([]);
 const subjectFilter = ref('');
 const classFilter = ref('');
+const selectedClassName = computed(() => classList.value.find(c => String(c.id) === String(classFilter.value))?.name || '全部学生');
+const percentOf = (value, totalValue) => totalValue ? Math.round(Number(value) * 10000 / Number(totalValue)) / 100 : 0;
+const statisticsScope = computed(() => classFilter.value ? `${selectedClassName.value}学生` : '系统内全部学生');
+const questionScopeLabel = computed(() => classFilter.value
+  ? `所选试卷在${selectedClassName.value}的逐题作答情况`
+  : '所选试卷包含题目在全部历史试卷提交中的作答情况');
 
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 
@@ -473,6 +460,23 @@ const recordsPageSize = ref(50);
 const questionStats = ref([]);
 const analysisData = ref(null);
 
+const formulaFacts = computed(() => {
+  const rows = recordsList.value;
+  return {
+    scoreSum: Math.round(rows.reduce((sum, row) => sum + (Number(row.score) || 0), 0) * 100) / 100,
+    passCount: rows.filter(row => (Number(row.score) || 0) >= 60).length,
+    correctTotal: rows.reduce((sum, row) => sum + (Number(row.correct_count ?? row.correctCount) || 0), 0),
+    questionTotal: rows.reduce((sum, row) => sum + (Number(row.total_count ?? row.totalCount) || 0), 0),
+  };
+});
+const attemptFormula = computed(() => `统计范围：${statisticsScope.value}。练习总次数 = 提交记录数 = ${analysis.totalAttempts}次；同一学生多次提交分别计数。`);
+const participantFormula = computed(() => `统计范围：${statisticsScope.value}。参与人数 = 提交学生账号去重数 = ${analysis.uniqueStudents}人。`);
+const scoreFormula = computed(() => `统计范围：${statisticsScope.value}。平均得分 = 得分总和 ÷ 提交次数 = ${formulaFacts.value.scoreSum} ÷ ${analysis.totalAttempts} = ${analysis.avgScore}分。`);
+const passFormula = computed(() => `统计范围：${statisticsScope.value}。及格率 = 得分≥60分的提交次数 ÷ 提交总次数 × 100% = ${formulaFacts.value.passCount} ÷ ${analysis.totalAttempts} × 100% = ${analysis.passRate}%。`);
+const accuracyFormula = computed(() => `统计范围：${statisticsScope.value}。整体正确率 = 全部提交答对题数 ÷ 全部提交题目数 × 100% = ${formulaFacts.value.correctTotal} ÷ ${formulaFacts.value.questionTotal} × 100% = ${analysis.avgAccuracy}%。`);
+const scoreSliceFormula = (label, count, rule) => `${selectedClassName.value} · ${label}：${rule}；${count}次 ÷ ${analysis.totalAttempts}次 × 100% = ${percentOf(count, analysis.totalAttempts)}%。`;
+const accuracySliceFormula = (label, count, rule) => `${selectedClassName.value} · ${label}正确率：${rule}；${count}次 ÷ ${analysis.totalAttempts}次 × 100% = ${percentOf(count, analysis.totalAttempts)}%。`;
+
 const analysis = reactive({
   totalAttempts: 0,
   uniqueStudents: 0,
@@ -493,8 +497,38 @@ const openExamAnalysis = async (exam) => {
   recordsPage.value = 1;
 
   try {
-    await Promise.all([loadExamAnalysis(), loadExamRecords()]);
+    const params = classFilter.value ? { classId: classFilter.value } : {};
+    const data = await getExamAnalytics(exam.id, params);
+    const overview = data?.overview || {};
+    recordsList.value = data?.studentResults || [];
+    recordsTotal.value = Number(overview.attempt_count) || recordsList.value.length;
+    questionStats.value = (data?.questionStats || []).map((q, idx) => {
+      const answered = Number(q.answered_count) || 0;
+      const correct = Number(q.correct_count) || 0;
+      const wrong = Number(q.wrong_count) || 0;
+      const skipped = Number(q.skipped_count) || 0;
+      return {
+        index: idx + 1,
+        title: q.question_text || `第${idx + 1}题`,
+        type: Number(q.question_type) || 0,
+        typeName: getTypeName(Number(q.question_type)) || '未知',
+        difficulty: Number(q.difficulty) || 0,
+        answer: q.correct_answer || '--',
+        answeredCount: answered,
+        correctCount: correct,
+        wrongCount: wrong,
+        skippedCount: skipped,
+        correctRate: answered ? Math.round(correct * 10000 / answered) / 100 : 0,
+        wrongRate: answered ? Math.round(wrong * 10000 / answered) / 100 : 0,
+        skipRate: answered ? Math.round(skipped * 10000 / answered) / 100 : 0,
+      };
+    });
     computeAnalysis();
+    analysis.totalAttempts = Number(overview.attempt_count) || 0;
+    analysis.uniqueStudents = Number(overview.participant_count) || 0;
+    analysis.avgScore = Number(overview.avg_score) || 0;
+    analysis.passRate = Number(overview.pass_rate) || 0;
+    analysis.avgAccuracy = Number(overview.avg_accuracy) || 0;
   } catch (err) {
     onToast({ message: err.message || '加载分析数据失败', type: 'error' });
   } finally {
@@ -534,27 +568,7 @@ const loadExamAnalysis = async () => {
 };
 
 const loadExamRecords = async () => {
-  recordsLoading.value = true;
-  try {
-    const params = {
-      examId: selectedExam.value.id,
-      page: recordsPage.value,
-      pageSize: recordsPageSize.value,
-    };
-    if (props.role === 'teacher') params.role = 'student';
-    const data = await adminListRecords(params);
-    if (Array.isArray(data)) {
-      recordsList.value = data;
-      recordsTotal.value = data.length;
-    } else {
-      recordsList.value = data?.list || [];
-      recordsTotal.value = data?.total || 0;
-    }
-  } catch (err) {
-    onToast({ message: err.message || '加载记录失败', type: 'error' });
-  } finally {
-    recordsLoading.value = false;
-  }
+  if (selectedExam.value) await openExamAnalysis(selectedExam.value);
 };
 
 const pick = (obj, fields, fallback = '') => {
@@ -563,6 +577,10 @@ const pick = (obj, fields, fallback = '') => {
     if (obj[f] !== null && obj[f] !== undefined && obj[f] !== '') return obj[f];
   }
   return fallback;
+};
+
+const loadQuestionStats = async () => {
+  return Promise.resolve();
 };
 
 const computeAnalysis = () => {
@@ -827,6 +845,7 @@ onMounted(async () => {
 
 .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .chart-card { padding: 20px; }
+.chart-card-wide { grid-column: 1 / -1; }
 .chart-title { font-size: 15px; font-weight: 600; color: var(--iq-neutral-800); margin-bottom: 16px; }
 
 .pie-chart-wrap { display: flex; align-items: center; gap: 20px; }

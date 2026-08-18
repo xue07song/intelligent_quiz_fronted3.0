@@ -42,12 +42,19 @@
       <section class="iq-card section">
         <div class="section-head">
           <div>
-            <h3>👥 学生学习状态</h3>
-            <p>点击学生即可查看试卷、自适应练习、章节表现和具体建议</p>
+            <h3>👥 {{ selectedClass ? selectedClass + '学生列表' : '班级学习状态' }}</h3>
+            <p>{{ selectedClass ? '选择学生查看个人的试卷、自适应练习和各项学习指标' : '选择一个班级，进入班内学生分析' }}</p>
           </div>
+          <button v-if="selectedClass" class="back" @click="selectedClass = ''">← 返回班级列表</button>
         </div>
-        <div class="student-list">
-          <button v-for="s in overview.students" :key="s.id" @click="openStudent(s.id)">
+        <div v-if="!selectedClass" class="class-browser">
+          <button v-for="item in overview.classes" :key="item.id" class="class-browser-card" @click="selectedClass = item.name">
+            <b>{{ item.name }}</b><span>{{ item.studentCount }} 名学生</span><em>查看班级 ›</em>
+          </button>
+          <div v-if="!overview.classes.length" class="empty">尚未创建班级</div>
+        </div>
+        <div v-else class="student-list">
+          <button v-for="s in visibleStudents" :key="s.id" @click="openStudent(s.id)">
             <span class="avatar">{{ (s.nickname || s.username).slice(0, 1) }}</span>
             <span class="student-name">
               <b>{{ s.nickname || s.username }}</b>
@@ -62,16 +69,16 @@
         </div>
       </section>
 
-      <section class="iq-card section">
+      <section v-if="selectedClass" class="iq-card section">
         <div class="section-head">
           <div>
             <div class="explain-title">
-              <h3>📉 班级共同薄弱点</h3>
+              <h3>📉 班级薄弱点</h3>
               <span class="explain-trigger" tabindex="0">
                 ?
                 <span class="weak-tooltip">
                   <b>计算说明</b>
-                  <p>综合正确率 = 参与学生在该知识点答对的题数 ÷ 完成的总题数。至少有 2 名学生练习过该知识点才会展示。</p>
+                  <p>以当前班级为单位，将普通试卷与自适应练习中同一知识点的答对题数相加，再除以两类练习的完成题数。至少有 2 名学生练习过才展示。</p>
                 </span>
               </span>
             </div>
@@ -81,12 +88,21 @@
             进入智能组卷
           </button>
         </div>
-        <div v-if="!overview.commonWeaknesses.length" class="empty">目前还没有足够的多人练习数据</div>
-        <div class="weak-grid">
-          <article v-for="x in overview.commonWeaknesses" :key="x.key">
-            <div>
+        <div v-if="!selectedClassWeaknesses.length" class="empty">当前班级还没有足够的多人练习数据</div>
+        <div class="weak-chart" aria-label="班级知识点综合正确率图">
+          <article v-for="x in selectedClassWeaknesses" :key="x.key" class="weak-chart-row" tabindex="0">
+            <div class="weak-chart-label">
               <b>{{ x.key }}</b>
-              <span>{{ x.students }} 名学生练习 · 共 {{ x.answered }} 题</span>
+              <span>{{ x.students }} 名学生 · {{ x.answered }} 题</span>
+            </div>
+            <div class="weak-bar-track">
+              <span class="weak-bar-fill" :style="{ width: `${Math.max(2, x.accuracy)}%` }"></span>
+              <div class="weak-point-tooltip">
+                <b>{{ x.key }}</b>
+                <p>综合正确率：{{ x.accuracy }}%</p>
+                <p>当前班级 {{ x.students }} 名学生共完成 {{ x.answered }} 题，其中答对 {{ x.correct }} 题。</p>
+                <p>计算方式：（试卷答对数 + 自适应练习答对数）÷（试卷完成数 + 自适应练习完成数）× 100%</p>
+              </div>
             </div>
             <strong :class="scoreClass(x.accuracy)">{{ x.accuracy }}%</strong>
           </article>
@@ -308,7 +324,11 @@ const props = defineProps({
 const emit = defineEmits(['toast', 'practice', 'navigate']);
 
 const loading = ref(false);
-const overview = ref({ students: [], commonWeaknesses: [] });
+const selectedClass = ref('');
+const classNames = computed(() => [...new Set(overview.value.students.map((s) => s.className || '未分班'))]);
+const visibleStudents = computed(() => selectedClass.value ? overview.value.students.filter((s) => (s.className || '未分班') === selectedClass.value) : []);
+const selectedClassWeaknesses = computed(() => overview.value.classWeaknesses?.[selectedClass.value] || []);
+const overview = ref({ students: [], classes: [], commonWeaknesses: [], classWeaknesses: {} });
 const data = ref(null);
 const selectedId = ref(null);
 
@@ -468,7 +488,11 @@ const load = async () => {
     if (props.role === 'student') {
       data.value = await getLearningAnalysis();
     } else {
-      overview.value = await getLearningAnalysisOverview();
+      const payload = await getLearningAnalysisOverview();
+      overview.value = {
+        students: [], classes: [], commonWeaknesses: [], classWeaknesses: {},
+        ...(payload || {}),
+      };
     }
   } catch (e) {
     emit('toast', { message: e.message || '读取分析失败', type: 'error' });
@@ -844,36 +868,19 @@ onUnmounted(() => {
 }
 
 /* ===== 薄弱点网格 ===== */
-.weak-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.weak-grid article {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 16px;
-  background: #F5F3FF;
-  border-left: 3px solid #6366F1;
-  border-radius: 6px;
-}
-.weak-grid article > div {
-  display: grid;
-  gap: 4px;
-}
-.weak-grid article b {
-  font-size: 14px;
-  color: #1E293B;
-}
-.weak-grid article span {
-  font-size: 12px;
-  color: #64748B;
-}
-.weak-grid article strong {
-  font-size: 20px;
-  font-weight: 700;
-}
+.weak-chart { display:grid; gap:12px; padding:4px 0; }
+.weak-chart-row { position:relative; display:grid; grid-template-columns:minmax(150px, 240px) 1fr 56px; align-items:center; gap:16px; padding:8px 10px; border-radius:8px; outline:none; }
+.weak-chart-row:hover, .weak-chart-row:focus { background:#F8FAFF; }
+.weak-chart-label { display:grid; gap:3px; min-width:0; }
+.weak-chart-label b { overflow:hidden; color:#1E293B; font-size:14px; text-overflow:ellipsis; white-space:nowrap; }
+.weak-chart-label span { color:#64748B; font-size:12px; }
+.weak-bar-track { position:relative; height:14px; border-radius:7px; background:#E8ECF5; }
+.weak-bar-fill { display:block; height:100%; max-width:100%; border-radius:7px; background:#6366F1; transition:width .25s ease; }
+.weak-chart-row > strong { font-size:16px; text-align:right; }
+.weak-point-tooltip { display:none; position:absolute; z-index:20; left:50%; bottom:24px; width:min(390px, 70vw); padding:13px 15px; border:1px solid #C7D2FE; border-radius:8px; background:#fff; box-shadow:0 12px 30px rgba(30,41,59,.16); color:#1E293B; transform:translateX(-50%); }
+.weak-point-tooltip b { font-size:14px; }
+.weak-point-tooltip p { margin:5px 0 0; color:#475569; font-size:12px; line-height:1.55; }
+.weak-chart-row:hover .weak-point-tooltip, .weak-chart-row:focus .weak-point-tooltip { display:block; }
 
 /* ===== 学生摘要 ===== */
 .student-summary {
@@ -1263,9 +1270,8 @@ onUnmounted(() => {
     text-align: center;
     gap: 12px;
   }
-  .weak-grid {
-    grid-template-columns: 1fr;
-  }
+  .weak-chart-row { grid-template-columns:1fr 52px; gap:8px; }
+  .weak-chart-label { grid-column:1 / -1; }
   .weak-tooltip {
     left: auto;
     right: -8px;
@@ -1299,4 +1305,10 @@ onUnmounted(() => {
     font-size: 12px;
   }
 }
+.class-browser { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:12px; }
+.class-browser-card { min-height:105px; padding:18px; border:1px solid #dbe5f5; background:#f8fbff; text-align:left; display:grid; gap:7px; cursor:pointer; }
+.class-browser-card:hover { border-color:#6d75ed; background:#f3f5ff; }
+.class-browser-card b { font-size:16px; color:#14213d; }
+.class-browser-card span { color:#64748b; }
+.class-browser-card em { color:#4f46e5; font-style:normal; }
 </style>
