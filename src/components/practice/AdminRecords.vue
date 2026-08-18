@@ -458,6 +458,7 @@ const recordsTotal = ref(0);
 const recordsPage = ref(1);
 const recordsPageSize = ref(50);
 const questionStats = ref([]);
+const analysisData = ref(null);
 
 const formulaFacts = computed(() => {
   const rows = recordsList.value;
@@ -535,6 +536,37 @@ const openExamAnalysis = async (exam) => {
   }
 };
 
+const loadExamAnalysis = async () => {
+  analysisLoading.value = true;
+  questionsLoading.value = true;
+  try {
+    analysisData.value = await getExamAnalytics(selectedExam.value.id);
+    const stats = analysisData.value?.questionStats || [];
+    questionStats.value = stats.map((q, idx) => {
+      const typeNum = Number(q.question_type || 0);
+      const answered = Number(q.answered_count) || 0;
+      const wrong = Number(q.wrong_count) || 0;
+      const skipped = Number(q.skipped_count) || 0;
+      return {
+        index: idx + 1,
+        title: String(q.question_text || '').substring(0, 60) || `第${idx + 1}题`,
+        type: typeNum,
+        typeName: getTypeName(typeNum) || '未知',
+        difficulty: 0,
+        answer: q.correct_answer || '--',
+        correctRate: Math.round(Number(q.accuracy) || 0),
+        wrongRate: answered ? Math.round(wrong * 100 / answered) : 0,
+        skipRate: answered ? Math.round(skipped * 100 / answered) : 0,
+      };
+    });
+  } catch (err) {
+    onToast({ message: err.message || '加载分析数据失败', type: 'error' });
+  } finally {
+    analysisLoading.value = false;
+    questionsLoading.value = false;
+  }
+};
+
 const loadExamRecords = async () => {
   if (selectedExam.value) await openExamAnalysis(selectedExam.value);
 };
@@ -552,8 +584,8 @@ const loadQuestionStats = async () => {
 };
 
 const computeAnalysis = () => {
-  const records = recordsList.value;
-  if (records.length === 0) {
+  const data = analysisData.value;
+  if (!data) {
     Object.assign(analysis, {
       totalAttempts: 0, uniqueStudents: 0, avgScore: 0, passRate: 0, avgAccuracy: 0,
       scoreDist: { excellent: 0, pass: 0, fail: 0 },
@@ -563,16 +595,16 @@ const computeAnalysis = () => {
     return;
   }
 
-  const totalAttempts = recordsTotal.value || records.length;
-  const studentSet = new Set(records.map(r => r.user_id || r.userId || r.id));
-  const uniqueStudents = studentSet.size;
+  const overview = data.overview || {};
+  const studentResults = data.studentResults || [];
+  const totalAttempts = overview.participant_count || studentResults.length;
+  const uniqueStudents = totalAttempts;
 
-  const scores = records.map(r => Number(r.score) || 0);
+  const scores = studentResults.map(r => Number(r.score) || 0);
   const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-  const passCount = scores.filter(s => s >= 60).length;
-  const passRate = Math.round((passCount / scores.length) * 100);
+  const passRate = Math.round(Number(overview.pass_rate) || 0);
 
-  const accuracies = records.map(r => Number(r.accuracy) || 0);
+  const accuracies = studentResults.map(r => Number(r.accuracy) || 0);
   const avgAccuracy = Math.round(accuracies.reduce((a, b) => a + b, 0) / accuracies.length);
 
   const scoreDist = {
@@ -587,30 +619,20 @@ const computeAnalysis = () => {
     low: accuracies.filter(a => a < 60).length,
   };
 
-  const classMap = {};
-  records.forEach(r => {
-    const clsName = r.class_name || r.className || '未分班';
-    if (!classMap[clsName]) classMap[clsName] = { scores: [], count: 0 };
-    classMap[clsName].scores.push(Number(r.score) || 0);
-    classMap[clsName].count++;
-  });
-  const classStats = Object.entries(classMap).map(([name, data]) => ({
-    name,
-    avgScore: Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length),
-    count: data.count,
-  })).sort((a, b) => b.avgScore - a.avgScore);
+  const classStats = (data.classBreakdown || []).map((c) => ({
+    name: c.class_name || '未分班',
+    avgScore: Math.round(Number(c.avg_score) || 0),
+    count: c.participant_count || 0,
+  }));
 
-  const segments = [
-    { label: '0-59', min: 0, max: 59, count: 0, color: '#ef4444' },
-    { label: '60-69', min: 60, max: 69, count: 0, color: '#f59e0b' },
-    { label: '70-79', min: 70, max: 79, count: 0, color: '#eab308' },
-    { label: '80-89', min: 80, max: 89, count: 0, color: '#22c55e' },
-    { label: '90-100', min: 90, max: 100, count: 0, color: '#10b981' },
-  ];
-  scores.forEach(s => {
-    const seg = segments.find(seg => s >= seg.min && s <= seg.max);
-    if (seg) seg.count++;
-  });
+  const segmentColors = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#10b981'];
+  const segments = (data.scoreDistribution || []).map((s) => ({
+    label: s.range_label || '--',
+    min: 0,
+    max: 100,
+    count: Number(s.count) || 0,
+    color: segmentColors[(Number(s.range_order) || 1) - 1] || '#10b981',
+  }));
   const maxSegment = Math.max(...segments.map(s => s.count), 1);
 
   Object.assign(analysis, {

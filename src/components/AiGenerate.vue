@@ -30,6 +30,13 @@
           <div v-if="!drafts.length" class="iq-modal-body">
             <div class="iq-form-grid ai-grid">
               <div class="iq-form-field">
+                <label class="iq-form-label">科目 <span class="iq-req">*</span></label>
+                <select v-model="form.科目" class="iq-select">
+                  <option value="">请选择科目</option>
+                  <option v-for="s in subjectOptions" :key="s" :value="s">{{ s }}</option>
+                </select>
+              </div>
+              <div class="iq-form-field">
                 <label class="iq-form-label">章节</label>
                 <input v-model="form.章节" type="number" class="iq-input" placeholder="不限留空" />
               </div>
@@ -151,15 +158,19 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue';
 import { generateQuestions, saveGenerated } from '@/api/ai';
+import { getSubjects } from '@/api/subject';
 import { TYPE_OPTIONS, DIFFICULTY_OPTIONS, getTypeName } from '@/utils/constants';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
+  role: { type: String, default: 'teacher' },
+  subjects: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(['close', 'success']);
 
 const form = reactive({
+  科目: '',
   章节: '',
   题型: '',
   难度: '',
@@ -172,6 +183,22 @@ const loading = ref(false);
 const saving = ref(false);
 const errorMsg = ref('');
 const drafts = ref([]);
+const allSubjects = ref([]);
+
+const subjectOptions = computed(() => {
+  if (props.role === 'teacher') return props.subjects || [];
+  return allSubjects.value || [];
+});
+
+const loadSubjects = async () => {
+  if (props.role === 'teacher') return;
+  try {
+    const data = await getSubjects();
+    allSubjects.value = Array.isArray(data) ? data : [];
+  } catch {
+    allSubjects.value = [];
+  }
+};
 
 const typeOptions = TYPE_OPTIONS;
 const difficultyOptions = DIFFICULTY_OPTIONS;
@@ -188,6 +215,10 @@ const resetDrafts = () => {
 };
 
 const handleGenerate = async () => {
+  if (!form.科目) {
+    errorMsg.value = '请选择入库科目';
+    return;
+  }
   if (!form.数量 || form.数量 < 1 || form.数量 > 10) {
     errorMsg.value = '数量需在 1-10 之间';
     return;
@@ -218,11 +249,15 @@ const handleGenerate = async () => {
 const handleSave = async () => {
   const selected = drafts.value.filter((d) => d._checked);
   if (selected.length === 0) return;
+  if (!form.科目) {
+    errorMsg.value = '请选择入库科目';
+    return;
+  }
   saving.value = true;
   errorMsg.value = '';
   try {
     const questions = selected.map(({ _checked, ...rest }) => rest);
-    const result = await saveGenerated(questions);
+    const result = await saveGenerated(questions, form.科目);
     emit('success', result);
   } catch (err) {
     errorMsg.value = err.message || '入库失败，请稍后重试';
@@ -232,9 +267,15 @@ const handleSave = async () => {
 };
 
 watch(() => props.visible, (val) => {
-  if (!val) {
+  if (val) {
+    loadSubjects();
+    if (props.role === 'teacher' && props.subjects?.length === 1) {
+      form.科目 = props.subjects[0];
+    }
+  } else {
     setTimeout(() => {
       resetDrafts();
+      form.科目 = '';
       form.章节 = '';
       form.题型 = '';
       form.难度 = '';

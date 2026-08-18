@@ -38,7 +38,7 @@ export const generateQuestions = (data) => {
 // 入库审核后的题目（仅教师/管理员）
 // body: { questions: [...] }
 // 返回: { inserted, skipped, ... }
-export const saveGenerated = (questions) => {
-  return request.post('/ai/generate/save', { questions });
+export const saveGenerated = (questions, subject) => {
+  return request.post('/ai/generate/save', { questions, subject });
 };
 
