@@ -120,6 +120,11 @@ export const createWrongExam = (data) => {
   return request.post('/practice/wrong-exams', data);
 };
 
+// ===== [新增] 单题练习：根据题目ID生成练习 =====
+export const startSingleQuestion = (questionId) => {
+  return request.post('/practice/single-question', { questionId });
+};
+
 // ==================== 管理端接口（教师/管理员）====================
 // 教师只能查看学生数据；管理员可查看所有人并按角色筛选
 
@@ -151,6 +156,10 @@ export const adminListUserRecords = (userId, params = {}) => {
 // 管理端：查看指定用户的统计分析
 export const adminGetUserStats = (userId) => {
   return request.get(`/practice/admin/users/${userId}/statistics`);
+};
+// ===== 单题判题（直接返回对错和解析） =====
+export const checkSingleQuestion = (questionId, userAnswer) => {
+  return request.post('/practice/single-question/check', { questionId, userAnswer });
 };
 
 // 管理端：以人为界的全局统计总览（每人含汇总 + 最近 N 次答题明细）

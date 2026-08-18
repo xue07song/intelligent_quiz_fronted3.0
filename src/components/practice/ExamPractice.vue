@@ -206,7 +206,7 @@
       </div>
 
       <!-- ===== 底部提交栏 ===== -->
-      <div class="submit-bar">
+      <div v-if="exam.questions?.length !== 1" class="submit-bar">
         <div class="submit-info">
           已答 <strong class="answered-highlight">{{ answeredCount }}</strong>
           <span class="text-muted">/ {{ exam.questions?.length || 0 }} 题</span>
@@ -219,6 +219,10 @@
           {{ submitting ? '提交中...' : '📤 提交试卷' }}
         </button>
       </div>
+      <div v-else-if="phase === 'exam'" class="single-submit-hint">
+        <span v-if="!submitting">✅ 选择答案后将自动提交</span>
+        <span v-else><span class="btn-spinner"></span> 提交中...</span>
+      </div>
     </div>
 
     <!-- ===== 结果阶段 ===== -->
@@ -227,6 +231,22 @@
         <div class="result-emoji">🎉</div>
         <h2>答题完成！</h2>
         <p class="result-sub">系统已自动完成客观题评分</p>
+
+        <!-- ===== 单题解析 ===== -->
+        <div v-if="exam.questions?.length === 1 && singleQuestionDetail" class="single-result-detail">
+          <div class="detail-question">{{ singleQuestionDetail.questions?.[0]?.题目 || '题目内容' }}</div>
+          <div class="detail-answer">
+            <span class="detail-label">你的答案：</span>
+            <span class="detail-user-answer">{{ singleQuestionDetail.answers?.[0]?.userAnswer || '未作答' }}</span>
+            <span class="detail-correct-answer">正确答案：{{ singleQuestionDetail.answers?.[0]?.correctAnswer || '无' }}</span>
+          </div>
+          <div class="detail-result" :class="singleQuestionDetail.answers?.[0]?.isCorrect === 1 ? 'correct' : 'wrong'">
+            {{ singleQuestionDetail.answers?.[0]?.isCorrect === 1 ? '✅ 回答正确' : '❌ 回答错误' }}
+          </div>
+          <div v-if="singleQuestionDetail.questions?.[0]?.解析" class="detail-analysis">
+            <strong>📖 解析：</strong>{{ singleQuestionDetail.questions[0].解析 }}
+          </div>
+        </div>
 
         <div class="score-display" :class="scoreClass(result.score)">
           <span class="score-number">{{ result.score }}</span>
@@ -275,7 +295,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
-import { getExam, submitExam, startExamApi, getExamDraftApi, saveExamDraftApi } from '@/api/practice';
+import { getExam, submitExam, getRecord } from '@/api/practice';
 import { getFavorites, addFavorite, removeFavorite } from '@/api/student';
 import { askTutor as askTutorApi } from '@/api/ai';
 import { getTypeName, getDifficultyLabel } from '@/utils/constants';
@@ -297,6 +317,7 @@ const exam = ref({ questions: [] });
 const answers = reactive({});
 const multiAnswers = reactive({});
 const result = ref(null);
+const singleQuestionDetail = ref(null);
 const favoriteSet = ref(new Set());
 const favoriteLoading = reactive({});
 const draftSaved = ref(false);
@@ -307,6 +328,7 @@ const remainingSeconds = ref(null);
 const expired = ref(false);
 let timer = null;
 let draftTimer = null;
+let autoSubmitTimer = null;
 
 // ===== AI 答疑 =====
 const tutorOpen = reactive({});
@@ -352,17 +374,41 @@ function parseOptions(text) {
   if (!text) return [];
   const str = String(text).trim();
   const lines = str.split(/\n+/).filter(Boolean);
+
+  const cleanText = (raw) => {
+    return String(raw || '')
+        .replace(/^[A-Fa-f]\s*[.、)）]\s*/, '')
+        .trim();
+  };
+
+  const result = [];
+  const seenText = new Set();
+
+  const addOption = (key, rawText) => {
+    const textClean = cleanText(rawText);
+    if (textClean && !seenText.has(textClean)) {
+      seenText.add(textClean);
+      result.push({ key, text: textClean });
+    }
+  };
+
   if (lines.length > 1) {
-    return lines.map((line) => {
+    lines.forEach((line, index) => {
       const match = line.match(/^([A-Fa-f])\s*[.、)）]?\s*(.*)/);
       if (match) {
-        return { key: match[1].toUpperCase(), text: match[2].trim() };
+        addOption(match[1].toUpperCase(), match[2]);
+      } else {
+        addOption(String.fromCharCode(65 + index), line);
       }
-      return { key: String.fromCharCode(65 + lines.indexOf(line)), text: line.trim() };
+    });
+  } else {
+    const parts = str.split(/[，,;；\s]+/).filter(Boolean);
+    parts.forEach((p, i) => {
+      addOption(String.fromCharCode(65 + i), p);
     });
   }
-  const parts = str.split(/[，,;；\s]+/).filter(Boolean);
-  return parts.map((p, i) => ({ key: String.fromCharCode(65 + i), text: p }));
+
+  return result;
 }
 
 function syncMulti(qid) {
@@ -581,17 +627,23 @@ const loadExam = async () => {
 
 // ===== 提交 =====
 const handleSubmit = async () => {
-  if (expired.value) {
-    emit('toast', { message: '答题时间已到，无法提交', type: 'error' });
+  if (submitting.value) {
+    console.log('提交中，跳过重复提交');
     return;
   }
   const total = exam.value.questions?.length || 0;
-  if (answeredCount.value < total) {
+  if (answeredCount.value < total && total > 1) {
     if (!window.confirm(`还有 ${total - answeredCount.value} 题未作答，确定提交吗？`)) {
       return;
     }
   }
+  if (total === 1 && answeredCount.value === 0) {
+    emit('toast', { message: '请先作答', type: 'warning' });
+    return;
+  }
+
   submitting.value = true;
+  console.log('开始提交...');
   try {
     const answersArr = exam.value.questions.map((q) => ({
       questionId: q.id,
@@ -601,8 +653,20 @@ const handleSubmit = async () => {
       answers: answersArr,
       startedAt: startedAt.value.toISOString(),
     });
+    console.log('提交成功', data);
     result.value = data;
     phase.value = 'result';
+
+    if (exam.value.questions.length === 1 && data.recordId) {
+      try {
+        const detail = await getRecord(data.recordId);
+        singleQuestionDetail.value = detail;
+        console.log('获取解析成功', detail);
+      } catch (err) {
+        console.warn('获取单题详情失败:', err);
+      }
+    }
+
     if (timer) clearInterval(timer);
     emit('update-question-id', null);
     emit('update-question', null);
@@ -611,6 +675,7 @@ const handleSubmit = async () => {
     draftSaved.value = false;
     emit('toast', { message: `提交成功！得分 ${data.score} 分`, type: 'success' });
   } catch (err) {
+    console.error('提交失败:', err);
     emit('toast', { message: err.message || '提交失败', type: 'error' });
   } finally {
     submitting.value = false;
@@ -627,11 +692,27 @@ const handleExit = () => {
   emit('exit');
 };
 
-// ===== 监听 =====
+// ===== 监听答案变化 =====
 watch([answers, multiAnswers], () => {
   if (!exam.value.questions?.length) return;
+
   clearTimeout(draftTimer);
   draftTimer = setTimeout(saveDraft, 400);
+
+  const totalQuestions = exam.value.questions.length;
+  if (totalQuestions === 1 && phase.value === 'exam' && !submitting.value) {
+    const q = exam.value.questions[0];
+    if (isAnswered(q)) {
+      console.log('单题已答，准备自动提交...');
+      clearTimeout(autoSubmitTimer);
+      autoSubmitTimer = setTimeout(async () => {
+        console.log('执行自动提交');
+        await handleSubmit();
+      }, 800);
+    } else {
+      clearTimeout(autoSubmitTimer);
+    }
+  }
 }, { deep: true });
 
 // ===== 生命周期 =====
@@ -641,6 +722,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearTimeout(draftTimer);
+  clearTimeout(autoSubmitTimer);
   if (phase.value === 'exam' && exam.value.questions?.length && answeredCount.value > 0) saveDraft();
   if (timer) clearInterval(timer);
 });
@@ -1145,6 +1227,99 @@ onUnmounted(() => {
   vertical-align: middle;
 }
 
+/* ===== [新增] 单题提交提示 ===== */
+.single-submit-hint {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(900px, 100%);
+  padding: 14px 24px;
+  background: #fff;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.08);
+  z-index: 50;
+  text-align: center;
+  color: #64748B;
+  font-size: 14px;
+}
+.single-submit-hint .btn-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(99, 102, 241, 0.3);
+  border-top: 2px solid #6366F1;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
+/* ===== [新增] 单题解析区域 ===== */
+.single-result-detail {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+.detail-question {
+  font-size: 16px;
+  font-weight: 500;
+  color: #1E293B;
+  margin-bottom: 12px;
+  line-height: 1.8;
+}
+.detail-answer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  align-items: center;
+}
+.detail-label {
+  color: #94A3B8;
+}
+.detail-user-answer {
+  font-weight: 600;
+  color: #1E293B;
+}
+.detail-correct-answer {
+  font-weight: 500;
+  color: #059669;
+}
+.detail-result {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+.detail-result.correct {
+  background: #DCFCE7;
+  color: #15803D;
+}
+.detail-result.wrong {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+.detail-analysis {
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.8;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 8px;
+  border-left: 3px solid #6366F1;
+}
+.detail-analysis strong {
+  color: #1E293B;
+}
+
 /* ===== 结果页 ===== */
 .result-phase {
   display: flex;
@@ -1261,5 +1436,6 @@ onUnmounted(() => {
   .result-card { padding: 24px 20px; }
   .result-grid { grid-template-columns: repeat(2, 1fr); }
   .submit-bar { flex-direction: column; gap: 10px; padding: 12px 16px; }
+  .single-submit-hint { padding: 12px 16px; }
 }
 </style>

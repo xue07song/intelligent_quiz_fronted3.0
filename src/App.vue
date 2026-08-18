@@ -93,6 +93,7 @@
         <WrongBook
             v-if="currentView === 'wrongbook'"
             @start-exam="startExam"
+            @start-single-practice="startSinglePractice"
             @toast="handleToastFromChild"
         />
         <PracticeRecords
@@ -113,6 +114,17 @@
             :role="currentUser.role"
             @toast="handleToastFromChild"
         />
+        <Favorites
+            v-if="currentView === 'favorites'"
+            @close="currentView = 'analysis'"
+            @start-exam="startExam"
+            @start-single-practice="startSinglePractice"
+        />
+        <SingleQuestionPractice
+            v-if="currentView === 'single-practice' && singleQuestionId"
+            :questionId="singleQuestionId"
+            @exit="exitSinglePractice"
+        />
       </main>
     </div>
 
@@ -129,7 +141,6 @@
         </div>
 
         <nav class="iq-sidebar-nav">
-          <!-- ===== 教学管理 ===== -->
           <div class="iq-nav-group">
             <div class="iq-nav-group-label">教学管理</div>
             <button
@@ -156,7 +167,6 @@
             </button>
           </div>
 
-          <!-- ===== 教学数据 ===== -->
           <div class="iq-nav-group">
             <div class="iq-nav-group-label">教学数据</div>
             <button
@@ -189,7 +199,6 @@
             </button>
           </div>
 
-          <!-- ===== 系统管理（仅管理员） ===== -->
           <div v-if="currentUser.role === 'admin'" class="iq-nav-group">
             <div class="iq-nav-group-label">系统管理</div>
             <button
@@ -210,7 +219,6 @@
           </div>
         </nav>
 
-        <!-- ===== 左下角用户菜单 ===== -->
         <div class="iq-sidebar-footer">
           <div class="sidebar-user-trigger" @click.stop="toggleSidebarUserMenu">
             <div class="user-info">
@@ -245,7 +253,6 @@
 
       <div v-if="sidebarOpen" class="iq-sidebar-overlay" @click="sidebarOpen = false"></div>
 
-      <!-- ===== 顶部 Header（已移除改密码和退出按钮） ===== -->
       <header class="iq-layout-header">
         <div class="header-left">
           <button class="iq-sidebar-toggle" @click="sidebarOpen = !sidebarOpen" aria-label="打开菜单">
@@ -261,7 +268,6 @@
             <span class="breadcrumb-current">{{ currentBreadcrumb }}</span>
           </nav>
         </div>
-        <!-- 右上角只保留头像和姓名，功能移至左下角下拉菜单 -->
         <div class="iq-header-right">
           <div class="iq-avatar-wrap">
             <div class="iq-avatar">{{ avatarChar }}</div>
@@ -275,12 +281,9 @@
         </div>
       </header>
 
-      <!-- ===== 主内容区 ===== -->
       <main class="iq-layout-main">
-        <!-- ===== 题库管理（与学情分析宽度一致） ===== -->
         <template v-if="currentView === 'main'">
           <div class="question-bank-page">
-            <!-- 顶部横幅 -->
             <header class="iq-page-hero">
               <div class="hero-content">
                 <span class="hero-badge">📚 教学管理</span>
@@ -295,7 +298,6 @@
               </div>
             </header>
 
-            <!-- 统计卡片 -->
             <div v-if="stats" class="iq-stat-grid">
               <div class="iq-card iq-stat-card">
                 <div class="iq-stat-label">📊 题库总量</div>
@@ -307,7 +309,6 @@
               </div>
             </div>
 
-            <!-- 筛选栏 -->
             <SearchBar
                 :initialFilters="filters"
                 :role="currentUser.role"
@@ -316,7 +317,6 @@
                 @reset="handleReset"
             />
 
-            <!-- 表格 -->
             <QuestionTable
                 :list="list"
                 :loading="loading"
@@ -328,7 +328,6 @@
                 @delete="handleDelete"
             />
 
-            <!-- 分页 -->
             <Pagination
                 v-model:page="page"
                 v-model:pageSize="pageSize"
@@ -338,38 +337,45 @@
           </div>
         </template>
 
-        <!-- ===== 用户管理（仅管理员） ===== -->
         <template v-if="currentView === 'users' && currentUser.role === 'admin'">
           <div class="iq-page-titlebar"><h1>👥 用户管理</h1></div>
           <UserManagement @toast="handleToastFromChild" />
         </template>
 
-        <!-- ===== 注册审核（仅管理员） ===== -->
         <template v-if="currentView === 'audit' && currentUser.role === 'admin'">
           <div class="iq-page-titlebar"><h1>✅ 注册审核</h1></div>
           <RegistrationAudit @toast="handleToastFromChild" @update:pending="loadPendingCount" />
         </template>
 
-        <!-- ===== 个人中心 ===== -->
         <template v-if="currentView === 'profile'">
           <Profile />
         </template>
 
-        <!-- ===== 用户反馈 ===== -->
         <template v-if="currentView === 'feedback'">
           <div class="iq-page-titlebar"><h1>💬 用户反馈</h1></div>
           <Feedback :role="currentUser.role" @toast="handleToastFromChild" />
         </template>
 
-        <!-- ===== 出卷与学生管理 ===== -->
+        <template v-if="currentView === 'favorites'">
+          <Favorites
+              @close="currentView = 'analysis'"
+              @start-exam="startExam"
+              @start-single-practice="startSinglePractice"
+          />
+        </template>
+
+        <SingleQuestionPractice
+            v-if="currentView === 'single-practice' && singleQuestionId"
+            :questionId="singleQuestionId"
+            @exit="exitSinglePractice"
+        />
+
         <template v-if="currentView === 'practice'">
-          <!-- 只在非独立视图且不是 generate 时显示标题（generate 自己显示横幅） -->
           <div v-if="!standalonePracticeViews.includes(practiceView) && practiceView !== 'generate'" class="iq-page-titlebar">
             <h1>{{ pageTitle }}</h1>
           </div>
 
-          <!-- 子导航：只在试卷列表和智能组卷显示 -->
-          <div v-if="!standalonePracticeViews.includes(practiceView) && currentUser.role !== 'admin'" class="iq-practice-subnav">
+          <div v-if="!standalonePracticeViews.includes(practiceView)" class="iq-practice-subnav">
             <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
             <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
           </div>
@@ -421,7 +427,6 @@
         </template>
       </main>
 
-      <!-- ===== 弹窗层 ===== -->
       <QuestionForm
           :visible="dialogVisible"
           :data="formData"
@@ -472,14 +477,13 @@
     </div>
   </div>
 
-  <!-- ===== Toast ===== -->
   <Toast :message="toastMessage" :type="toastType" v-if="currentUser" />
 </template>
 
 <script setup>
 import { ref, reactive, computed, provide, onMounted, onUnmounted, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 
-// ===== 组件导入 =====
 import Login from '@/components/Login.vue';
 import RegistrationDialog from '@/components/RegistrationDialog.vue';
 import Toast from '@/components/Toast.vue';
@@ -497,7 +501,6 @@ import AiGenerate from '@/components/AiGenerate.vue';
 import Feedback from '@/components/Feedback.vue';
 import Profile from '@/components/Profile.vue';
 
-// ===== Practice 组件 =====
 import ExamList from '@/components/practice/ExamList.vue';
 import ExamPractice from '@/components/practice/ExamPractice.vue';
 import AdaptivePractice from '@/components/practice/AdaptivePractice.vue';
@@ -510,7 +513,11 @@ import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ClassManagement from '@/components/practice/ClassManagement.vue';
 import AdminRecords from '@/components/practice/AdminRecords.vue';
 
-// ===== API =====
+import Favorites from '@/views/Favorites.vue';
+
+// ===== [新增] 单题练习组件 =====
+import SingleQuestionPractice from '@/components/practice/SingleQuestionPractice.vue';
+
 import {
   getQuestions,
   addQuestion,
@@ -520,6 +527,12 @@ import {
   batchDeleteQuestions,
 } from '@/api/question';
 import { getRegistrations } from '@/api/auth';
+
+// ================================================================
+// 路由实例
+// ================================================================
+const router = useRouter();
+const route = useRoute();
 
 // ================================================================
 // 常量
@@ -546,7 +559,6 @@ const pwdVisible = ref(false);
 // ================================================================
 // 答题练习状态
 // ================================================================
-// admin-records 已加入独立视图列表，试卷分析不显示子导航
 const practiceView = ref('exams');
 const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'adaptive-review', 'classes', 'admin-records'];
 const activeExamId = ref(null);
@@ -555,6 +567,20 @@ const analysisPracticeFilters = ref({});
 const currentQuestionId = ref(null);
 const currentQuestion = ref(null);
 const currentExamId = ref(null);
+
+// ===== [新增] 单题练习状态 =====
+const singleQuestionId = ref(null);
+// ===== [新增] 记录进入单题练习前的视图 =====
+const previousView = ref(null);
+
+// ================================================================
+// 路由监听
+// ================================================================
+watch(() => route.path, (newPath) => {
+  if (newPath === '/favorites') {
+    currentView.value = 'favorites';
+  }
+}, { immediate: true });
 
 const openPracticeView = (view) => {
   practiceView.value = view;
@@ -617,14 +643,15 @@ provide('assistantState', {
 // ================================================================
 const navigateTo = (view) => {
   currentView.value = view;
+  if (view === 'favorites') {
+    router.push('/favorites');
+  }
 };
 
 const goHome = () => {
   if (currentUser.value?.role === 'student') {
     currentView.value = 'papers';
-  } else if (currentUser.value?.role === 'admin') {
-    currentView.value = 'practice';
-    practiceView.value = 'exams';
+    router.push('/');
   } else {
     currentView.value = 'main';
   }
@@ -701,6 +728,8 @@ const currentBreadcrumb = computed(() => {
   if (currentView.value === 'audit') return '注册审核';
   if (currentView.value === 'feedback') return '用户反馈';
   if (currentView.value === 'profile') return '个人中心';
+  if (currentView.value === 'favorites') return '我的收藏';
+  if (currentView.value === 'single-practice') return '单题练习';
   if (currentView.value === 'practice') {
     const map = {
       exams: '试卷列表',
@@ -742,6 +771,8 @@ const pageTitle = computed(() => {
   };
   return map[practiceView.value] || '';
 });
+
+// ===== 考试相关方法 =====
 const startExam = (examId) => {
   activeExamId.value = examId;
   if (currentUser.value?.role === 'student') {
@@ -763,6 +794,20 @@ const exitExam = () => {
 const viewRecord = (recordId) => {
   activeRecordId.value = recordId;
   practiceView.value = 'record-detail';
+};
+
+// ===== [修改] 单题练习相关方法 =====
+const startSinglePractice = (questionId) => {
+  singleQuestionId.value = questionId;
+  previousView.value = currentView.value; // 保存当前视图
+  currentView.value = 'single-practice';
+};
+
+const exitSinglePractice = () => {
+  singleQuestionId.value = null;
+  // 如果有保存的视图则恢复，否则默认回到学情分析
+  currentView.value = previousView.value || 'analysis';
+  previousView.value = null; // 清空保存
 };
 
 // ================================================================
@@ -834,6 +879,7 @@ const handleLogout = () => {
   pendingCount.value = 0;
   closeUserMenu();
   closeSidebarUserMenu();
+  router.push('/');
 };
 
 const handlePwdChanged = () => {
@@ -843,6 +889,7 @@ const handlePwdChanged = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     currentUser.value = null;
+    router.push('/');
   }, 1500);
 };
 
@@ -1724,7 +1771,6 @@ onUnmounted(() => {
   background: #F8FAFC;
 }
 
-/* ===== 题库管理页面容器（与学情分析宽度一致） ===== */
 .question-bank-page {
   max-width: 1240px;
   margin: 0 auto;
@@ -1732,7 +1778,6 @@ onUnmounted(() => {
   gap: 18px;
 }
 
-/* ===== 统计卡片 ===== */
 .iq-stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -1759,7 +1804,6 @@ onUnmounted(() => {
   color: #6366F1;
 }
 
-/* ===== 顶部横幅 ===== */
 .iq-page-hero {
   display: flex;
   justify-content: space-between;
@@ -1800,7 +1844,6 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-/* 浅色背景按钮（用于深色横幅上） */
 .iq-btn-secondary-light {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
@@ -1846,7 +1889,6 @@ onUnmounted(() => {
   background: #F1F5F9;
 }
 
-/* ===== 子导航 ===== */
 .iq-practice-subnav {
   display: flex;
   gap: 8px;

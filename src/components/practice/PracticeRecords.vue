@@ -40,7 +40,9 @@
         <div class="record-card-header">
           <div class="record-left">
             <span class="record-index">#{{ (page - 1) * pageSize + index + 1 }}</span>
-            <span class="record-title">{{ r.exam_title || `试卷#${r.exam_id}` }}</span>
+            <!-- ===== [修改] 使用 getRecordTitle 方法 ===== -->
+            <span class="record-title">{{ getRecordTitle(r) }}</span>
+            <span v-if="r.exam_id === null" class="record-type-tag adaptive">🎯 自适应</span>
             <span v-if="showSubmitter" class="record-submitter">
               <span class="submitter-avatar">{{ getAvatar(r.nickname || r.username) }}</span>
               {{ r.nickname || r.username || '未知用户' }}
@@ -106,7 +108,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { getRecords } from '@/api/practice';
-import { formatTime } from '@/utils/format';
+// ===== [修改] 移除外部导入，改为本地实现 =====
+// import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
 
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
@@ -141,6 +144,33 @@ const scoreClass = (score) => {
   if (score >= 90) return 'score-excellent';
   if (score >= 60) return 'score-pass';
   return 'score-fail';
+};
+
+// ===== [新增] 本地 formatTime 函数，更健壮 =====
+const formatTime = (value) => {
+  if (!value) return '';
+  try {
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return String(value);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
+  } catch {
+    return String(value);
+  }
+};
+
+// ===== [新增] 获取记录标题 =====
+const getRecordTitle = (record) => {
+  // 如果 exam_id 为 null，说明是自适应练习
+  if (record.exam_id === null) {
+    return '🎯 自适应练习';
+  }
+  // 否则显示试卷标题
+  return record.exam_title || `试卷#${record.exam_id}`;
 };
 
 const loadRecords = async () => {
@@ -333,6 +363,18 @@ defineExpose({ loadRecords });
   font-size: 15px;
   font-weight: 600;
   color: #1E293B;
+}
+
+/* ===== [新增] 自适应练习标签 ===== */
+.record-type-tag {
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.record-type-tag.adaptive {
+  background: #DCFCE7;
+  color: #15803D;
 }
 
 .record-submitter {
