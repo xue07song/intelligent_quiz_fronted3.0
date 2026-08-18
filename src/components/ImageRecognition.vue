@@ -74,6 +74,10 @@
                 <button class="ocr-link-btn" @click="resetAll">重新上传</button>
               </div>
 
+              <div v-if="isMockResult" class="ocr-mock-warning">
+                ⚠️ 当前为模拟识别数据，仅用于调试，不能导入正式题库。请配置 GLM_API_KEY 后重新识别。
+              </div>
+
               <div class="ocr-list">
                 <div v-for="(q, index) in questions" :key="index" class="ocr-item">
                   <div class="ocr-item-head">
@@ -151,7 +155,7 @@
             </button>
             <template v-else>
               <button type="button" class="iq-btn iq-btn-secondary" :disabled="importing" @click="resetQuestions">重新识别</button>
-              <button type="button" class="iq-btn iq-btn-primary" :disabled="importing || selectedCount === 0" @click="handleImport">
+              <button type="button" class="iq-btn iq-btn-primary" :disabled="importing || isMockResult || selectedCount === 0" @click="handleImport">
                 <span v-if="importing" class="ocr-spinner"></span>
                 {{ importing ? '导入中...' : `导入所选 (${selectedCount})` }}
               </button>
@@ -187,6 +191,7 @@ const importing = ref(false);
 const errorMsg = ref('');
 const questions = ref([]);
 const allSubjects = ref([]);
+const isMockResult = ref(false);
 
 const subjectOptions = computed(() => {
   if (props.role === 'teacher') return props.subjects || [];
@@ -257,6 +262,7 @@ const removeFile = () => {
 const resetQuestions = () => {
   questions.value = [];
   errorMsg.value = '';
+  isMockResult.value = false;
 };
 
 const resetAll = () => {
@@ -279,6 +285,7 @@ const handleRecognize = async () => {
   try {
     const data = await recognizeQuestionImage(file.value);
     questions.value = (data.questions || []).map((q) => ({ ...q, _selected: true }));
+    isMockResult.value = data.isMock === true;
     if (!questions.value.length) {
       errorMsg.value = data.rawText || '图片中未识别到有效题目';
     }
@@ -548,6 +555,16 @@ const formatSize = (b) => {
   background: #fef2f2;
   color: #b91c1c;
   border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+.ocr-mock-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 13px;

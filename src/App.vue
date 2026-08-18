@@ -179,6 +179,13 @@
             >
               <span class="iq-nav-icon">📊</span> 自适应学情
             </button>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'practice' && practiceView === 'adaptive-review' }"
+                @click="openPracticeView('adaptive-review'); sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">📝</span> 自适应复核
+            </button>
           </div>
 
           <!-- ===== 系统管理（仅管理员） ===== -->
@@ -400,6 +407,11 @@
               @toast="handleToastFromChild"
           />
 
+          <AdaptiveReview
+              v-if="practiceView === 'adaptive-review'"
+              @toast="handleToastFromChild"
+          />
+
           <AdminRecords
               v-if="practiceView === 'admin-records'"
               :role="currentUser.role"
@@ -441,6 +453,8 @@
 
       <AiGenerate
           :visible="aiVisible"
+          :role="currentUser.role"
+          :subjects="currentUser.subjects || []"
           @close="aiVisible = false"
           @success="handleAiSuccess"
       />
@@ -490,6 +504,7 @@ import WrongBook from '@/components/practice/WrongBook.vue';
 import PracticeRecords from '@/components/practice/PracticeRecords.vue';
 import LearningAnalysis from '@/components/practice/LearningAnalysis.vue';
 import AdaptiveOverview from '@/components/practice/AdaptiveOverview.vue';
+import AdaptiveReview from '@/components/practice/AdaptiveReview.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ClassManagement from '@/components/practice/ClassManagement.vue';
 import AdminRecords from '@/components/practice/AdminRecords.vue';
@@ -532,7 +547,7 @@ const pwdVisible = ref(false);
 // ================================================================
 // admin-records 已加入独立视图列表，试卷分析不显示子导航
 const practiceView = ref('exams');
-const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'classes', 'admin-records'];
+const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'adaptive-review', 'classes', 'admin-records'];
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
 const analysisPracticeFilters = ref({});
@@ -689,6 +704,7 @@ const currentBreadcrumb = computed(() => {
       'wrong-book': '错题本',
       adaptive: '自适应练习',
       'adaptive-overview': '自适应学情',
+      'adaptive-review': '自适应复核',
       'adaptive-progress': '自适应成果',
       'learning-analysis': '学习分析',
       practice: '答题中',
@@ -710,6 +726,7 @@ const pageTitle = computed(() => {
     'wrong-book': '📕 错题本',
     adaptive: '🧭 自适应练习',
     'adaptive-overview': '📈 自适应学情',
+    'adaptive-review': '📝 自适应复核',
     'adaptive-progress': '🏅 自适应成果',
     'learning-analysis': '📉 学习分析',
     practice: '✍️ 答题中',

@@ -88,7 +88,8 @@
               </div>
               <ul class="iq-import-tips-list">
                 <li><strong class="tip-req">必填：</strong><code>题目</code> / <code>题型</code>（1判断 2单选 3多选 4填空 5简答 6程序论述）/ <code>难度</code>（1-5 或 1星-5星）</li>
-                <li><strong class="tip-opt">可选：</strong><code>ID</code> / <code>章节</code> / <code>序号</code> / <code>选项</code> / <code>答案</code> / <code>解析</code> / <code>知识点</code> / <code>使用频率</code> / <code>出题人</code></li>
+                <li><strong class="tip-req">答案要求：</strong>判断、单选、多选、填空题必须填写<code>答案</code>；选择/填空题还需填写<code>选项</code>，答案须为有效选项字母</li>
+                <li><strong class="tip-opt">可选：</strong><code>ID</code> / <code>章节</code> / <code>序号</code> / <code>解析</code> / <code>知识点</code> / <code>使用频率</code> / <code>出题人</code></li>
                 <li>若 ID 与数据库已有记录重复则自动跳过</li>
               </ul>
             </div>

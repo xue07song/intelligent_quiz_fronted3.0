@@ -76,7 +76,7 @@
                 <input v-model="form.解析" class="iq-input" placeholder="答案解析" />
               </div>
               <div class="iq-form-field">
-                <label class="iq-form-label">难度</label>
+                <label class="iq-form-label">难度 <span class="iq-req">*</span></label>
                 <select v-model="form.难度" class="iq-select">
                   <option value="">请选择难度</option>
                   <option v-for="opt in difficultyOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
@@ -88,7 +88,7 @@
               </div>
               <div class="iq-form-field">
                 <label class="iq-form-label">使用频率</label>
-                <input v-model="form.使用频率" class="iq-input" placeholder="如 0" />
+                <input v-model="form.使用频度" class="iq-input" placeholder="如 0" />
               </div>
               <div class="iq-form-field">
                 <label class="iq-form-label">出题人</label>
@@ -148,7 +148,7 @@ const defaultForm = () => ({
   解析: '',
   难度: '',
   知识点: '',
-  使用频率: '',
+  使用频度: '',
   出题人: '',
   科目: '',
 });
@@ -167,17 +167,58 @@ watch(
   { immediate: true }
 );
 
+const parseOptionKeys = (optionsText) => {
+  const text = String(optionsText || '').trim();
+  if (!text) return [];
+  const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 1) {
+    const tokens = lines[0].split(/(?=[A-Za-z]\s*[.、)）:：])/).map((token) => token.trim()).filter(Boolean);
+    if (tokens.length > 1) {
+      lines.length = 0;
+      lines.push(...tokens);
+    }
+  }
+  const keys = [];
+  lines.forEach((line) => {
+    const match = line.match(/^([A-Za-z])\s*[.、)）:：]?\s*(.*)$/);
+    if (match) keys.push(match[1].toUpperCase());
+  });
+  return keys;
+};
+
+const validateForm = () => {
+  if (!form.id || !form.id.trim()) return 'ID不能为空';
+  if (!form.题目 || !form.题目.trim()) return '题目内容不能为空';
+  if (!form.科目 || !form.科目.trim()) return '科目不能为空';
+  if (!form.难度) return '难度不能为空';
+  const type = Number(form.题型);
+  const answer = String(form.答案 || '').trim();
+  const optionsText = String(form.选项 || '').trim();
+  if (type === 1) {
+    if (!answer) return '判断题必须填写答案';
+    if (!/^(对|错|正确|错误|T|F|√|×|是|否|1|0)$/i.test(answer)) {
+      return '判断题答案需为 对/错、T/F、正确/错误、√/× 等';
+    }
+  } else if (type === 2 || type === 3) {
+    const keys = parseOptionKeys(optionsText);
+    if (keys.length < 2) return '选择题至少需要两个选项';
+    if (!answer) return '选择题必须填写答案';
+    const answerLetters = answer.toUpperCase().replace(/[；;，,、\s]/g, '').split('').filter((ch) => /^[A-Z]$/.test(ch));
+    if (answerLetters.length === 0) return '答案中未识别出有效选项字母';
+    const invalid = answerLetters.filter((ch) => !keys.includes(ch));
+    if (invalid.length) return `答案包含不存在的选项：${invalid.join('、')}`;
+    if (type === 2 && answerLetters.length !== 1) return '单选题答案只能是一个选项';
+    if (type === 3 && new Set(answerLetters).size < 2) return '多选题答案至少需要两个选项';
+  } else if (type === 4) {
+    if (!answer) return '填空题必须填写答案';
+  }
+  return '';
+};
+
 const handleSubmit = async () => {
-  if (!form.id || !form.id.trim()) {
-    alert('ID不能为空');
-    return;
-  }
-  if (!form.题目 || !form.题目.trim()) {
-    alert('题目内容不能为空');
-    return;
-  }
-  if (!form.科目 || !form.科目.trim()) {
-    alert('科目不能为空');
+  const errorMsg = validateForm();
+  if (errorMsg) {
+    alert(errorMsg);
     return;
   }
   submitting.value = true;

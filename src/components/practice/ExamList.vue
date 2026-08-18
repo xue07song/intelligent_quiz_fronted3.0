@@ -63,6 +63,7 @@
           <span class="paper-type-badge" :class="getTypeClass(exam)">
             {{ exam.class_id || exam.classId ? '定向' : '全开放' }}
           </span>
+          <span class="paper-status" :class="exam.status || 'published'">{{ statusText(exam.status) }}</span>
           <span class="paper-id">#{{ exam.id }}</span>
         </div>
 
@@ -91,6 +92,9 @@
           <span class="paper-date">{{ formatTime(exam.created_at) }}</span>
           <div class="footer-actions">
             <button v-if="role === 'teacher' || role === 'admin'" class="btn-export" @click.stop="openExport(exam)">📥 导出</button>
+            <button v-if="(role === 'teacher' || role === 'admin') && (!exam.status || exam.status === 'draft')" class="btn-export" @click.stop="handlePublish(exam)">🚀 发布</button>
+            <button v-if="(role === 'teacher' || role === 'admin') && exam.status === 'published'" class="btn-export" @click.stop="handleClose(exam)">⏹ 关闭</button>
+            <button v-if="role === 'teacher' || role === 'admin'" class="btn-export" @click.stop="handleDelete(exam)">🗑 删除</button>
             <button class="btn-start" @click.stop="handleStartExam(exam.id)">
               {{ role === 'student' ? '📝 开始答题' : '查看题目' }}
             </button>
@@ -155,7 +159,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getExams, getExam } from '@/api/practice';
+import { getExams, getExam, updateExamStatusApi, deleteExamApi } from '@/api/practice';
 import { getTypeName, getDifficultyLabel } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
@@ -185,6 +189,45 @@ const exportExamData = ref(null);
 const openExport = (exam) => {
   exportExamData.value = exam;
   exportVisible.value = true;
+};
+
+const statusText = (status) => ({
+  draft: '草稿',
+  published: '已发布',
+  closed: '已关闭',
+}[status] || '已发布');
+
+const handlePublish = async (exam) => {
+  if (!window.confirm(`确认发布试卷「${exam.title}」？发布后学生可以开始答题。`)) return;
+  try {
+    await updateExamStatusApi(exam.id, 'published');
+    emit('toast', { message: '试卷已发布', type: 'success' });
+    await loadExams();
+  } catch (err) {
+    emit('toast', { message: err.message || '发布失败', type: 'error' });
+  }
+};
+
+const handleClose = async (exam) => {
+  if (!window.confirm(`确认关闭试卷「${exam.title}」？关闭后学生无法继续作答。`)) return;
+  try {
+    await updateExamStatusApi(exam.id, 'closed');
+    emit('toast', { message: '试卷已关闭', type: 'success' });
+    await loadExams();
+  } catch (err) {
+    emit('toast', { message: err.message || '关闭失败', type: 'error' });
+  }
+};
+
+const handleDelete = async (exam) => {
+  if (!window.confirm(`确认删除试卷「${exam.title}」？仅无作答记录的试卷可以删除。`)) return;
+  try {
+    await deleteExamApi(exam.id);
+    emit('toast', { message: '试卷已删除', type: 'success' });
+    await loadExams();
+  } catch (err) {
+    emit('toast', { message: err.message || '删除失败', type: 'error' });
+  }
 };
 
 const loadExams = async () => {
