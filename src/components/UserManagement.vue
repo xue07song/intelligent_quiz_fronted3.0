@@ -179,10 +179,17 @@
                 </select>
               </div>
               <div class="iq-form-field" v-if="form.role === 'teacher'">
+                <label class="iq-form-label">学院</label>
+                <select v-model="form.college" class="iq-select">
+                  <option value="">请选择学院</option>
+                  <option v-for="c in collegeOptions" :key="c" :value="c">{{ c }}</option>
+                </select>
+              </div>
+              <div class="iq-form-field" v-if="form.role === 'teacher'">
                 <label class="iq-form-label">所教科目</label>
                 <div class="iq-subject-checkboxes">
                   <label
-                    v-for="opt in allSubjects"
+                    v-for="opt in teacherSubjectOptions"
                     :key="opt"
                     class="iq-checkbox-item"
                   >
@@ -194,8 +201,22 @@
                     />
                     <span>{{ opt }}</span>
                   </label>
-                  <span v-if="allSubjects.length === 0" class="iq-text-sm iq-text-muted">加载中...</span>
+                  <span v-if="teacherSubjectOptions.length === 0" class="iq-text-sm iq-text-muted">请先选择学院</span>
                 </div>
+              </div>
+              <div class="iq-form-field" v-if="form.role === 'student'">
+                <label class="iq-form-label">学院</label>
+                <select v-model="form.college" class="iq-select">
+                  <option value="">请选择学院</option>
+                  <option v-for="c in collegeOptions" :key="c" :value="c">{{ c }}</option>
+                </select>
+              </div>
+              <div class="iq-form-field" v-if="form.role === 'student'">
+                <label class="iq-form-label">专业</label>
+                <select v-model="form.major" class="iq-select" :disabled="!form.college">
+                  <option value="">请选择专业</option>
+                  <option v-for="m in majorOptions" :key="m" :value="m">{{ m }}</option>
+                </select>
               </div>
               <div class="iq-form-field" v-if="form.role === 'student' && isEdit">
                 <label class="iq-form-label">必修班级</label>
@@ -226,10 +247,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { getUsers, createUser, updateUser, resetUserPassword, toggleUserStatus, deleteUser } from '@/api/user';
 import { getSubjects } from '@/api/subject';
 import { getClasses } from '@/api/class';
+import { COLLEGE_NAMES, getMajorsByCollege, getSubjectsByCollege } from '@/utils/colleges';
 
 const emit = defineEmits(['toast']);
 
@@ -255,8 +277,36 @@ const form = reactive({
   nickname: '',
   role: 'student',
   status: 1,
+  college: '',
+  major: '',
   subjects: [],
   class_id: null,
+});
+
+const collegeOptions = COLLEGE_NAMES;
+
+const majorOptions = computed(() => {
+  if (!form.college) return [];
+  return getMajorsByCollege(form.college);
+});
+
+const teacherSubjectOptions = computed(() => {
+  if (!form.college) return allSubjects.value;
+  const byCollege = getSubjectsByCollege(form.college);
+  return byCollege.length ? byCollege : allSubjects.value;
+});
+
+watch(() => form.college, () => {
+  if (form.role === 'student') {
+    if (form.major && !getMajorsByCollege(form.college).includes(form.major)) {
+      form.major = '';
+    }
+  } else if (form.role === 'teacher') {
+    const valid = getSubjectsByCollege(form.college);
+    if (valid.length) {
+      form.subjects = form.subjects.filter((s) => valid.includes(s));
+    }
+  }
 });
 
 const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
@@ -300,7 +350,7 @@ const changePage = (newPage) => {
 
 const openCreate = () => {
   isEdit.value = false;
-  Object.assign(form, { id: null, username: '', password: '', nickname: '', role: 'student', status: 1, subjects: [], class_id: null });
+  Object.assign(form, { id: null, username: '', password: '', nickname: '', role: 'student', status: 1, college: '', major: '', subjects: [], class_id: null });
   dialogVisible.value = true;
 };
 
@@ -313,6 +363,8 @@ const openEdit = (user) => {
     nickname: user.nickname || '',
     role: user.role,
     status: user.status,
+    college: user.college || '',
+    major: user.major || '',
     subjects: Array.isArray(user.subjects) ? [...user.subjects] : [],
     class_id: user.class_id || user.classId || null,
   });
@@ -324,9 +376,12 @@ const handleSubmit = async () => {
     if (isEdit.value) {
       const updateData = { nickname: form.nickname, role: form.role };
       if (form.role === 'teacher') {
+        updateData.college = form.college || '';
         updateData.subjects = form.subjects || [];
       }
       if (form.role === 'student') {
+        updateData.college = form.college || '';
+        updateData.major = form.major || '';
         updateData.class_id = form.class_id || null;
       }
       await updateUser(form.id, updateData);
@@ -348,7 +403,12 @@ const handleSubmit = async () => {
         status: form.status,
       };
       if (form.role === 'teacher') {
+        createData.college = form.college || '';
         createData.subjects = form.subjects || [];
+      }
+      if (form.role === 'student') {
+        createData.college = form.college || '';
+        createData.major = form.major || '';
       }
       await createUser(createData);
       showToast('用户创建成功');

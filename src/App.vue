@@ -392,6 +392,8 @@
 
           <ClassManagement
               v-if="practiceView === 'classes'"
+              :role="currentUser.role"
+              :subjects="currentUser.subjects || []"
               @toast="handleToastFromChild"
           />
 
@@ -470,6 +472,8 @@
 
       <Toast :message="toastMessage" :type="toastType" />
     </div>
+
+    <AIAssistant @start-exam="startExam" />
   </div>
 
   <!-- ===== Toast ===== -->
@@ -509,6 +513,7 @@ import AdaptiveReview from '@/components/practice/AdaptiveReview.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ClassManagement from '@/components/practice/ClassManagement.vue';
 import AdminRecords from '@/components/practice/AdminRecords.vue';
+import AIAssistant from '@/components/AIAssistant.vue';
 
 // ===== API =====
 import {

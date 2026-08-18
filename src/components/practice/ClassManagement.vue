@@ -38,6 +38,7 @@
             <div class="class-item-main">
               <div class="class-item-name">{{ cls.name }}</div>
               <div class="class-item-meta">
+                <span v-if="cls.subject" class="class-item-subject">📚 {{ cls.subject }}</span>
                 <span>👥 {{ cls.student_count ?? cls.students?.length ?? 0 }} 人</span>
                 <span v-if="cls.grade">年级 {{ cls.grade }}</span>
               </div>
@@ -71,6 +72,7 @@
             <div>
               <h2 class="iq-text-lg iq-font-semibold" style="margin:0;">{{ currentClass?.name }}</h2>
               <p class="iq-text-sm iq-text-muted" style="margin:4px 0 0;">
+                <span v-if="currentClass?.subject">📚 课程：{{ currentClass.subject }} · </span>
                 <span v-if="currentClass?.grade">年级：{{ currentClass.grade }} · </span>
                 班内学生：{{ studentList.length }} 人
                 <span v-if="currentClass?.description"> · 备注：{{ currentClass.description }}</span>
@@ -171,8 +173,24 @@
             </div>
             <form class="iq-modal-body class-editor-body" @submit.prevent="handleSubmitClass">
               <div class="iq-form-grid" style="grid-template-columns: 1fr 1fr;">
-                <div class="iq-form-field"><label class="iq-form-label">学院 <span class="iq-req">*</span></label><div class="inline-picker"><select v-model="classForm.collegeId" class="iq-select" @change="onCollegeChange"><option value="">请选择学院</option><option v-for="v in academicStructure" :key="v.id" :value="v.id">{{ v.name }}</option></select><button type="button" class="iq-btn iq-btn-primary iq-btn-sm" title="新建学院" @click="openAcademicDialog('college')">＋</button></div></div>
-                <div class="iq-form-field"><label class="iq-form-label">专业 <span class="iq-req">*</span></label><div class="inline-picker"><select v-model="classForm.majorId" class="iq-select" @change="syncMajor"><option value="">请选择专业</option><option v-for="v in availableMajors" :key="v.id" :value="v.id">{{ v.name }}</option></select><button type="button" class="iq-btn iq-btn-primary iq-btn-sm" title="在当前学院新建专业" :disabled="!classForm.collegeId" @click="openAcademicDialog('major')">＋</button></div></div>
+                <div class="iq-form-field"><label class="iq-form-label">学院 <span class="iq-req">*</span></label><select v-model="classForm.college" class="iq-select" @change="onCollegeChange"><option value="">请选择学院</option><option v-for="c in collegeOptions" :key="c">{{ c }}</option></select></div>
+                <div class="iq-form-field"><label class="iq-form-label">专业 <span class="iq-req">*</span></label><select v-model="classForm.major" class="iq-select" :disabled="!classForm.college" @change="onMajorChange"><option value="">请选择专业</option><option v-for="m in availableMajors" :key="m">{{ m }}</option></select></div>
+              </div>
+              <div class="iq-form-field">
+                <label class="iq-form-label">课程 <span class="iq-req">*</span></label>
+                <div class="iq-subject-checkboxes">
+                  <label v-for="s in availableSubjects" :key="s" class="iq-checkbox-item">
+                    <input type="radio" class="iq-checkbox" :value="s" v-model="classForm.subject" />
+                    <span>{{ s }}</span>
+                  </label>
+                  <span v-if="availableSubjects.length === 0" class="iq-text-sm iq-text-muted">
+                    {{ role === 'teacher' ? '您还未分配所教课程，请联系管理员或在「用户管理」中补充' : '请先选择学院' }}
+                  </span>
+                </div>
+                <span class="iq-text-xs iq-text-muted">
+                  <template v-if="role === 'teacher'">仅可在本人所教课程中选择（{{ (subjects || []).length }} 门）</template>
+                  <template v-else>班级按课程分类，任课教师仅能看到所教课程的班级</template>
+                </span>
               </div>
               <div class="iq-form-grid" style="grid-template-columns: 1fr 1fr;">
                 <div class="iq-form-field">
@@ -196,48 +214,6 @@
                 <button type="submit" class="iq-btn iq-btn-primary" :disabled="classSubmitting.value">
                   <span v-if="classSubmitting.value" class="iq-btn-spinner"></span>
                   {{ classSubmitting.value ? '提交中...' : (isEditClass ? '确认修改' : '确认创建') }}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
-    <!-- 学院、专业维护弹窗 -->
-    <Teleport to="body">
-      <Transition name="modal-fade">
-        <div v-if="academicDialog.visible" class="iq-modal-overlay academic-modal-layer" @click.self="closeAcademicDialog">
-          <div class="iq-modal iq-modal-sm academic-dialog">
-            <div class="iq-modal-header">
-              <div class="iq-modal-title-wrap">
-                <div class="iq-modal-icon" style="background:var(--iq-primary-50);color:var(--iq-primary-600);">＋</div>
-                <div>
-                  <h3 class="iq-modal-title">{{ academicDialog.type === 'college' ? '新建学院' : '新建专业' }}</h3>
-                  <p class="iq-modal-subtitle">
-                    {{ academicDialog.type === 'college' ? '学院保存后会立即显示在下拉框中' : `所属学院：${classForm.college}` }}
-                  </p>
-                </div>
-              </div>
-              <button type="button" class="iq-modal-close" @click="closeAcademicDialog">×</button>
-            </div>
-            <form class="iq-modal-body" @submit.prevent="confirmAcademicCreate">
-              <div class="iq-form-field">
-                <label class="iq-form-label">{{ academicDialog.type === 'college' ? '学院名称' : '专业名称' }} <span class="iq-req">*</span></label>
-                <input
-                  ref="academicNameInput"
-                  v-model.trim="academicDialog.name"
-                  class="iq-input"
-                  maxlength="100"
-                  :placeholder="academicDialog.type === 'college' ? '请输入学院名称' : '请输入专业名称'"
-                  autocomplete="off"
-                />
-                <div v-if="academicDialog.error" class="academic-error">{{ academicDialog.error }}</div>
-              </div>
-              <div class="iq-modal-footer">
-                <button type="button" class="iq-btn iq-btn-secondary" :disabled="academicDialog.submitting" @click="closeAcademicDialog">取消</button>
-                <button type="submit" class="iq-btn iq-btn-primary" :disabled="academicDialog.submitting || !academicDialog.name">
-                  {{ academicDialog.submitting ? '保存中...' : '确定' }}
                 </button>
               </div>
             </form>
@@ -562,7 +538,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, watch } from 'vue';
 import {
   getClasses,
   getClassById,
@@ -574,13 +550,22 @@ import {
   removeStudentFromClass,
   getUnassignedStudents,
   getTeacherOptions,
-  getAcademicStructure,
-  createCollege as createCollegeApi,
-  createMajor as createMajorApi,
 } from '@/api/class';
 import { adminListUserRecords, adminGetRecord } from '@/api/practice';
 import { formatTime, formatDuration } from '@/utils/format';
 import { getTypeName } from '@/utils/constants';
+import {
+  COLLEGE_NAMES,
+  getMajorsByCollege,
+  getSubjectsByCollege,
+  ALL_SUBJECTS,
+} from '@/utils/colleges';
+
+// 角色与所教课程（用于按课程过滤班级创建选项）
+const props = defineProps({
+  role: { type: String, default: 'admin' },
+  subjects: { type: Array, default: () => [] },
+});
 
 const emit = defineEmits(['toast']);
 const showToast = (message, type = 'success') => emit('toast', { message, type });
@@ -908,19 +893,38 @@ const classDialogVisible = ref(false);
 const isEditClass = ref(false);
 const classSubmitting = reactive({ value: false });
 const teacherOptions = ref([]);
-const academicStructure = ref([]);
 const counselorKeyword = ref('');
 const headTeacherKeywords = reactive({});
 const headTeachers = reactive({});
-const academicNameInput = ref(null);
-const academicDialog = reactive({ visible: false, type: 'college', name: '', error: '', submitting: false });
-const classForm = reactive({ id: null, collegeId: '', majorId: '', college: '', major: '', grade: '2024', classCount: 1, capacity: 50, counselorId: '', description: '' });
-const availableMajors = computed(() => academicStructure.value.find(item => Number(item.id) === Number(classForm.collegeId))?.majors || []);
+// 学院/专业/课程均来自预定义（colleges.js），不再依赖 DB 表，也不再用文本输入新建
+const collegeOptions = COLLEGE_NAMES;
+const classForm = reactive({
+  id: null,
+  college: '',
+  major: '',
+  subject: '',
+  grade: '2024',
+  classCount: 1,
+  capacity: 50,
+  counselorId: '',
+  description: '',
+});
+// 当前学院下的专业（勾选式下拉）
+const availableMajors = computed(() => getMajorsByCollege(classForm.college));
+// 当前可选课程：
+//   - 教师：仅限本人所教课程（props.subjects），与学院无强绑定
+//   - 管理员：当前学院下全部课程；未选学院时返回全部课程
+const availableSubjects = computed(() => {
+  if (props.role === 'teacher') return props.subjects || [];
+  if (!classForm.college) return ALL_SUBJECTS;
+  return getSubjectsByCollege(classForm.college);
+});
 const generatedClasses = computed(() => {
-  if (isEditClass.value) return [{ index: 1, name: currentClass.value?.name || `${classForm.college}${classForm.major}${String(classForm.grade).slice(-2)}-1班` }];
+  const subjectTag = classForm.subject ? `${classForm.subject}-` : '';
+  if (isEditClass.value) return [{ index: 1, name: currentClass.value?.name || `${subjectTag}${classForm.major}${String(classForm.grade).slice(-2)}-1班` }];
   return Array.from({ length: Math.max(1, Number(classForm.classCount || 1)) }, (_, index) => ({
     index: index + 1,
-    name: `${classForm.college || '学院'}${classForm.major || '专业'}${String(classForm.grade || '').slice(-2) || '年级'}-${index + 1}班`,
+    name: `${subjectTag}${classForm.major || '专业'}${String(classForm.grade || '').slice(-2) || '年级'}-${index + 1}班`,
   }));
 });
 const filterTeachers = keyword => {
@@ -943,100 +947,54 @@ const loadTeachers = async () => {
     teacherOptions.value = Array.isArray(data) ? data : (data?.list || []);
   } catch { teacherOptions.value = []; }
 };
-const loadAcademicStructure = async () => {
-  try {
-    const data = await getAcademicStructure();
-    academicStructure.value = Array.isArray(data) ? data : [];
-  } catch { academicStructure.value = []; }
-};
+// 学院切换：清空专业与课程（课程对教师保持所教课程不变）
 const onCollegeChange = () => {
-  const college = academicStructure.value.find(item => Number(item.id) === Number(classForm.collegeId));
-  classForm.college = college?.name || '';
-  classForm.majorId = '';
   classForm.major = '';
-};
-const syncMajor = () => {
-  classForm.major = availableMajors.value.find(item => Number(item.id) === Number(classForm.majorId))?.name || '';
-};
-const openAcademicDialog = async type => {
-  if (type === 'major' && !classForm.collegeId) {
-    showToast('请先选择学院，再添加专业', 'error');
-    return;
-  }
-  Object.assign(academicDialog, { visible: true, type, name: '', error: '', submitting: false });
-  await nextTick();
-  academicNameInput.value?.focus();
-};
-const closeAcademicDialog = () => {
-  if (academicDialog.submitting) return;
-  academicDialog.visible = false;
-  academicDialog.error = '';
-};
-const confirmAcademicCreate = async () => {
-  const name = academicDialog.name.trim();
-  if (!name) {
-    academicDialog.error = academicDialog.type === 'college' ? '请输入学院名称' : '请输入专业名称';
-    return;
-  }
-  academicDialog.submitting = true;
-  academicDialog.error = '';
-  try {
-    if (academicDialog.type === 'college') {
-      await createCollegeApi(name);
-      await loadAcademicStructure();
-      const created = academicStructure.value.find(item => item.name === name);
-      if (!created) throw new Error('学院已保存，但列表刷新失败，请重新打开页面');
-      classForm.collegeId = created.id;
-      onCollegeChange();
-      showToast(`学院“${name}”添加成功`);
-    } else {
-      const collegeId = classForm.collegeId;
-      await createMajorApi(collegeId, name);
-      await loadAcademicStructure();
-      const college = academicStructure.value.find(item => Number(item.id) === Number(collegeId));
-      const created = college?.majors?.find(item => item.name === name);
-      if (!created) throw new Error('专业已保存，但列表刷新失败，请重新打开页面');
-      classForm.collegeId = collegeId;
-      classForm.college = college?.name || classForm.college;
-      classForm.majorId = created.id;
-      syncMajor();
-      showToast(`专业“${name}”添加成功`);
-    }
-    academicDialog.visible = false;
-  } catch (err) {
-    academicDialog.error = err?.response?.data?.message || err.message || '保存失败，请稍后重试';
-  } finally {
-    academicDialog.submitting = false;
+  if (props.role !== 'teacher') {
+    // 管理员：课程随学院联动，若当前课程不在新学院范围内则清空
+    const valid = getSubjectsByCollege(classForm.college);
+    if (classForm.subject && !valid.includes(classForm.subject)) classForm.subject = '';
+  } else {
+    // 教师：课程仅限本人所教课程，若不在新学院范围内则清空
+    if (classForm.subject && !(props.subjects || []).includes(classForm.subject)) classForm.subject = '';
   }
 };
+const onMajorChange = () => { /* 仅存储，无副作用 */ };
 
 const openCreateClass = () => {
   isEditClass.value = false;
-  Object.assign(classForm, { id: null, collegeId: '', majorId: '', college: '', major: '', grade: String(new Date().getFullYear()), classCount: 1, capacity: 50, counselorId: '', description: '' });
+  Object.assign(classForm, {
+    id: null,
+    college: '',
+    major: '',
+    subject: '',
+    grade: String(new Date().getFullYear()),
+    classCount: 1,
+    capacity: 50,
+    counselorId: '',
+    description: '',
+  });
   counselorKeyword.value = '';
   Object.keys(headTeachers).forEach(key => delete headTeachers[key]);
   Object.keys(headTeacherKeywords).forEach(key => delete headTeacherKeywords[key]);
-  Promise.all([loadTeachers(), loadAcademicStructure()]);
+  loadTeachers();
   classDialogVisible.value = true;
 };
 const openEditClass = (cls) => {
   isEditClass.value = true;
   Object.assign(classForm, {
-    id: cls.id, collegeId: '', majorId: '',
-    college: cls.college || '', major: cls.major || '', classCount: 1, capacity: cls.capacity || 50,
+    id: cls.id,
+    college: cls.college || '',
+    major: cls.major || '',
+    subject: cls.subject || '',
+    classCount: 1,
+    capacity: cls.capacity || 50,
     grade: cls.grade || '',
     counselorId: cls.counselor_id || '',
     description: cls.description || '',
   });
   headTeachers[1] = cls.head_teacher_id || '';
-  Promise.all([loadTeachers(), loadAcademicStructure()]).then(() => {
-    const college = academicStructure.value.find(item => item.name === classForm.college);
-    if (college) {
-      classForm.collegeId = college.id;
-      const major = college.majors?.find(item => item.name === classForm.major);
-      if (major) classForm.majorId = major.id;
-    }
-  });
+  loadTeachers();
   classDialogVisible.value = true;
 };
 const handleDeleteClass = async (cls) => {
@@ -1056,21 +1014,27 @@ const handleDeleteClass = async (cls) => {
 };
 const handleSubmitClass = async () => {
   if (!classForm.college.trim() || !classForm.major.trim() || !String(classForm.grade).trim()) { alert('请完整填写学院、专业和入学年份'); return; }
+  if (!classForm.subject) { alert('请选择课程（班级按课程分类）'); return; }
   classSubmitting.value = true;
   try {
     if (isEditClass.value) {
       await updateClass(classForm.id, {
         name: generatedClasses.value[0].name,
         grade: classForm.grade,
-        college: classForm.college, major: classForm.major, capacity: classForm.capacity, counselorId: classForm.counselorId, headTeacherId: headTeachers[1] || null,
+        college: classForm.college, major: classForm.major, subject: classForm.subject,
+        capacity: classForm.capacity, counselorId: classForm.counselorId, headTeacherId: headTeachers[1] || null,
         description: classForm.description,
       });
       showToast('班级修改成功', 'success');
     } else {
       for (const generated of generatedClasses.value) {
-        await createClass({ name: generated.name, grade: classForm.grade,
-          college: classForm.college, major: classForm.major, capacity: classForm.capacity,
-          counselorId: classForm.counselorId, headTeacherId: headTeachers[generated.index] || null, description: classForm.description });
+        await createClass({
+          name: generated.name, grade: classForm.grade,
+          college: classForm.college, major: classForm.major, subject: classForm.subject,
+          capacity: classForm.capacity,
+          counselorId: classForm.counselorId, headTeacherId: headTeachers[generated.index] || null,
+          description: classForm.description,
+        });
       }
       showToast(`成功生成 ${classForm.classCount} 个班级`, 'success');
     }
@@ -1084,7 +1048,7 @@ const handleSubmitClass = async () => {
 };
 
 onMounted(async () => {
-  await Promise.all([loadClasses(), loadUnassignedCount(), loadAcademicStructure(), loadTeachers()]);
+  await Promise.all([loadClasses(), loadUnassignedCount(), loadTeachers()]);
 });
 </script>
 
@@ -1199,7 +1163,8 @@ onMounted(async () => {
 .class-item.active { border-color: #6366F1; background: #EEF2FF; box-shadow: 0 0 0 2px rgba(99,102,241,0.08); }
 .class-item-main { flex: 1; min-width: 0; }
 .class-item-name { font-weight: 600; color: #1E293B; font-size: 14px; }
-.class-item-meta { display: flex; gap: 10px; margin-top: 3px; font-size: 12px; color: #64748B; }
+.class-item-meta { display: flex; gap: 10px; margin-top: 3px; font-size: 12px; color: #64748B; flex-wrap: wrap; }
+.class-item-subject { color: #4F46E5; font-weight: 600; }
 .class-item-actions { display: none; gap: 4px; }
 .class-item:hover .class-item-actions { display: flex; }
 
@@ -1234,6 +1199,20 @@ onMounted(async () => {
 .iq-checkbox {
   width: 16px; height: 16px; accent-color: #6366F1; cursor: pointer;
 }
+
+/* 课程勾选区（与注册弹窗风格一致） */
+.iq-subject-checkboxes {
+  display: flex; flex-wrap: wrap; gap: 10px 14px;
+  padding: 10px 12px; border: 1px solid #E2E8F0; border-radius: 8px;
+  background: #fff; max-height: 168px; overflow-y: auto;
+}
+.iq-checkbox-item {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #334155; cursor: pointer; user-select: none;
+}
+.iq-checkbox-item:hover { color: #4F46E5; }
+.iq-text-xs { font-size: 12px; }
+.iq-text-muted { color: #64748B; }
 
 .iq-table-action { display: flex; gap: 4px; flex-wrap: wrap; }
 .act-edit { color: #B45309 !important; }
@@ -1498,10 +1477,6 @@ onMounted(async () => {
 @media (max-width: 480px) {
   .stu-stats-grid { grid-template-columns: 1fr; }
 }
-.inline-picker { display:grid; grid-template-columns:1fr 38px; gap:8px; }
-.academic-modal-layer { z-index: 1100; }
-.academic-dialog { width: min(440px, calc(100vw - 32px)); }
-.academic-error { margin-top: 7px; color: #dc2626; font-size: 13px; line-height: 1.45; }
 .class-editor-dialog { width:min(760px, calc(100vw - 32px)); max-width:760px; max-height:92vh; display:flex; flex-direction:column; }
 .class-editor-dialog .iq-modal-header { flex:0 0 auto; }
 .class-editor-body { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding-bottom:0; }

@@ -71,11 +71,17 @@
             <template v-if="form.role === 'student'">
               <div class="iq-form-field">
                 <label class="iq-form-label">学院 <span class="iq-form-required">*</span></label>
-                <input v-model="form.college" type="text" class="iq-input" placeholder="请输入学院，如：计算机学院" />
+                <select v-model="form.college" class="iq-select">
+                  <option value="">请选择学院</option>
+                  <option v-for="c in collegeOptions" :key="c" :value="c">{{ c }}</option>
+                </select>
               </div>
               <div class="iq-form-field">
                 <label class="iq-form-label">专业 <span class="iq-form-required">*</span></label>
-                <input v-model="form.major" type="text" class="iq-input" placeholder="请输入专业，如：软件工程" />
+                <select v-model="form.major" class="iq-select" :disabled="!form.college">
+                  <option value="">请选择专业</option>
+                  <option v-for="m in majorOptions" :key="m" :value="m">{{ m }}</option>
+                </select>
               </div>
               <div class="iq-form-field">
                 <label class="iq-form-label">学号 <span class="iq-form-required">*</span></label>
@@ -92,16 +98,19 @@
               </div>
               <div class="iq-form-field">
                 <label class="iq-form-label">学院 <span class="iq-form-required">*</span></label>
-                <input v-model="form.college" type="text" class="iq-input" placeholder="请输入所在学院，如：计算机学院" />
+                <select v-model="form.college" class="iq-select">
+                  <option value="">请选择学院</option>
+                  <option v-for="c in collegeOptions" :key="c" :value="c">{{ c }}</option>
+                </select>
               </div>
               <div class="iq-form-field">
                 <label class="iq-form-label">所教科目 <span class="iq-form-required">*</span></label>
                 <div class="iq-subject-checkboxes">
-                  <label v-for="opt in subjectOptions" :key="opt" class="iq-checkbox-item">
+                  <label v-for="opt in teacherSubjectOptions" :key="opt" class="iq-checkbox-item">
                     <input type="checkbox" class="iq-checkbox" :value="opt" v-model="form.subjects" />
                     <span>{{ opt }}</span>
                   </label>
-                  <span v-if="subjectOptions.length === 0" class="iq-text-sm iq-text-muted">科目加载中...</span>
+                  <span v-if="teacherSubjectOptions.length === 0" class="iq-text-sm iq-text-muted">请先选择学院</span>
                 </div>
                 <span class="iq-text-xs iq-text-muted">至少选择一个所教科目；如列表不含目标科目，可在审核通过后由管理员补充</span>
               </div>
@@ -131,9 +140,10 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch, onMounted } from 'vue';
+import { reactive, ref, watch, onMounted, computed } from 'vue';
 import { submitRegistration } from '@/api/auth';
 import { getSubjects } from '@/api/subject';
+import { COLLEGE_NAMES, getMajorsByCollege, getSubjectsByCollege, ALL_SUBJECTS } from '@/utils/colleges';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -159,6 +169,36 @@ const form = reactive({
   // 教师专属
   employee_no: '',
   subjects: [],
+});
+
+// 学院下拉选项
+const collegeOptions = COLLEGE_NAMES;
+
+// 学生专业选项（按所选学院联动）
+const majorOptions = computed(() => {
+  if (!form.college) return [];
+  return getMajorsByCollege(form.college);
+});
+
+// 教师可选科目（按所选学院联动；接口失败时用 ALL_SUBJECTS 兜底）
+const teacherSubjectOptions = computed(() => {
+  if (!form.college) return subjectOptions.value.length ? subjectOptions.value : ALL_SUBJECTS;
+  const byCollege = getSubjectsByCollege(form.college);
+  return byCollege.length ? byCollege : (subjectOptions.value.length ? subjectOptions.value : ALL_SUBJECTS);
+});
+
+// 学院切换时重置非法的专业/科目
+watch(() => form.college, () => {
+  if (form.role === 'student') {
+    if (form.major && !getMajorsByCollege(form.college).includes(form.major)) {
+      form.major = '';
+    }
+  } else if (form.role === 'teacher') {
+    const valid = getSubjectsByCollege(form.college);
+    if (valid.length) {
+      form.subjects = form.subjects.filter((s) => valid.includes(s));
+    }
+  }
 });
 
 const loading = ref(false);
