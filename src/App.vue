@@ -144,6 +144,7 @@
           <div class="iq-nav-group">
             <div class="iq-nav-group-label">教学管理</div>
             <button
+                v-if="currentUser.role === 'teacher'"
                 class="iq-nav-item"
                 :class="{ active: currentView === 'main' }"
                 @click="currentView = 'main'; sidebarOpen = false"
@@ -152,10 +153,10 @@
             </button>
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'practice' && practiceView === 'generate' }"
-                @click="openPracticeView('generate'); sidebarOpen = false"
+                :class="{ active: currentView === 'practice' && (currentUser.role === 'admin' ? practiceView === 'exams' : practiceView === 'generate') }"
+                @click="openPracticeView(currentUser.role === 'admin' ? 'exams' : 'generate'); sidebarOpen = false"
             >
-              <span class="iq-nav-icon">📝</span> 出卷管理
+              <span class="iq-nav-icon">📝</span> {{ currentUser.role === 'admin' ? '试卷列表管理' : '出卷管理' }}
             </button>
             <button
                 class="iq-nav-item"
@@ -180,7 +181,7 @@
                 :class="{ active: currentView === 'practice' && practiceView === 'learning-analysis' }"
                 @click="openPracticeView('learning-analysis'); sidebarOpen = false"
             >
-              <span class="iq-nav-icon">📈</span> 学情分析
+              <span class="iq-nav-icon">📈</span> {{ currentUser.role === 'admin' ? '学生个性化分析' : '学情分析' }}
             </button>
             <button
                 class="iq-nav-item"
@@ -188,6 +189,13 @@
                 @click="openPracticeView('adaptive-overview'); sidebarOpen = false"
             >
               <span class="iq-nav-icon">📊</span> 自适应学情
+            </button>
+            <button
+                class="iq-nav-item"
+                :class="{ active: currentView === 'practice' && practiceView === 'adaptive-review' }"
+                @click="openPracticeView('adaptive-review'); sidebarOpen = false"
+            >
+              <span class="iq-nav-icon">📝</span> 自适应复核
             </button>
           </div>
 
@@ -369,19 +377,19 @@
 
           <div v-if="!standalonePracticeViews.includes(practiceView)" class="iq-practice-subnav">
             <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-            <button v-if="currentUser.role === 'teacher' || currentUser.role === 'admin'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
+            <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
           </div>
 
           <ExamList
               v-if="practiceView === 'exams'"
               :role="currentUser.role"
-              @generate="practiceView = 'generate'"
+              @generate="currentUser.role === 'teacher' && (practiceView = 'generate')"
               @start-exam="startExam"
               @toast="handleToastFromChild"
           />
 
           <GenerateExam
-              v-if="practiceView === 'generate' && (currentUser.role === 'teacher' || currentUser.role === 'admin')"
+              v-if="practiceView === 'generate' && currentUser.role === 'teacher'"
               :role="currentUser.role"
               :subjects="currentUser.subjects || []"
               @start-exam="startExam"
@@ -403,6 +411,11 @@
 
           <AdaptiveOverview
               v-if="practiceView === 'adaptive-overview'"
+              @toast="handleToastFromChild"
+          />
+
+          <AdaptiveReview
+              v-if="practiceView === 'adaptive-review'"
               @toast="handleToastFromChild"
           />
 
@@ -446,6 +459,8 @@
 
       <AiGenerate
           :visible="aiVisible"
+          :role="currentUser.role"
+          :subjects="currentUser.subjects || []"
           @close="aiVisible = false"
           @success="handleAiSuccess"
       />
@@ -493,6 +508,7 @@ import WrongBook from '@/components/practice/WrongBook.vue';
 import PracticeRecords from '@/components/practice/PracticeRecords.vue';
 import LearningAnalysis from '@/components/practice/LearningAnalysis.vue';
 import AdaptiveOverview from '@/components/practice/AdaptiveOverview.vue';
+import AdaptiveReview from '@/components/practice/AdaptiveReview.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ClassManagement from '@/components/practice/ClassManagement.vue';
 import AdminRecords from '@/components/practice/AdminRecords.vue';
@@ -544,7 +560,7 @@ const pwdVisible = ref(false);
 // 答题练习状态
 // ================================================================
 const practiceView = ref('exams');
-const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'classes', 'admin-records'];
+const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'adaptive-review', 'classes', 'admin-records'];
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
 const analysisPracticeFilters = ref({});
@@ -721,6 +737,7 @@ const currentBreadcrumb = computed(() => {
       'wrong-book': '错题本',
       adaptive: '自适应练习',
       'adaptive-overview': '自适应学情',
+      'adaptive-review': '自适应复核',
       'adaptive-progress': '自适应成果',
       'learning-analysis': '学习分析',
       practice: '答题中',
@@ -742,6 +759,7 @@ const pageTitle = computed(() => {
     'wrong-book': '📕 错题本',
     adaptive: '🧭 自适应练习',
     'adaptive-overview': '📈 自适应学情',
+    'adaptive-review': '📝 自适应复核',
     'adaptive-progress': '🏅 自适应成果',
     'learning-analysis': '📉 学习分析',
     practice: '✍️ 答题中',
@@ -824,6 +842,9 @@ const restoreSession = () => {
       currentUser.value = user;
       if (user.role === 'student') {
         currentView.value = 'papers';
+      } else if (user.role === 'admin') {
+        currentView.value = 'practice';
+        practiceView.value = 'exams';
       } else {
         currentView.value = 'main';
       }
@@ -838,6 +859,9 @@ const handleLoginSuccess = (user) => {
   currentUser.value = user;
   if (user.role === 'student') {
     currentView.value = 'papers';
+  } else if (user.role === 'admin') {
+    currentView.value = 'practice';
+    practiceView.value = 'exams';
   } else {
     currentView.value = 'main';
   }

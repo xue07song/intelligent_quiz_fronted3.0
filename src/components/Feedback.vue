@@ -292,9 +292,11 @@
                 <input
                     v-model="form.contact"
                     class="iq-input"
-                    placeholder="邮箱 / 手机号，方便我们联系你"
+                    placeholder="填写邮箱或中国大陆手机号"
                     maxlength="100"
+                    @input="contactError = ''"
                 />
+                <div v-if="contactError" class="iq-contact-error">{{ contactError }}</div>
               </div>
 
               <div class="iq-modal-footer">
@@ -425,6 +427,7 @@ const handleDelete = async (item) => {
 // ===== 提交反馈 =====
 const createVisible = ref(false);
 const createLoading = ref(false);
+const contactError = ref('');
 
 const categories = [
   { value: 'bug', label: 'Bug 故障', icon: '🐛' },
@@ -444,6 +447,7 @@ const openCreateModal = () => {
   form.title = '';
   form.content = '';
   form.contact = '';
+  contactError.value = '';
   createVisible.value = true;
 };
 
@@ -460,6 +464,13 @@ const handleCreate = async () => {
     emit('toast', { message: '请填写反馈内容', type: 'warning' });
     return;
   }
+  const contact = form.contact.trim();
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+  const validPhone = /^1[3-9]\d{9}$/.test(contact);
+  if (contact && !validEmail && !validPhone) {
+    contactError.value = '请填写正规手机号码或邮箱';
+    return;
+  }
 
   createLoading.value = true;
   try {
@@ -467,7 +478,7 @@ const handleCreate = async () => {
       category: form.category,
       title: form.title.trim(),
       content: form.content.trim(),
-      contact: form.contact.trim() || undefined,
+      contact: contact || undefined,
     });
     emit('toast', { message: '✅ 反馈提交成功，感谢你的建议！', type: 'success' });
     createVisible.value = false;
@@ -638,6 +649,11 @@ defineExpose({ loadList });
   gap: 16px;
 }
 .iq-feedback-detail { padding: 24px; }
+.iq-contact-error {
+  margin-top: 6px;
+  color: #dc2626;
+  font-size: 12px;
+}
 .iq-detail-header {
   margin-bottom: 20px;
   padding-bottom: 16px;

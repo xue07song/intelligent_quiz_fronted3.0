@@ -13,7 +13,7 @@
             <span class="dot">·</span>
             <span>已答 <strong class="answered-highlight">{{ answeredCount }}</strong> / {{ exam.questions?.length || 0 }} 题</span>
             <span class="dot">·</span>
-            <span>⏱ {{ elapsedText }}</span>
+            <span>⏱ {{ remainingSeconds !== null ? `剩余 ${formatRemaining(remainingSeconds)}` : elapsedText }}</span>
             <span v-if="draftSaved" class="draft-badge">💾 草稿已存</span>
           </div>
         </div>
@@ -168,10 +168,10 @@
 
           <!-- AI 答疑 -->
           <div class="ai-tutor">
-            <button class="btn-ai-tutor" @click="toggleTutor(q.id)">
+            <button v-if="!examMode" class="btn-ai-tutor" @click="toggleTutor(q.id)">
               🤖 {{ tutorOpen[q.id] ? '收起答疑' : '问 AI 老师' }}
             </button>
-            <div v-if="tutorOpen[q.id]" class="tutor-panel">
+            <div v-if="!examMode && tutorOpen[q.id]" class="tutor-panel">
               <div class="tutor-history">
                 <div v-if="!tutorHistory[q.id]?.length" class="tutor-empty">
                   💡 遇到困难？向 AI 老师提问，获取解题思路提示。
@@ -312,6 +312,7 @@ const OBJECTIVE_TYPES = [1, 2, 3, 4];
 const loading = ref(true);
 const submitting = ref(false);
 const phase = ref('exam');
+const examMode = ref(false);
 const exam = ref({ questions: [] });
 const answers = reactive({});
 const multiAnswers = reactive({});
@@ -323,6 +324,8 @@ const draftSaved = ref(false);
 const activeQuestionId = ref(null);
 const startedAt = ref(null);
 const elapsedSeconds = ref(0);
+const remainingSeconds = ref(null);
+const expired = ref(false);
 let timer = null;
 let draftTimer = null;
 let autoSubmitTimer = null;
@@ -347,6 +350,12 @@ const answeredCount = computed(() =>
 );
 
 const elapsedText = computed(() => formatDuration(elapsedSeconds.value));
+
+const formatRemaining = (sec) => {
+  const m = Math.floor(Number(sec) / 60);
+  const s = Math.floor(Number(sec) % 60);
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+};
 
 // ===== 方法 =====
 function isObjective(type) {
@@ -414,8 +423,8 @@ function formatDuration(sec) {
 }
 
 function getDifficultyClass(level) {
-  const map = { 1: 'diff-easy', 2: 'diff-medium', 3: 'diff-hard' };
-  return map[level] || 'diff-easy';
+  const map = { 1: 'diff-easy', 2: 'diff-easy', 3: 'diff-medium', 4: 'diff-hard', 5: 'diff-hard' };
+  return map[Number(level)] || 'diff-easy';
 }
 
 function scoreClass(score) {
@@ -444,14 +453,27 @@ const saveDraft = () => {
     savedAt: Date.now(),
   };
   localStorage.setItem(draftKey(), JSON.stringify(payload));
+  saveExamDraftApi(props.examId, {
+    answers: { ...answers },
+    durationSeconds: Math.floor(elapsedSeconds.value),
+  }).catch(() => { /* 服务端草稿保存失败不影响本地答题 */ });
   draftSaved.value = true;
 };
 
-const restoreDraft = (loadedExam) => {
-  const raw = localStorage.getItem(draftKey());
-  if (!raw) return false;
+const restoreDraft = (loadedExam, serverDraft = null) => {
+  let draft = null;
+  if (serverDraft?.answers && Object.keys(serverDraft.answers).length) {
+    draft = { answers: serverDraft.answers, elapsedSeconds: serverDraft.duration_seconds };
+  } else {
+    const raw = localStorage.getItem(draftKey());
+    if (!raw) return false;
+    try {
+      draft = JSON.parse(raw);
+    } catch {
+      return false;
+    }
+  }
   try {
-    const draft = JSON.parse(raw);
     if (!draft?.answers) return false;
     loadedExam.questions.forEach((q) => {
       const qid = q.id;
@@ -467,7 +489,9 @@ const restoreDraft = (loadedExam) => {
       const start = new Date(draft.startedAt);
       if (!isNaN(start.getTime())) startedAt.value = start;
     }
-    elapsedSeconds.value = Math.max(0, Number(draft.elapsedSeconds) || 0);
+    if (draft.elapsedSeconds !== undefined || draft.duration_seconds !== undefined) {
+      elapsedSeconds.value = Math.max(0, Number(draft.elapsedSeconds ?? draft.duration_seconds) || 0);
+    }
     return true;
   } catch {
     return false;
@@ -539,6 +563,7 @@ const askTutor = async (q) => {
       questionType: Number(q.题型),
       userQuestion: inputText,
       userAnswer: answers[qid] || '',
+      examId: props.examId,
     });
     tutorHistory[qid].push({ role: 'ai', content: data.reply || '（AI 未返回内容）' });
   } catch (err) {
@@ -554,6 +579,18 @@ const loadExam = async () => {
   try {
     const data = await getExam(props.examId);
     exam.value = data;
+    examMode.value = Boolean(data.duration_minutes || data.end_at || data.max_attempts || data.status === 'draft' || data.status === 'closed');
+    const started = await startExamApi(props.examId);
+    if (started?.startedAt) {
+      const serverStart = new Date(started.startedAt);
+      if (!isNaN(serverStart.getTime())) startedAt.value = serverStart;
+    }
+    remainingSeconds.value = started?.remainingSeconds ?? null;
+    expired.value = remainingSeconds.value === 0;
+    let serverDraft = null;
+    try {
+      serverDraft = await getExamDraftApi(props.examId);
+    } catch { /* 无服务端草稿 */ }
     data.questions.forEach((q) => {
       if (Number(q.题型) === 3) {
         multiAnswers[q.id] = [];
@@ -567,7 +604,7 @@ const loadExam = async () => {
       emit('update-question', data.questions[0]);
       emit('update-exam-id', props.examId);
     }
-    const restored = restoreDraft(data);
+    const restored = restoreDraft(data, serverDraft);
     if (!startedAt.value) startedAt.value = new Date();
     if (restored) {
       emit('toast', { message: '已恢复上次答题草稿', type: 'info' });
@@ -575,6 +612,10 @@ const loadExam = async () => {
     loadFavorites();
     timer = setInterval(() => {
       elapsedSeconds.value = Math.floor((Date.now() - startedAt.value.getTime()) / 1000);
+      if (remainingSeconds.value !== null) {
+        remainingSeconds.value = Math.max(0, remainingSeconds.value - 1);
+        if (remainingSeconds.value <= 0) expired.value = true;
+      }
     }, 1000);
   } catch (err) {
     emit('toast', { message: err.message || '加载试卷失败', type: 'error' });

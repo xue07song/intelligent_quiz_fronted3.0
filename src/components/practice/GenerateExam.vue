@@ -58,6 +58,9 @@
         <label><span>试卷标题</span><input v-model="form.title" class="iq-input" placeholder="留空则自动生成" /></label>
         <label><span>总题数</span><input v-model.number="form.count" type="number" min="1" max="100" class="iq-input" :disabled="!!activePaperPreset" @change="handleCountChange" /></label>
         <label><span>最少知识点覆盖</span><input v-model.number="form.minKnowledgePoints" type="number" min="1" :max="inventory?.knowledgePoints.length || 111" class="iq-input" :disabled="!!activePaperPreset" @input="markTypeCustom" /></label>
+        <label><span>考试时长（分钟，留空不限）</span><input v-model.number="form.durationMinutes" type="number" min="1" class="iq-input" /></label>
+        <label><span>截止时间（可选）</span><input v-model="form.endAt" type="datetime-local" class="iq-input" /></label>
+        <label><span>最多作答次数（留空不限）</span><input v-model.number="form.maxAttempts" type="number" min="1" class="iq-input" /></label>
       </div>
       <div class="chapter-selector">
         <div class="chapter-selector-head">
@@ -86,7 +89,7 @@
           >
             <span class="chapter-check">{{ form.chapters.includes(chapter) ? '✓' : '' }}</span>
             <span class="chapter-name"><b>第{{ chapter }}章</b><em>{{ getChapterName(chapter) }}</em></span>
-            <small>{{ chapterTotals[chapter] || 0 }}题</small>
+            <small>{{ chapterCounts[chapter] || 0 }}题</small>
           </button>
         </div>
         <p class="chapter-help">点击任意章节即可选中或取消；可以连续点击选择多个章节。</p>
@@ -209,12 +212,18 @@ const paperPresets = [
       { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[10,15,25,30,20] },
     ]},
 ];
-const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classId: '' });
+const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classId: '', durationMinutes: '', endAt: '', maxAttempts: '' });
 const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), result = ref(null), aiResult = ref(false), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref('standard'), activePaperPreset = ref('standard'), activePaperVariant = ref('standard-balanced');
 const exportVisible = ref(false);
 const allSubjects = ref([]);
 const classList = ref([]);
-const chapterTotals = {1:43,2:40,3:40,4:29,5:30,6:35,7:37,8:44,9:40,10:37};
+const chapterCounts = computed(() => {
+  const counts = {};
+  Object.entries(inventory.value?.byChapter || {}).forEach(([key, value]) => {
+    counts[Number(key)] = Number(value);
+  });
+  return counts;
+});
 const typeSum = computed(() => Object.values(form.typeDistribution).reduce((s,v)=>s+(Number(v)||0),0));
 const difficultySum = computed(() => Object.values(form.difficultyDistribution).reduce((s,v)=>s+(Number(v)||0),0));
 const subjectiveCount = computed(() => (Number(form.typeDistribution[5])||0)+(Number(form.typeDistribution[6])||0));
@@ -303,6 +312,9 @@ const buildRulePayload = () => ({
   difficultyDistribution: { ...form.difficultyDistribution },
   subject: form.subject || undefined,
   classId: form.classId || undefined,
+  durationMinutes: form.durationMinutes || undefined,
+  endAt: form.endAt || undefined,
+  maxAttempts: form.maxAttempts || undefined,
 });
 const subjectOptions = computed(() => {
   // 教师：限自己所教科目；管理员：全部科目
@@ -404,7 +416,7 @@ const handleRegenerate = async () => {
   } catch (err) { errorMsg.value=err.message||'重新生成失败'; schedulePreview(); }
   finally { loading.value=false; }
 };
-const handleSmartExam = async () => { errorMsg.value='';aiLoading.value=true;try{const body={count:form.count};if(form.chapters.length===1)body.章节=form.chapters[0];result.value=await smartExam(body);aiResult.value=true;emit('toast',{message:'AI辅助组卷成功',type:'success'});}catch(err){errorMsg.value=err.message||'AI辅助组卷失败';}finally{aiLoading.value=false;} };
+const handleSmartExam = async () => { errorMsg.value='';aiLoading.value=true;try{const body={count:form.count,subject:form.subject||undefined,classId:form.classId||undefined};if(form.chapters.length===1)body.章节=form.chapters[0];const activeTypes=Object.entries(form.typeDistribution||{}).filter(([,v])=>Number(v)>0).map(([k])=>Number(k));if(activeTypes.length===1)body.题型=activeTypes[0];const activeDifficulty=Object.entries(form.difficultyDistribution||{}).filter(([,v])=>Number(v)>0).map(([k])=>Number(k));if(activeDifficulty.length===1)body.难度=String(activeDifficulty[0]);result.value=await smartExam(body);aiResult.value=true;emit('toast',{message:'AI辅助组卷成功',type:'success'});}catch(err){errorMsg.value=err.message||'AI辅助组卷失败';}finally{aiLoading.value=false;} };
 </script>
 
 <style scoped>
