@@ -110,6 +110,7 @@
         </div>
       </section>
 
+      <!-- ===== 统计卡片：增加「收藏」 ===== -->
       <section class="source-board">
         <div>
           <span>📄 普通试卷</span>
@@ -127,9 +128,14 @@
           <span>✅ 已重新掌握错题</span>
           <b>{{ data.summary.recovered }} 题</b>
         </div>
+        <!-- ===== [新增] 收藏统计卡片 ===== -->
+        <div class="favorite-card">
+          <span>⭐ 收藏题目</span>
+          <b>{{ favoritesData.total || 0 }}</b>
+        </div>
       </section>
 
-      <!-- ===== 章节完成情况（2列 + 进度条） ===== -->
+      <!-- ===== 章节完成情况（2列 + 进度条 + 收藏标签） ===== -->
       <section class="iq-card section">
         <div class="section-head">
           <div>
@@ -166,9 +172,24 @@
                 </div>
                 <span class="chapter-row-rate">{{ x.adaptiveAnswered > 0 ? Math.round(x.adaptiveCorrect / x.adaptiveAnswered * 100) : 0 }}%</span>
               </div>
+              <!-- ===== [新增] 收藏行 ===== -->
+              <div class="chapter-row favorite-row">
+                <span class="chapter-row-label">⭐ 收藏</span>
+                <span class="chapter-row-num">{{ getChapterFavoriteCount(x.key) }} 题</span>
+                <div class="chapter-progress favorite-progress">
+                  <div
+                      class="chapter-progress-fill favorite-fill"
+                      :style="{ width: (getChapterFavoriteCount(x.key) > 0 ? 100 : 0) + '%' }"
+                  ></div>
+                </div>
+                <span class="chapter-row-rate">{{ getChapterFavoriteCount(x.key) > 0 ? '📌' : '-' }}</span>
+              </div>
             </div>
             <div class="chapter-footer-v2">
               合计完成 <b>{{ x.answered }}</b> 题，答对 <b>{{ x.correct }}</b> 题
+              <span v-if="getChapterFavoriteCount(x.key) > 0" class="favorite-badge">
+                ⭐ {{ getChapterFavoriteCount(x.key) }} 题已收藏
+              </span>
             </div>
           </div>
         </div>
@@ -255,13 +276,60 @@
           </span>
         </div>
       </section>
+
+      <!-- ===== [新增] 我的宝典（收藏题集） ===== -->
+      <section class="iq-card section treasure-section">
+        <div class="section-head">
+          <div>
+            <h3>📚 我的宝典 <span class="treasure-badge">⭐ 收藏题集</span></h3>
+            <p>你主动标记的重点题目，覆盖 {{ favoriteChaptersCount }} 个章节，共 {{ favoritesData.total || 0 }} 题</p>
+          </div>
+          <!-- ===== 修改：按钮点击改为 goToFavorites ===== -->
+          <button class="primary" @click="goToFavorites">
+            📖 进入收藏夹复习
+          </button>
+        </div>
+
+        <div v-if="!favoritesData.list?.length" class="empty">
+          💡 还没有收藏题目。遇到好题、重点题时，点击「收藏」按钮即可加入宝典。
+        </div>
+
+        <div v-else class="treasure-grid">
+          <div
+              v-for="item in favoritesData.list.slice(0, 12)"
+              :key="item.questionId"
+              class="treasure-item"
+          >
+            <div class="treasure-header">
+              <span class="treasure-type" :class="`type-${item.questionType}`">
+                {{ getTypeName(item.questionType) }}
+              </span>
+              <span class="treasure-chapter">{{ getChapterLabel(item.chapter) }}</span>
+            </div>
+            <div class="treasure-title">{{ item.question || item.title || '（题目内容）' }}</div>
+            <div class="treasure-footer">
+              <span class="treasure-tag">⭐ 收藏于 {{ formatTime(item.createdAt) }}</span>
+              <button class="treasure-unfavorite" @click="unfavoriteQuestion(item.questionId)">
+                取消收藏
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== 修改：查看全部按钮点击改为 goToFavorites ===== -->
+        <div v-if="favoritesData.list?.length > 12" class="treasure-more">
+          还有 {{ favoritesData.list.length - 12 }} 题，<button class="treasure-link" @click="goToFavorites">查看全部 →</button>
+        </div>
+      </section>
     </template>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, reactive } from 'vue';
+import { useRouter } from 'vue-router';  // ===== [新增] 导入 useRouter =====
 import { getLearningAnalysis, getLearningAnalysisOverview, getStudentLearningAnalysis } from '@/api/practice';
+import { getFavorites, removeFavorite } from '@/api/student';
 import * as echarts from 'echarts';
 
 // ================================================================
@@ -298,6 +366,15 @@ const getTypeName = (id) => {
   return TYPE_NAMES[id] || `题型${id}`;
 };
 
+const formatTime = (v) => {
+  if (!v) return '';
+  try {
+    return new Date(v).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+};
+
 // ================================================================
 // 组件逻辑
 // ================================================================
@@ -307,15 +384,34 @@ const props = defineProps({
 
 const emit = defineEmits(['toast', 'practice', 'navigate']);
 
+// ===== [新增] 创建 router 实例 =====
+const router = useRouter();
+
 const loading = ref(false);
 const overview = ref({ students: [], commonWeaknesses: [] });
 const data = ref(null);
 const selectedId = ref(null);
 
+// ===== [新增] 收藏数据 =====
+const favoritesData = reactive({
+  list: [],
+  total: 0,
+  byChapter: {}, // { chapter: count }
+});
+
 // ===== 图表引用 =====
 const radarChartRef = ref(null);
 const lineChartRef = ref(null);
 const chartResizeHandlers = [];
+
+// ===== 计算收藏相关 =====
+const favoriteChaptersCount = computed(() => {
+  return Object.keys(favoritesData.byChapter).filter(k => favoritesData.byChapter[k] > 0).length;
+});
+
+const getChapterFavoriteCount = (chapterKey) => {
+  return favoritesData.byChapter[chapterKey] || 0;
+};
 
 // ===== 雷达图数据 =====
 const radarData = computed(() => {
@@ -462,11 +558,54 @@ const attentionCount = computed(() =>
     overview.value.students.filter((x) => x.answered >= 5 && (x.accuracy < 60 || x.change <= -10)).length
 );
 
+// ===== [新增] 加载收藏数据 =====
+const loadFavorites = async () => {
+  try {
+    const res = await getFavorites({ page: 1, size: 999 });
+    const list = res.list || [];
+    favoritesData.list = list;
+    favoritesData.total = list.length;
+
+    // 按章节统计
+    const byChapter = {};
+    list.forEach(item => {
+      const ch = item.chapter || '0';
+      byChapter[ch] = (byChapter[ch] || 0) + 1;
+    });
+    favoritesData.byChapter = byChapter;
+  } catch (e) {
+    // 收藏功能未初始化时静默失败，不影响主体功能
+    console.warn('加载收藏数据失败:', e.message);
+    favoritesData.list = [];
+    favoritesData.total = 0;
+    favoritesData.byChapter = {};
+  }
+};
+
+// ===== [新增] 取消收藏 =====
+const unfavoriteQuestion = async (questionId) => {
+  try {
+    await removeFavorite(questionId);
+    // 刷新收藏列表
+    await loadFavorites();
+    emit('toast', { message: '已取消收藏', type: 'success' });
+  } catch (e) {
+    emit('toast', { message: e.message || '取消收藏失败', type: 'error' });
+  }
+};
+
+// ===== [新增] 跳转到收藏夹 =====
+const goToFavorites = () => {
+  router.push('/favorites');
+};
+
 const load = async () => {
   loading.value = true;
   try {
     if (props.role === 'student') {
       data.value = await getLearningAnalysis();
+      // 学生端加载收藏数据
+      await loadFavorites();
     } else {
       overview.value = await getLearningAnalysisOverview();
     }
@@ -486,6 +625,8 @@ const openStudent = async (id) => {
   try {
     data.value = await getStudentLearningAnalysis(id);
     selectedId.value = id;
+    // 加载该学生的收藏（教师端查看学生时，可能需要传 studentId）
+    await loadFavorites();
     setTimeout(() => {
       initRadarChart();
       initLineChart();
@@ -714,7 +855,7 @@ onUnmounted(() => {
 .overview-cards,
 .source-board {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
 }
 .overview-cards > div,
@@ -736,6 +877,18 @@ onUnmounted(() => {
 .source-board span {
   font-size: 13px;
   color: #64748B;
+}
+
+/* ===== [新增] 收藏卡片高亮 ===== */
+.favorite-card {
+  border-color: #FCD34D !important;
+  background: #FFFBEB !important;
+}
+.favorite-card b {
+  color: #B45309 !important;
+}
+.favorite-card span {
+  color: #92400E !important;
 }
 
 .overview-cards.three {
@@ -1010,6 +1163,29 @@ onUnmounted(() => {
   background: #10B981;
 }
 
+/* ===== [新增] 收藏行样式 ===== */
+.favorite-row {
+  opacity: 0.7;
+}
+.favorite-row .chapter-row-label {
+  color: #B45309;
+}
+.favorite-progress {
+  background: #FEF3C7 !important;
+}
+.favorite-fill {
+  background: #FBBF24 !important;
+  width: 100% !important;
+}
+.favorite-badge {
+  margin-left: 12px;
+  font-size: 12px;
+  color: #B45309;
+  background: #FEF3C7;
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
 .chapter-row-rate {
   font-weight: 600;
   color: #1E293B;
@@ -1121,6 +1297,122 @@ onUnmounted(() => {
   color: #1E293B;
 }
 
+/* ===== [新增] 我的宝典 ===== */
+.treasure-section {
+  border-color: #FCD34D;
+  background: #FFFBEB;
+}
+
+.treasure-badge {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 12px;
+  border-radius: 12px;
+  background: #FEF3C7;
+  color: #B45309;
+  margin-left: 8px;
+}
+
+.treasure-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.treasure-item {
+  padding: 14px 16px;
+  border: 1px solid #FDE68A;
+  border-radius: 10px;
+  background: #FFFDF5;
+  transition: border-color 0.2s;
+}
+.treasure-item:hover {
+  border-color: #FBBF24;
+}
+
+.treasure-header {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.treasure-type {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 10px;
+  border-radius: 10px;
+}
+.treasure-type.type-1 { background: #EDE9FE; color: #6D28D9; }
+.treasure-type.type-2 { background: #DBEAFE; color: #1D4ED8; }
+.treasure-type.type-3 { background: #FCE7F3; color: #BE185D; }
+.treasure-type.type-4 { background: #D1FAE5; color: #047857; }
+.treasure-type.type-5 { background: #FEF3C7; color: #B45309; }
+.treasure-type.type-6 { background: #FFEDD5; color: #C2410C; }
+
+.treasure-chapter {
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.treasure-title {
+  font-size: 14px;
+  color: #1E293B;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.treasure-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.treasure-unfavorite {
+  padding: 2px 12px;
+  border: 1px solid #FCA5A5;
+  border-radius: 12px;
+  background: #FEF2F2;
+  color: #B91C1C;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.treasure-unfavorite:hover {
+  background: #FEE2E2;
+}
+
+.treasure-more {
+  text-align: center;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #FDE68A;
+  font-size: 13px;
+  color: #64748B;
+}
+
+.treasure-link {
+  background: none;
+  border: none;
+  color: #6366F1;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+}
+.treasure-link:hover {
+  color: #4F46E5;
+  text-decoration: underline;
+}
+
 /* ===== 按钮 ===== */
 .primary,
 .secondary {
@@ -1228,6 +1520,9 @@ onUnmounted(() => {
   .student-list > button {
     grid-template-columns: 40px 1fr auto auto 60px 18px;
   }
+  .source-board {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
 }
 
 @media (max-width: 800px) {
@@ -1271,6 +1566,9 @@ onUnmounted(() => {
     right: -8px;
     width: min(300px, 80vw);
   }
+  .treasure-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 540px) {
@@ -1297,6 +1595,9 @@ onUnmounted(() => {
     grid-template-columns: 70px 1fr 1fr 32px;
     gap: 6px;
     font-size: 12px;
+  }
+  .source-board {
+    grid-template-columns: 1fr 1fr !important;
   }
 }
 </style>

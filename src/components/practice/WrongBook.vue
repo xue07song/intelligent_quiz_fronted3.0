@@ -68,7 +68,7 @@
             </span>
             <span class="wrong-difficulty">{{ getDifficultyLabel(item.difficulty) }}</span>
           </div>
-          <span class="wrong-count-badge">错 {{ item.wrong_count }} 次</span>
+          <span class="wrong-count-badge">错 {{ item.wrong_count || 1 }} 次</span>
         </div>
 
         <div class="wrong-question">{{ item.title }}</div>
@@ -89,7 +89,8 @@
         </div>
 
         <div class="wrong-card-footer">
-          <button class="btn-retry-single" @click="handleSingleRetry(item.id)">重练</button>
+          <!-- ===== 修改：重练按钮触发单题练习 ===== -->
+          <button class="btn-retry-single" @click="handleSingleRetry(item)">重练</button>
           <button class="btn-view" @click="handleView(item.id)">解析</button>
         </div>
       </div>
@@ -114,7 +115,8 @@ import { getTypeName, getDifficultyLabel, TYPE_OPTIONS } from '@/utils/constants
 import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
 
-const emit = defineEmits(['start-exam', 'toast']);
+// ===== [修改] 添加 start-single-practice 事件 =====
+const emit = defineEmits(['start-exam', 'toast', 'start-single-practice']);
 
 const list = ref([]);
 const total = ref(0);
@@ -169,8 +171,9 @@ const handleRetry = async () => {
   }
 };
 
-const handleSingleRetry = (id) => {
-  emit('toast', { message: '单题重练功能开发中', type: 'info' });
+// ===== [修改] 单题重练：触发单题练习事件 =====
+const handleSingleRetry = (item) => {
+  emit('start-single-practice', item.id);
 };
 
 const handleView = (id) => {
