@@ -100,6 +100,12 @@
             @view-record="viewRecord"
             @toast="handleToastFromChild"
         />
+        <RecordDetail
+            v-if="currentView === 'record-detail'"
+            :recordId="activeRecordId"
+            @back="backFromRecordDetail"
+            @toast="handleToastFromChild"
+        />
         <LearningAnalysis
             v-if="currentView === 'analysis'"
             :role="currentUser.role"
@@ -107,7 +113,7 @@
             @navigate="handleNavigateFromAnalysis"
             @toast="handleToastFromChild"
         />
-        <Profile v-if="currentView === 'profile'" />
+        <Profile v-if="currentView === 'profile'" @profile-updated="handleProfileUpdated" />
         <Feedback
             v-if="currentView === 'feedback'"
             :role="currentUser.role"
@@ -133,7 +139,7 @@
           <div class="iq-nav-group">
             <div class="iq-nav-group-label">教学管理</div>
             <button
-                v-if="currentUser.role === 'teacher'"
+                v-if="currentUser.role === 'teacher' || currentUser.role === 'admin'"
                 class="iq-nav-item"
                 :class="{ active: currentView === 'main' }"
                 @click="currentView = 'main'; sidebarOpen = false"
@@ -352,7 +358,7 @@
 
         <!-- ===== 个人中心 ===== -->
         <template v-if="currentView === 'profile'">
-          <Profile />
+          <Profile @profile-updated="handleProfileUpdated" />
         </template>
 
         <!-- ===== 用户反馈 ===== -->
@@ -513,6 +519,7 @@ import AdaptiveReview from '@/components/practice/AdaptiveReview.vue';
 import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ClassManagement from '@/components/practice/ClassManagement.vue';
 import AdminRecords from '@/components/practice/AdminRecords.vue';
+import RecordDetail from '@/components/practice/RecordDetail.vue';
 import AIAssistant from '@/components/AIAssistant.vue';
 
 // ===== API =====
@@ -556,6 +563,7 @@ const practiceView = ref('exams');
 const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'adaptive-review', 'classes', 'admin-records'];
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
+const recordDetailReturn = ref('records');
 const analysisPracticeFilters = ref({});
 const currentQuestionId = ref(null);
 const currentQuestion = ref(null);
@@ -672,6 +680,12 @@ const goToProfile = () => {
   closeSidebarUserMenu();
 };
 
+const handleProfileUpdated = (updated) => {
+  if (updated && currentUser.value) {
+    currentUser.value = { ...currentUser.value, ...updated };
+  }
+};
+
 const openChangePasswordFromMenu = () => {
   pwdVisible.value = true;
   closeUserMenu();
@@ -767,7 +781,24 @@ const exitExam = () => {
 
 const viewRecord = (recordId) => {
   activeRecordId.value = recordId;
-  practiceView.value = 'record-detail';
+  if (currentUser.value?.role === 'student') {
+    recordDetailReturn.value = currentView.value;
+    currentView.value = 'record-detail';
+  } else {
+    practiceView.value = 'record-detail';
+  }
+};
+
+const backFromRecordDetail = () => {
+  if (currentUser.value?.role === 'student') {
+    if (recordDetailReturn.value === 'practice') {
+      exitExam();
+    } else {
+      currentView.value = recordDetailReturn.value || 'records';
+    }
+  } else {
+    practiceView.value = 'admin-records';
+  }
 };
 
 // ================================================================

@@ -60,11 +60,25 @@
         <el-descriptions-item label="学院">
           {{ textValue(profile.college) }}
         </el-descriptions-item>
-        <el-descriptions-item v-if="profile.role === 'student'" label="所在班级">
-          <template v-if="profile.className || profile.class_name">
+        <el-descriptions-item v-if="profile.role === 'student'" label="对应课程">
+          <template v-if="profile.classes && profile.classes.length > 0">
+            <div class="profile-class-grid">
+              <el-tag
+                  v-for="(cls, idx) in profile.classes"
+                  :key="`${cls.classId}-${cls.relationType}-${idx}`"
+                  :type="cls.relationType === 'elective' ? 'warning' : 'success'"
+                  effect="light"
+                  style="margin-right: 6px; margin-bottom: 4px;"
+              >
+                <span class="class-type-badge">{{ cls.relationType === 'elective' ? '选修' : '必修' }}</span>
+                {{ cls.className }}
+              </el-tag>
+            </div>
+          </template>
+          <template v-else-if="profile.className || profile.class_name">
             <el-tag type="success" effect="light">{{ profile.className || profile.class_name }}</el-tag>
           </template>
-          <span v-else class="iq-text-muted">未分班</span>
+          <span v-else class="iq-text-muted">暂无课程记录</span>
         </el-descriptions-item>
         <el-descriptions-item v-if="profile.role === 'teacher'" label="所教科目" :span="2">
           <template v-if="profile.subjects && profile.subjects.length > 0">
@@ -174,6 +188,66 @@ import { ElMessage } from 'element-plus';
 import { getStudentProfile, updateProfile } from '@/api/student';
 import { changePassword } from '@/api/auth';
 import { createFeedback } from '@/api/feedback';
+import { getClasses } from '@/api/class';
+
+const emit = defineEmits(['profile-updated']);
+
+// ===== 工具：把后端返回的班级信息规范为 classes 数组 =====
+// 优先使用 data.classes / data.compulsoryClasses / data.electiveClasses；
+// 如果都没有，则用 className 拆分 + 班级列表匹配，保证展示稳定
+const normalizeClasses = async (data = {}, userId) => {
+  if (Array.isArray(data.classes) && data.classes.length > 0) {
+    return data.classes.map((c) => ({
+      classId: c.classId ?? c.class_id ?? c.id,
+      className: c.className ?? c.class_name ?? c.name ?? '',
+      relationType: c.relationType ?? c.relation_type ?? c.type ?? 'compulsory',
+    })).filter((c) => c.className);
+  }
+  const comp = Array.isArray(data.compulsoryClasses) ? data.compulsoryClasses : [];
+  const elec = Array.isArray(data.electiveClasses) ? data.electiveClasses : [];
+  if (comp.length || elec.length) {
+    return [
+      ...comp.map((c) => ({
+        classId: c.classId ?? c.class_id ?? c.id,
+        className: c.className ?? c.class_name ?? c.name ?? '',
+        relationType: 'compulsory',
+      })),
+      ...elec.map((c) => ({
+        classId: c.classId ?? c.class_id ?? c.id,
+        className: c.className ?? c.class_name ?? c.name ?? '',
+        relationType: 'elective',
+      })),
+    ].filter((c) => c.className);
+  }
+  // 兜底：classIds/classNames 数组
+  if (Array.isArray(data.classNames) && data.classNames.length) {
+    return data.classNames.map((name, idx) => ({
+      classId: Array.isArray(data.classIds) ? data.classIds[idx] : null,
+      className: name,
+      relationType: 'compulsory',
+    })).filter((c) => c.className);
+  }
+  // 再兜底：className 字符串以 / 或 , 分隔
+  const raw = String(data.className || data.class_name || '').trim();
+  if (raw) {
+    let names = raw.split(/[\/,，、]/).map((s) => s.trim()).filter(Boolean);
+    // 尝试根据 /api/v1/classes 的 type 来区分必修/选修
+    try {
+      const list = await getClasses({}).catch(() => []);
+      const rows = Array.isArray(list) ? list : [];
+      const nameMap = new Map();
+      rows.forEach((c) => nameMap.set(String(c.name || '').trim(), c.type || 'compulsory'));
+      return names.map((n) => ({
+        classId: (rows.find((r) => (r.name || '') === n) || {}).id ?? null,
+        className: n,
+        relationType: nameMap.get(n) === 'elective' ? 'elective' : 'compulsory',
+      }));
+    } catch {
+      return names.map((n) => ({ classId: null, className: n, relationType: 'compulsory' }));
+    }
+  }
+  return [];
+};
 
 // ===== 个人信息 =====
 const profile = ref({});
@@ -215,10 +289,16 @@ const loadProfile = async () => {
   profile.value = { ...localUser };
   profileLoading.value = true;
   try {
-    const data = await getStudentProfile();
-    profile.value = { ...localUser, ...data };
+    const data = await getStudentProfile() || {};
+    const merged = { ...localUser, ...data };
+    // 规范 classes 字段（若后端未返回完整数组，按 className/接口结果补齐）
+    merged.classes = await normalizeClasses(merged, localUser.id);
+    profile.value = merged;
   } catch (err) {
-    // 接口异常时保留 localStorage 中的用户信息
+    // 接口异常时保留 localStorage 中的用户信息，但仍尝试补齐 classes
+    try {
+      profile.value.classes = await normalizeClasses(profile.value, localUser.id);
+    } catch { /* ignore */ }
   } finally {
     profileLoading.value = false;
   }
@@ -262,7 +342,9 @@ const handleSaveProfile = async () => {
     editVisible.value = false;
     await loadProfile();
     const current = JSON.parse(localStorage.getItem('user') || '{}');
-    localStorage.setItem('user', JSON.stringify({ ...current, ...profile.value }));
+    const updated = { ...current, ...profile.value };
+    localStorage.setItem('user', JSON.stringify(updated));
+    emit('profile-updated', updated);
   } catch (err) {
     ElMessage.error(err.message || '资料更新失败');
   } finally {
@@ -472,6 +554,21 @@ onMounted(() => {
 
 .profile-edit-form :deep(.el-input__wrapper.is-focus) {
   box-shadow: 0 0 0 1px var(--iq-primary) inset;
+}
+
+.profile-class-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.class-type-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-right: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 @media (max-width: 768px) {

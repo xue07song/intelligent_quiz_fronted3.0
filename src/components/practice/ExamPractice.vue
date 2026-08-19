@@ -42,14 +42,14 @@
         <div class="answer-card-grid">
           <button
               v-for="(q, idx) in exam.questions"
-              :key="q.id"
+              :key="qid(q)"
               type="button"
               class="answer-cell"
               :class="{
               answered: isAnswered(q),
-              active: activeQuestionId === q.id
+              active: activeQuestionId === qid(q)
             }"
-              @click="scrollToQuestion(q.id)"
+              @click="scrollToQuestion(qid(q))"
           >
             {{ idx + 1 }}
           </button>
@@ -60,8 +60,8 @@
       <div class="question-list">
         <div
             v-for="(q, idx) in exam.questions"
-            :key="q.id"
-            :id="`question-${q.id}`"
+            :key="qid(q)"
+            :id="`question-${qid(q)}`"
             class="question-card"
         >
           <div class="q-header">
@@ -79,19 +79,19 @@
               <button
                   type="button"
                   class="btn-favorite"
-                  :class="{ active: favoriteSet.has(String(q.id)) }"
-                  :disabled="favoriteLoading[q.id]"
+                  :class="{ active: favoriteSet.has(qid(q)) }"
+                  :disabled="favoriteLoading[qid(q)]"
                   @click="toggleFavorite(q)"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                 </svg>
-                {{ favoriteSet.has(String(q.id)) ? '已收藏' : '收藏' }}
+                {{ favoriteSet.has(qid(q)) ? '已收藏' : '收藏' }}
               </button>
             </div>
           </div>
 
-          <div class="q-title">{{ q.题目 }}</div>
+          <div class="q-title">{{ unescapeStem(q.题目) }}</div>
 
           <!-- 选项区域 -->
           <div v-if="[2, 3].includes(Number(q.题型)) && q.选项" class="q-options">
@@ -101,26 +101,25 @@
                 class="option-choice"
                 :class="{
                 selected: Number(q.题型) === 3
-                  ? (multiAnswers[q.id] || []).includes(opt.key)
-                  : answers[q.id] === opt.key
+                  ? (multiAnswers[qid(q)] || []).includes(opt.key)
+                  : answers[qid(q)] === opt.key
               }"
             >
               <input
                   v-if="Number(q.题型) === 2"
                   type="radio"
-                  :name="`q-${q.id}`"
+                  :name="`q-${qid(q)}`"
                   :value="opt.key"
-                  v-model="answers[q.id]"
+                  v-model="answers[qid(q)]"
               />
               <input
                   v-else
                   type="checkbox"
                   :value="opt.key"
-                  v-model="multiAnswers[q.id]"
-                  @change="syncMulti(q.id)"
+                  v-model="multiAnswers[qid(q)]"
+                  @change="syncMulti(qid(q))"
               />
-              <span class="option-key">{{ opt.key }}.</span>
-              <span class="option-text">{{ opt.text }}</span>
+              <span class="option-text"><strong>{{ opt.key }}.</strong> {{ opt.text }}</span>
             </label>
           </div>
 
@@ -130,12 +129,12 @@
 
             <!-- 判断题 -->
             <div v-if="Number(q.题型) === 1" class="judge-group">
-              <label class="judge-btn" :class="{ active: answers[q.id] === 'T' }">
-                <input type="radio" :name="`q-${q.id}`" value="T" v-model="answers[q.id]" />
+              <label class="judge-btn" :class="{ active: answers[qid(q)] === 'T' }">
+                <input type="radio" :name="`q-${qid(q)}`" value="T" v-model="answers[qid(q)]" />
                 ✅ 对
               </label>
-              <label class="judge-btn" :class="{ active: answers[q.id] === 'F' }">
-                <input type="radio" :name="`q-${q.id}`" value="F" v-model="answers[q.id]" />
+              <label class="judge-btn" :class="{ active: answers[qid(q)] === 'F' }">
+                <input type="radio" :name="`q-${qid(q)}`" value="F" v-model="answers[qid(q)]" />
                 ❌ 错
               </label>
             </div>
@@ -151,7 +150,7 @@
             <!-- 填空题 -->
             <input
                 v-else-if="Number(q.题型) === 4"
-                v-model="answers[q.id]"
+                v-model="answers[qid(q)]"
                 class="input-field"
                 placeholder="请输入答案..."
             />
@@ -159,7 +158,7 @@
             <!-- 简答/程序题 -->
             <textarea
                 v-else
-                v-model="answers[q.id]"
+                v-model="answers[qid(q)]"
                 class="textarea-field"
                 placeholder="请输入你的解答..."
                 rows="4"
@@ -168,33 +167,33 @@
 
           <!-- AI 答疑 -->
           <div class="ai-tutor">
-            <button v-if="!examMode" class="btn-ai-tutor" @click="toggleTutor(q.id)">
-              🤖 {{ tutorOpen[q.id] ? '收起答疑' : '问 AI 老师' }}
+            <button v-if="!examMode" class="btn-ai-tutor" @click="toggleTutor(qid(q))">
+              🤖 {{ tutorOpen[qid(q)] ? '收起答疑' : '问 AI 老师' }}
             </button>
-            <div v-if="!examMode && tutorOpen[q.id]" class="tutor-panel">
+            <div v-if="!examMode && tutorOpen[qid(q)]" class="tutor-panel">
               <div class="tutor-history">
-                <div v-if="!tutorHistory[q.id]?.length" class="tutor-empty">
+                <div v-if="!tutorHistory[qid(q)]?.length" class="tutor-empty">
                   💡 遇到困难？向 AI 老师提问，获取解题思路提示。
                 </div>
-                <div v-for="(msg, mi) in tutorHistory[q.id] || []" :key="mi" class="tutor-msg" :class="msg.role">
+                <div v-for="(msg, mi) in tutorHistory[qid(q)] || []" :key="mi" class="tutor-msg" :class="msg.role">
                   <div class="msg-role">{{ msg.role === 'user' ? '🙋 我' : '🤖 AI 老师' }}</div>
                   <div class="msg-content">{{ msg.content }}</div>
                 </div>
-                <div v-if="tutorLoading[q.id]" class="tutor-loading">
+                <div v-if="tutorLoading[qid(q)]" class="tutor-loading">
                   <span class="mini-spinner"></span> AI 思考中...
                 </div>
               </div>
               <div class="tutor-input">
                 <input
-                    v-model="tutorInput[q.id]"
+                    v-model="tutorInput[qid(q)]"
                     class="input-field"
                     placeholder="输入你的问题..."
                     @keyup.enter="askTutor(q)"
-                    :disabled="tutorLoading[q.id]"
+                    :disabled="tutorLoading[qid(q)]"
                 />
                 <button
                     class="btn-send"
-                    :disabled="tutorLoading[q.id] || !tutorInput[q.id]?.trim()"
+                    :disabled="tutorLoading[qid(q)] || !tutorInput[qid(q)]?.trim()"
                     @click="askTutor(q)"
                 >
                   发送
@@ -320,11 +319,7 @@ const objectiveCount = computed(() =>
 );
 
 const answeredCount = computed(() =>
-    exam.value.questions?.filter((q) => {
-      const a = answers[q.id];
-      const m = multiAnswers[q.id];
-      return (a !== undefined && a !== '') || (m && m.length > 0);
-    }).length || 0
+    exam.value.questions?.filter((q) => isAnswered(q)).length || 0
 );
 
 const elapsedText = computed(() => formatDuration(elapsedSeconds.value));
@@ -336,38 +331,108 @@ const formatRemaining = (sec) => {
 };
 
 // ===== 方法 =====
+function qid(q) {
+  // 统一用字符串 key，避免 number/string/NaN 混用导致的串值/找不到
+  return String(q.id ?? q.question_id ?? q.questionId ?? '');
+}
+
+function unescapeStem(s) {
+  if (s === null || s === undefined) return '';
+  let t = String(s);
+  // 反义：数据库里可能多转义一层，导致页面出现 \" 或 \\"
+  t = t.replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+  return t;
+}
+
 function isObjective(type) {
   return OBJECTIVE_TYPES.includes(Number(type));
 }
 
 function isAnswered(q) {
+  const k = qid(q);
   if (Number(q.题型) === 3) {
-    return (multiAnswers[q.id] || []).length > 0;
+    return (multiAnswers[k] || []).length > 0;
   }
-  const value = answers[q.id];
-  return value !== undefined && value !== '';
+  const value = answers[k];
+  return value !== undefined && value !== '' && value !== null;
 }
 
-function parseOptions(text) {
-  if (!text) return [];
-  const str = String(text).trim();
-  const lines = str.split(/\n+/).filter(Boolean);
+function parseOptions(raw) {
+  if (raw === null || raw === undefined) return [];
+  // 1. 对象数组形式: [{ key:'A', text:'xxx' }] 或 { A:'xxx', B:'yyy' }
+  if (Array.isArray(raw) && raw.length) {
+    return raw
+      .map((o, i) => {
+        if (o && typeof o === 'object') {
+          const k = String(o.key ?? o.opt ?? o.option ?? o.label ?? '').trim() || String.fromCharCode(65 + i);
+          const t = String(o.text ?? o.value ?? o.content ?? o.answer ?? '').trim();
+          return { key: k.toUpperCase().slice(0, 1) || String.fromCharCode(65 + i), text: stripOptionKey(t) };
+        }
+        const t = String(o).trim();
+        return { key: String.fromCharCode(65 + i), text: stripOptionKey(t) };
+      })
+      .filter((o) => o.text);
+  }
+  if (raw && typeof raw === 'object') {
+    const keys = Object.keys(raw);
+    if (keys.length) {
+      return keys
+        .filter((k) => /^[A-Fa-f0-9]/.test(k))
+        .map((k, idx) => {
+          const letter = /^[A-Fa-f]/.test(k) ? k[0].toUpperCase() : String.fromCharCode(65 + idx);
+          return { key: letter, text: stripOptionKey(String(raw[k] || '').trim()) };
+        })
+        .filter((o) => o.text);
+    }
+  }
+  // 2. 字符串形式
+  const str = String(raw).trim();
+  if (!str) return [];
+  const lines = str.split(/\r?\n+/).map((l) => l.trim()).filter(Boolean);
   if (lines.length > 1) {
-    return lines.map((line) => {
-      const match = line.match(/^([A-Fa-f])\s*[.、)）]?\s*(.*)/);
-      if (match) {
-        return { key: match[1].toUpperCase(), text: match[2].trim() };
-      }
-      return { key: String.fromCharCode(65 + lines.indexOf(line)), text: line.trim() };
-    });
+    return lines.map((line, i) => {
+      const m = line.match(/^([A-Fa-f])\s*[.、)）:：\-]?\s*(.*)$/);
+      if (m) return { key: m[1].toUpperCase(), text: stripOptionKey(m[2].trim()) };
+      return { key: String.fromCharCode(65 + i), text: stripOptionKey(line) };
+    }).filter((o) => o.text);
   }
-  const parts = str.split(/[，,;；\s]+/).filter(Boolean);
-  return parts.map((p, i) => ({ key: String.fromCharCode(65 + i), text: p }));
+  // 单行: A.xx B.yy 或 A)xx B)yy
+  const regex = /([A-Fa-f])\s*[.、)）:：\-]?\s*([^A-F].*?)(?=\s*[A-Fa-f]\s*[.、)）:：\-]|$)/g;
+  const matches = [];
+  let mm;
+  while ((mm = regex.exec(str)) !== null) {
+    matches.push({ key: mm[1].toUpperCase(), text: stripOptionKey(mm[2].trim()) });
+  }
+  if (matches.length > 1) return matches;
+  // 兜底：用标点/空格分隔并分配字母
+  const parts = str.split(/\s*[，,;；|｜]\s*/).filter(Boolean);
+  if (parts.length > 1) {
+    return parts.map((p, i) => ({ key: String.fromCharCode(65 + i), text: stripOptionKey(p.trim()) })).filter((o) => o.text);
+  }
+  return [{ key: 'A', text: stripOptionKey(str) }];
 }
 
-function syncMulti(qid) {
-  const arr = multiAnswers[qid] || [];
-  answers[qid] = arr.sort().join('');
+function stripOptionKey(t) {
+  // 去掉文本前缀多余的 "A. / A) / A、" 等，防止显示为 "A. A. xxx"
+  return String(t || '').replace(/^[A-Fa-f]\s*[.、)）:：\-]\s*/, '').trim();
+}
+
+function syncMulti(rawQid) {
+  const k = String(rawQid);
+  // 防御：若 multiAnswers[k] 被意外写成字符串/对象，先转成数组，避免 "arr is not iterable"
+  let raw = multiAnswers[k];
+  let arr;
+  if (Array.isArray(raw)) {
+    arr = raw.filter((v) => typeof v === 'string');
+  } else if (raw === null || raw === undefined) {
+    arr = [];
+  } else if (typeof raw === 'string') {
+    arr = raw.split('').filter((c) => /^[A-Fa-f]$/.test(c)).map((c) => c.toUpperCase());
+  } else {
+    arr = [];
+  }
+  multiAnswers[k] = arr;
+  answers[k] = [...arr].sort().join('');
 }
 
 function formatDuration(sec) {
@@ -387,10 +452,11 @@ function scoreClass(score) {
   return 'score-fail';
 }
 
-function scrollToQuestion(qid) {
-  activeQuestionId.value = qid;
-  emit('update-question-id', qid);
-  const el = document.getElementById(`question-${qid}`);
+function scrollToQuestion(qidRaw) {
+  const k = String(qidRaw);
+  activeQuestionId.value = k;
+  emit('update-question-id', k);
+  const el = document.getElementById(`question-${k}`);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -414,10 +480,12 @@ const saveDraft = () => {
   draftSaved.value = true;
 };
 
+const normalizeQuestionKey = (raw) => String(raw ?? '');
+
 const restoreDraft = (loadedExam, serverDraft = null) => {
   let draft = null;
   if (serverDraft?.answers && Object.keys(serverDraft.answers).length) {
-    draft = { answers: serverDraft.answers, elapsedSeconds: serverDraft.duration_seconds };
+    draft = { answers: serverDraft.answers, elapsedSeconds: serverDraft.duration_seconds ?? serverDraft.durationSeconds };
   } else {
     const raw = localStorage.getItem(draftKey());
     if (!raw) return false;
@@ -429,14 +497,32 @@ const restoreDraft = (loadedExam, serverDraft = null) => {
   }
   try {
     if (!draft?.answers) return false;
+    // 先把草稿 answers / multiAnswers 的 key 做一次归一化（兼容 number 与 string 两种 key）
+    const normAnswers = Object.fromEntries(
+      Object.entries(draft.answers).map(([k, v]) => [normalizeQuestionKey(k), v])
+    );
+    const normMulti = draft.multiAnswers
+      ? Object.fromEntries(Object.entries(draft.multiAnswers).map(([k, v]) => [normalizeQuestionKey(k), Array.isArray(v) ? v : []]))
+      : {};
+    let restoredAny = false;
     loadedExam.questions.forEach((q) => {
-      const qid = q.id;
+      const k = qid(q);
       if (Number(q.题型) === 3) {
-        const restored = Array.isArray(draft.multiAnswers?.[qid]) ? draft.multiAnswers[qid] : [];
-        multiAnswers[qid] = restored;
-        if (restored.length) answers[qid] = [...restored].sort().join('');
-      } else if (draft.answers[qid] !== undefined) {
-        answers[qid] = draft.answers[qid];
+        const restored = normMulti[k] || [];
+        multiAnswers[k] = restored;
+        if (restored.length) {
+          answers[k] = [...restored].sort().join('');
+          restoredAny = true;
+        } else if (normAnswers[k]) {
+          // 后端 draft 可能只存 answers 字符串（例如 "AC"），拆回 multiAnswers
+          const chars = String(normAnswers[k]).split('').filter((c) => /^[A-Fa-f]$/.test(c));
+          multiAnswers[k] = chars.map((c) => c.toUpperCase());
+          answers[k] = chars.sort().join('');
+          restoredAny = restoredAny || chars.length > 0;
+        }
+      } else if (normAnswers[k] !== undefined) {
+        answers[k] = normAnswers[k];
+        if (answers[k] !== '' && answers[k] !== null && answers[k] !== undefined) restoredAny = true;
       }
     });
     if (draft.startedAt) {
@@ -446,7 +532,7 @@ const restoreDraft = (loadedExam, serverDraft = null) => {
     if (draft.elapsedSeconds !== undefined || draft.duration_seconds !== undefined) {
       elapsedSeconds.value = Math.max(0, Number(draft.elapsedSeconds ?? draft.duration_seconds) || 0);
     }
-    return true;
+    return restoredAny;
   } catch {
     return false;
   }
@@ -457,58 +543,69 @@ const loadFavorites = async () => {
   try {
     const ids = new Set();
     let page = 1;
-    while (true) {
+    let guard = 0;
+    while (guard++ < 20) {
       const data = await getFavorites({ page, size: 100 });
-      const rows = data.list || [];
-      rows.forEach((f) => ids.add(String(f.questionId)));
-      if (rows.length === 0 || ids.size >= Number(data.total || 0)) break;
+      // 兼容后端返回的多种字段名
+      const rows = Array.isArray(data) ? data : (data?.list || data?.rows || data?.items || []);
+      rows.forEach((f) => {
+        const v = f.questionId ?? f.question_id ?? f.id;
+        if (v !== undefined && v !== null) ids.add(String(v));
+      });
+      const total = Number(data?.total ?? data?.totalCount ?? rows.length);
+      if (rows.length === 0 || ids.size >= total) break;
       page += 1;
     }
     favoriteSet.value = ids;
-  } catch {
+  } catch (e) {
     // ignore
   }
 };
 
 const toggleFavorite = async (q) => {
-  const qid = String(q.id);
-  if (favoriteLoading[qid]) return;
-  favoriteLoading[qid] = true;
+  const qidStr = qid(q);
+  if (!qidStr || qidStr === 'undefined' || qidStr === 'NaN') {
+    emit('toast', { message: '题目ID异常，无法收藏', type: 'error' });
+    return;
+  }
+  if (favoriteLoading[qidStr]) return;
+  favoriteLoading[qidStr] = true;
   try {
-    if (favoriteSet.value.has(qid)) {
-      await removeFavorite(qid);
+    if (favoriteSet.value.has(qidStr)) {
+      await removeFavorite(qidStr);
       const next = new Set(favoriteSet.value);
-      next.delete(qid);
+      next.delete(qidStr);
       favoriteSet.value = next;
       emit('toast', { message: '已取消收藏', type: 'success' });
     } else {
-      await addFavorite(qid);
+      await addFavorite(qidStr);
       const next = new Set(favoriteSet.value);
-      next.add(qid);
+      next.add(qidStr);
       favoriteSet.value = next;
       emit('toast', { message: '已收藏', type: 'success' });
     }
   } catch (err) {
     emit('toast', { message: err.message || '收藏操作失败', type: 'error' });
   } finally {
-    favoriteLoading[qid] = false;
+    favoriteLoading[qidStr] = false;
   }
 };
 
 // ===== AI 答疑 =====
-const toggleTutor = (qid) => {
-  tutorOpen[qid] = !tutorOpen[qid];
-  if (!tutorHistory[qid]) tutorHistory[qid] = [];
+const toggleTutor = (rawQid) => {
+  const k = String(rawQid);
+  tutorOpen[k] = !tutorOpen[k];
+  if (!tutorHistory[k]) tutorHistory[k] = [];
 };
 
 const askTutor = async (q) => {
-  const qid = q.id;
-  const inputText = (tutorInput[qid] || '').trim();
-  if (!inputText || tutorLoading[qid]) return;
+  const k = qid(q);
+  const inputText = (tutorInput[k] || '').trim();
+  if (!inputText || tutorLoading[k]) return;
 
-  tutorHistory[qid].push({ role: 'user', content: inputText });
-  tutorInput[qid] = '';
-  tutorLoading[qid] = true;
+  tutorHistory[k].push({ role: 'user', content: inputText });
+  tutorInput[k] = '';
+  tutorLoading[k] = true;
 
   try {
     const data = await askTutorApi({
@@ -516,14 +613,14 @@ const askTutor = async (q) => {
       options: q.选项 || '',
       questionType: Number(q.题型),
       userQuestion: inputText,
-      userAnswer: answers[qid] || '',
+      userAnswer: answers[k] || '',
       examId: props.examId,
     });
-    tutorHistory[qid].push({ role: 'ai', content: data.reply || '（AI 未返回内容）' });
+    tutorHistory[k].push({ role: 'ai', content: data.reply || '（AI 未返回内容）' });
   } catch (err) {
-    tutorHistory[qid].push({ role: 'ai', content: `❌ ${err.message || 'AI 调用失败'}` });
+    tutorHistory[k].push({ role: 'ai', content: `❌ ${err.message || 'AI 调用失败'}` });
   } finally {
-    tutorLoading[qid] = false;
+    tutorLoading[k] = false;
   }
 };
 
@@ -545,16 +642,21 @@ const loadExam = async () => {
     try {
       serverDraft = await getExamDraftApi(props.examId);
     } catch { /* 无服务端草稿 */ }
+    // 先清空旧状态（防止组件复用）
+    Object.keys(answers).forEach((k) => delete answers[k]);
+    Object.keys(multiAnswers).forEach((k) => delete multiAnswers[k]);
     data.questions.forEach((q) => {
+      const k = qid(q);
       if (Number(q.题型) === 3) {
-        multiAnswers[q.id] = [];
+        multiAnswers[k] = [];
       } else {
-        answers[q.id] = '';
+        answers[k] = '';
       }
     });
     if (data.questions.length > 0) {
-      activeQuestionId.value = data.questions[0].id;
-      emit('update-question-id', data.questions[0].id);
+      const firstKey = qid(data.questions[0]);
+      activeQuestionId.value = firstKey;
+      emit('update-question-id', firstKey);
       emit('update-question', data.questions[0]);
       emit('update-exam-id', props.examId);
     }
@@ -585,7 +687,8 @@ const handleSubmit = async () => {
     emit('toast', { message: '答题时间已到，无法提交', type: 'error' });
     return;
   }
-  const total = exam.value.questions?.length || 0;
+  const qs = exam.value.questions || [];
+  const total = qs.length;
   if (answeredCount.value < total) {
     if (!window.confirm(`还有 ${total - answeredCount.value} 题未作答，确定提交吗？`)) {
       return;
@@ -593,10 +696,18 @@ const handleSubmit = async () => {
   }
   submitting.value = true;
   try {
-    const answersArr = exam.value.questions.map((q) => ({
-      questionId: q.id,
-      userAnswer: answers[q.id] || '',
-    }));
+    const answersArr = qs.map((q) => {
+      const k = qid(q);
+      const ua = Number(q.题型) === 3
+        ? (multiAnswers[k] || []).sort().join('')
+        : (answers[k] || '');
+      // 同时传 questionId / question_id 做兼容，避免后端只认某一种时出现 null
+      return {
+        questionId: q.id ?? q.questionId ?? q.question_id,
+        question_id: q.id ?? q.question_id ?? q.questionId,
+        userAnswer: ua,
+      };
+    });
     const data = await submitExam(props.examId, {
       answers: answersArr,
       startedAt: startedAt.value.toISOString(),

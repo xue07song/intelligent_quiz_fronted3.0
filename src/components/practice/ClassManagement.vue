@@ -920,13 +920,19 @@ const availableSubjects = computed(() => {
   return getSubjectsByCollege(classForm.college);
 });
 const generatedClasses = computed(() => {
-  const subjectTag = classForm.subject ? `${classForm.subject}-` : '';
-  if (isEditClass.value) return [{ index: 1, name: currentClass.value?.name || `${subjectTag}${classForm.major}${String(classForm.grade).slice(-2)}-1班` }];
+  if (isEditClass.value) {
+    return [{ index: 1, name: currentClass.value?.name || (classForm.subject ? `${classForm.subject}1班` : '') }];
+  }
   return Array.from({ length: Math.max(1, Number(classForm.classCount || 1)) }, (_, index) => ({
     index: index + 1,
-    name: `${subjectTag}${classForm.major || '专业'}${String(classForm.grade || '').slice(-2) || '年级'}-${index + 1}班`,
+    name: `${classForm.subject}${index + 1}班`,
   }));
 });
+// 从班级名推断科目（班级名规范为「科目+数字+班」）
+const inferSubjectFromName = (name) => {
+  if (!name) return '';
+  return (ALL_SUBJECTS || []).find((s) => String(name).startsWith(s)) || '';
+};
 const filterTeachers = keyword => {
   const word = String(keyword || '').trim().toLowerCase();
   if (!word) return teacherOptions.value;
@@ -986,7 +992,7 @@ const openEditClass = (cls) => {
     id: cls.id,
     college: cls.college || '',
     major: cls.major || '',
-    subject: cls.subject || '',
+    subject: cls.subject || inferSubjectFromName(cls.name) || '',
     classCount: 1,
     capacity: cls.capacity || 50,
     grade: cls.grade || '',

@@ -1,12 +1,12 @@
 <template>
   <div class="ai-assistant">
     <div v-if="!open">
-      <div v-if="contextTip" class="ai-context-chip" @click="toggleOpen">
+      <div v-if="contextTip && !hintVisible" class="ai-context-chip" :style="chipStyle" @click="toggleOpen">
         <span class="ai-chip-dot"></span>
         <span>{{ contextTip }}</span>
       </div>
 
-      <div class="ai-ball-actions">
+      <div class="ai-ball-actions" :style="actionsStyle">
         <button
           v-for="action in contextActions"
           :key="action.key"
@@ -16,13 +16,21 @@
           {{ action.label }}
         </button>
       </div>
+
+      <div v-if="hintVisible" class="ai-hint" :style="hintStyle" @click="toggleOpen">
+        点击打开智能助手
+      </div>
     </div>
 
     <button
       class="ai-ball"
       :style="ballStyle"
       :aria-label="open ? '收起智能助手' : '打开智能助手'"
-      @click="toggleOpen"
+      @pointerdown="startBallDrag"
+      @pointermove="onBallDrag"
+      @pointerup="endBallDrag"
+      @pointercancel="endBallDrag"
+      @click="onBallClick"
     >
       💬
     </button>
@@ -347,20 +355,75 @@ const contextMeta = computed(() => CONTEXT_META[contextMode.value] || CONTEXT_ME
 const contextTip = computed(() => contextMeta.value.tip);
 const contextActions = computed(() => contextMeta.value.actions || []);
 
-const ballStyle = computed(() => {
-  const style = {};
+
+
+const BALL_SIZE = 56;
+const PANEL_WIDTH = 400;
+const PANEL_HEIGHT = 520;
+
+const ballPos = ref(null);
+let ballDragOffset = { x: 0, y: 0 };
+let ballStartPointer = { x: 0, y: 0 };
+let ballDragging = false;
+let ballMoved = false;
+
+const defaultBallPos = () => {
   if (isAnswerPage.value) {
-    style.bottom = '104px';
-    style.opacity = '0.9';
+    return { x: window.innerWidth - BALL_SIZE - 24, y: window.innerHeight - BALL_SIZE - 104 };
   }
-  return style;
+  return { x: window.innerWidth - BALL_SIZE - 24, y: window.innerHeight - BALL_SIZE - 24 };
+};
+
+const ballStyle = computed(() => {
+  const pos = ballPos.value || defaultBallPos();
+  return {
+    left: `${pos.x}px`,
+    top: `${pos.y}px`,
+    right: 'auto',
+    bottom: 'auto',
+    opacity: isAnswerPage.value ? '0.9' : undefined,
+  };
+});
+
+const chipStyle = computed(() => {
+  const pos = ballPos.value || defaultBallPos();
+  return {
+    left: `${pos.x - 12}px`,
+    top: `${pos.y + 12}px`,
+    right: 'auto',
+    bottom: 'auto',
+    transform: 'translateX(-100%)',
+  };
+});
+
+const hintStyle = computed(() => {
+  const pos = ballPos.value || defaultBallPos();
+  return {
+    left: `${pos.x - 12}px`,
+    top: `${pos.y + 12}px`,
+    right: 'auto',
+    bottom: 'auto',
+    transform: 'translateX(-100%)',
+  };
+});
+
+const actionsStyle = computed(() => {
+  const pos = ballPos.value || defaultBallPos();
+  return {
+    left: `${pos.x + BALL_SIZE}px`,
+    top: `${pos.y - 8}px`,
+    right: 'auto',
+    bottom: 'auto',
+    transform: 'translate(-100%, -100%)',
+  };
 });
 
 const panelStyle = computed(() => {
-  if (!dragPos.value) return {};
+  const pos = dragPos.value;
+  if (!pos) return {};
   return {
-    left: `${dragPos.value.x}px`,
-    top: `${dragPos.value.y}px`,
+    left: `${pos.x}px`,
+    top: `${pos.y}px`,
     right: 'auto',
     bottom: 'auto',
   };
@@ -369,6 +432,22 @@ const panelStyle = computed(() => {
 const dragPos = ref(null);
 let dragOffset = { x: 0, y: 0 };
 let dragging = false;
+
+const clampPanel = (x, y) => {
+  return {
+    x: Math.min(Math.max(x, 0), window.innerWidth - PANEL_WIDTH),
+    y: Math.min(Math.max(y, 0), window.innerHeight - PANEL_HEIGHT),
+  };
+};
+
+const defaultPanelPos = () => {
+  const ball = ballPos.value || defaultBallPos();
+  let x = ball.x - PANEL_WIDTH - 12;
+  let y = ball.y - PANEL_HEIGHT + BALL_SIZE;
+  if (x < 0) x = ball.x + BALL_SIZE + 12;
+  if (y < 0) y = 12;
+  return clampPanel(x, y);
+};
 
 const renderMarkdown = (content) => {
   if (!content) return '';
@@ -385,7 +464,10 @@ const scrollToBottom = async () => {
 const toggleOpen = () => {
   open.value = !open.value;
   hintVisible.value = false;
-  if (open.value) scrollToBottom();
+  if (open.value) {
+    if (!dragPos.value) dragPos.value = defaultPanelPos();
+    scrollToBottom();
+  }
 };
 
 const closePanel = () => {
@@ -590,6 +672,46 @@ const endDrag = () => {
   dragging = false;
 };
 
+const startBallDrag = (event) => {
+  if (event.pointerType !== 'mouse') return;
+  const ball = event.currentTarget;
+  const rect = ball.getBoundingClientRect();
+  ballDragOffset = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  ballStartPointer = { x: event.clientX, y: event.clientY };
+  ballDragging = true;
+  ballMoved = false;
+  ball.setPointerCapture(event.pointerId);
+};
+
+const onBallDrag = (event) => {
+  if (!ballDragging || event.pointerType !== 'mouse') return;
+  const x = Math.min(Math.max(event.clientX - ballDragOffset.x, 0), window.innerWidth - BALL_SIZE);
+  const y = Math.min(Math.max(event.clientY - ballDragOffset.y, 0), window.innerHeight - BALL_SIZE);
+  if (Math.abs(event.clientX - ballStartPointer.x) > 4 || Math.abs(event.clientY - ballStartPointer.y) > 4) {
+    ballMoved = true;
+  }
+  ballPos.value = { x, y };
+  if (open.value) {
+    dragPos.value = defaultPanelPos();
+  }
+};
+
+const endBallDrag = () => {
+  ballDragging = false;
+};
+
+// 面板打开时，保持面板与球的相对位置同步
+watch(open, (val) => {
+  if (val && !dragPos.value) {
+    dragPos.value = defaultPanelPos();
+  }
+});
+
+const onBallClick = () => {
+  if (ballMoved) return;
+  toggleOpen();
+};
+
 watch(
   () => messages.value.length,
   () => scrollToBottom()
@@ -766,7 +888,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   animation: ai-breath 2.4s ease-in-out infinite;
-  transition: bottom 0.25s ease, opacity 0.25s ease, transform 0.15s ease;
+  transition: left 0.15s ease, top 0.15s ease, opacity 0.25s ease, transform 0.15s ease;
 }
 .ai-ball:hover {
   transform: scale(1.05);
@@ -811,7 +933,7 @@ onMounted(() => {
   right: 20px;
   bottom: calc(96px + env(safe-area-inset-bottom));
   width: 400px;
-  height: 600px;
+  height: 520px;
   max-height: calc(100vh - 120px);
   background: #fff;
   border: 1px solid #e2e8f0;

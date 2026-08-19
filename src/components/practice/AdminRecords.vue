@@ -499,6 +499,7 @@ const openExamAnalysis = async (exam) => {
   try {
     const params = classFilter.value ? { classId: classFilter.value } : {};
     const data = await getExamAnalytics(exam.id, params);
+    analysisData.value = data;
     const overview = data?.overview || {};
     recordsList.value = data?.studentResults || [];
     recordsTotal.value = Number(overview.attempt_count) || recordsList.value.length;
@@ -524,11 +525,6 @@ const openExamAnalysis = async (exam) => {
       };
     });
     computeAnalysis();
-    analysis.totalAttempts = Number(overview.attempt_count) || 0;
-    analysis.uniqueStudents = Number(overview.participant_count) || 0;
-    analysis.avgScore = Number(overview.avg_score) || 0;
-    analysis.passRate = Number(overview.pass_rate) || 0;
-    analysis.avgAccuracy = Number(overview.avg_accuracy) || 0;
   } catch (err) {
     onToast({ message: err.message || '加载分析数据失败', type: 'error' });
   } finally {
@@ -596,33 +592,36 @@ const computeAnalysis = () => {
   }
 
   const overview = data.overview || {};
-  const studentResults = data.studentResults || [];
-  const totalAttempts = overview.participant_count || studentResults.length;
-  const uniqueStudents = totalAttempts;
+  const totalAttempts = Number(overview.attempt_count) || 0;
+  const uniqueStudents = Number(overview.participant_count) || 0;
+  const avgScore = Number(overview.avg_score) || 0;
+  const passRate = Number(overview.pass_rate) || 0;
+  const avgAccuracy = Number(overview.avg_accuracy) || 0;
 
-  const scores = studentResults.map(r => Number(r.score) || 0);
-  const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-  const passRate = Math.round(Number(overview.pass_rate) || 0);
-
-  const accuracies = studentResults.map(r => Number(r.accuracy) || 0);
-  const avgAccuracy = Math.round(accuracies.reduce((a, b) => a + b, 0) / accuracies.length);
-
+  // 成绩分布：按提交次数，从分数段分布聚合（优秀≥80 / 及格60-79 / 不及格<60）
+  const dist = data.scoreDistribution || [];
+  const sumRange = (labels) => dist
+    .filter((s) => labels.includes(s.range_label))
+    .reduce((sum, s) => sum + (Number(s.count) || 0), 0);
   const scoreDist = {
-    excellent: scores.filter(s => s >= 80).length,
-    pass: scores.filter(s => s >= 60 && s < 80).length,
-    fail: scores.filter(s => s < 60).length,
+    excellent: sumRange(['良好(80-89)', '优秀(90-100)']),
+    pass: sumRange(['及格(60-69)', '中等(70-79)']),
+    fail: sumRange(['不及格(0-59)']),
   };
 
+  // 正确率分布：基于去重后的学生最佳成绩
+  const studentResults = data.studentResults || [];
+  const accuracies = studentResults.map((r) => Number(r.accuracy) || 0);
   const accDist = {
-    high: accuracies.filter(a => a >= 80).length,
-    mid: accuracies.filter(a => a >= 60 && a < 80).length,
-    low: accuracies.filter(a => a < 60).length,
+    high: accuracies.filter((a) => a >= 80).length,
+    mid: accuracies.filter((a) => a >= 60 && a < 80).length,
+    low: accuracies.filter((a) => a < 60).length,
   };
 
   const classStats = (data.classBreakdown || []).map((c) => ({
     name: c.class_name || '未分班',
     avgScore: Math.round(Number(c.avg_score) || 0),
-    count: c.participant_count || 0,
+    count: Number(c.participant_count) || 0,
   }));
 
   const segmentColors = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#10b981'];
@@ -633,7 +632,7 @@ const computeAnalysis = () => {
     count: Number(s.count) || 0,
     color: segmentColors[(Number(s.range_order) || 1) - 1] || '#10b981',
   }));
-  const maxSegment = Math.max(...segments.map(s => s.count), 1);
+  const maxSegment = Math.max(...segments.map((s) => s.count), 1);
 
   Object.assign(analysis, {
     totalAttempts, uniqueStudents, avgScore, passRate, avgAccuracy,

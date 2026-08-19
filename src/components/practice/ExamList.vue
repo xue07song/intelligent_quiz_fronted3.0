@@ -61,7 +61,7 @@
       >
         <div class="paper-card-header">
           <span class="paper-type-badge" :class="getTypeClass(exam)">
-            {{ exam.class_id || exam.classId ? '定向' : '全开放' }}
+            {{ isOpenAll(exam) ? '全开放' : '定向' }}
           </span>
           <span class="paper-status" :class="exam.status || 'published'">{{ statusText(exam.status) }}</span>
           <span class="paper-id">#{{ exam.id }}</span>
@@ -276,8 +276,14 @@ const closePreview = () => {
   previewExam.value = { questions: [] };
 };
 
+const isOpenAll = (exam) => {
+  const hasLegacy = exam.class_id != null || exam.classId != null;
+  const hasClassIds = Array.isArray(exam.class_ids) && exam.class_ids.length > 0;
+  return !hasLegacy && !hasClassIds;
+};
+
 const getTypeClass = (exam) => {
-  return exam.class_id || exam.classId ? 'badge-directed' : 'badge-open';
+  return isOpenAll(exam) ? 'badge-open' : 'badge-directed';
 };
 
 onMounted(() => {

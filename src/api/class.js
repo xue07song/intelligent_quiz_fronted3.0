@@ -57,3 +57,8 @@ export const getTeacherOptions = (params = {}) => request.get('/classes/teachers
 export const getAcademicStructure = () => request.get('/classes/academic/structure');
 export const createCollege = (name) => request.post('/classes/academic/colleges', { name });
 export const createMajor = (collegeId, name) => request.post('/classes/academic/majors', { collegeId, name });
+
+// 学生自主加入某个班级（选修或必修，权限依赖后端允许）
+export const joinClassAsStudent = (classId, studentId) => {
+  return request.post(`/classes/${classId}/students/join`, { studentId });
+};
