@@ -90,8 +90,8 @@
             v-if="currentView === 'adaptive'"
             @toast="handleToastFromChild"
         />
-        <WrongBook
-            v-if="currentView === 'wrongbook'"
+        <QuestionReview
+            v-if="currentView === 'review'"
             @start-exam="startExam"
             @toast="handleToastFromChild"
         />
@@ -512,6 +512,7 @@ import ExamList from '@/components/practice/ExamList.vue';
 import ExamPractice from '@/components/practice/ExamPractice.vue';
 import AdaptivePractice from '@/components/practice/AdaptivePractice.vue';
 import WrongBook from '@/components/practice/WrongBook.vue';
+import QuestionReview from '@/components/practice/QuestionReview.vue';
 import PracticeRecords from '@/components/practice/PracticeRecords.vue';
 import LearningAnalysis from '@/components/practice/LearningAnalysis.vue';
 import AdaptiveOverview from '@/components/practice/AdaptiveOverview.vue';
@@ -541,7 +542,7 @@ const roleMap = { admin: '管理员', teacher: '教师', student: '学生' };
 const studentTabs = [
   { key: 'papers', label: '试卷列表', icon: '📋' },
   { key: 'adaptive', label: '自适应练习', icon: '🎯' },
-  { key: 'wrongbook', label: '错题本', icon: '📕' },
+  { key: 'review', label: '题目复盘', icon: '📕' },
   { key: 'records', label: '答题记录', icon: '📊' },
   { key: 'analysis', label: '学情分析', icon: '📈' },
 ];
@@ -564,6 +565,7 @@ const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-anal
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
 const recordDetailReturn = ref('records');
+const practiceReturnView = ref('papers');
 const analysisPracticeFilters = ref({});
 const currentQuestionId = ref(null);
 const currentQuestion = ref(null);
@@ -764,6 +766,7 @@ const pageTitle = computed(() => {
 const startExam = (examId) => {
   activeExamId.value = examId;
   if (currentUser.value?.role === 'student') {
+    practiceReturnView.value = currentView.value;
     currentView.value = 'practice';
   } else {
     practiceView.value = 'practice';
@@ -773,7 +776,7 @@ const startExam = (examId) => {
 const exitExam = () => {
   activeExamId.value = null;
   if (currentUser.value?.role === 'student') {
-    currentView.value = 'papers';
+    currentView.value = practiceReturnView.value || 'papers';
   } else {
     practiceView.value = 'exams';
   }

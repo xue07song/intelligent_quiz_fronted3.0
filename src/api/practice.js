@@ -115,6 +115,16 @@ export const createWrongExam = (data) => {
   return request.post('/practice/wrong-exams', data);
 };
 
+// 单题练习：创建一道题的练习卷
+export const startSingleQuestionPractice = (questionId) => {
+  return request.post('/practice/single-question', { questionId });
+};
+
+// 单题判题：提交答案并返回结果（不创建试卷）
+export const checkSingleQuestion = (questionId, userAnswer) => {
+  return request.post('/practice/single-question/check', { questionId, userAnswer });
+};
+
 // ==================== 管理端接口（教师/管理员）====================
 // 教师只能查看学生数据；管理员可查看所有人并按角色筛选
 

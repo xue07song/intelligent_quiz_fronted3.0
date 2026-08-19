@@ -28,6 +28,13 @@
         <span class="retry-hint">从当前错题中随机抽取生成一套新试卷，反复巩固易错点</span>
       </div>
       <div class="retry-controls">
+        <input
+            v-model="searchKeyword"
+            class="filter-search"
+            placeholder="搜索题目/知识点/章节"
+            @keyup.enter="handleSearch"
+        />
+        <button class="btn-search" @click="handleSearch">🔍</button>
         <select v-model="retryChapter" class="filter-select" @change="loadData">
           <option value="">全部章节</option>
           <option v-for="i in 10" :key="i" :value="i">第{{ i }}章</option>
@@ -104,12 +111,55 @@
           @change="loadData"
       />
     </div>
+
+    <!-- ===== 单题解析弹窗 ===== -->
+    <div v-if="detailVisible" class="modal-mask" @click.self="detailVisible = false">
+      <div class="modal-dialog detail-dialog">
+        <div class="modal-head">
+          <h3>题目解析</h3>
+          <button class="close-btn" @click="detailVisible = false">✕</button>
+        </div>
+        <div class="modal-body" v-if="detailLoading">
+          <div class="loading-spinner"></div>
+          <p>加载中...</p>
+        </div>
+        <div class="modal-body" v-else-if="detailData">
+          <div class="detail-section">
+            <h4>题目</h4>
+            <p class="detail-text">{{ detailData.title }}</p>
+          </div>
+          <div class="detail-section" v-if="detailData.options && detailData.options.length">
+            <h4>选项</h4>
+            <ul class="detail-options">
+              <li v-for="(opt, idx) in detailData.options" :key="idx" :class="{ correct: detailData.correctAnswer === opt.label }">
+                <span class="opt-label">{{ opt.label }}.</span> {{ opt.content }}
+              </li>
+            </ul>
+          </div>
+          <div class="detail-section">
+            <h4>正确答案</h4>
+            <p class="detail-answer">{{ detailData.correctAnswer }}</p>
+          </div>
+          <div class="detail-section" v-if="detailData.analysis">
+            <h4>解析</h4>
+            <p class="detail-text">{{ detailData.analysis }}</p>
+          </div>
+          <div class="detail-section" v-if="detailData.knowledgePoint">
+            <h4>知识点</h4>
+            <p class="detail-text">{{ detailData.knowledgePoint }}</p>
+          </div>
+        </div>
+        <div class="modal-body" v-else>
+          <p class="detail-text">暂无解析数据</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getWrongQuestions, createWrongExam } from '@/api/practice';
+import { getWrongQuestions, createWrongExam, startSingleQuestionPractice } from '@/api/practice';
 import { getTypeName, getDifficultyLabel, TYPE_OPTIONS } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
 import Pagination from '@/components/Pagination.vue';
@@ -127,12 +177,18 @@ const retryChapter = ref('');
 const retryType = ref('');
 const retryCount = ref(20);
 
+const searchKeyword = ref('');
+const detailVisible = ref(false);
+const detailLoading = ref(false);
+const detailData = ref(null);
+
 const loadData = async () => {
   loading.value = true;
   try {
     const params = { page: page.value, pageSize: pageSize.value };
     if (retryChapter.value) params.chapter = retryChapter.value;
     if (retryType.value) params.questionType = retryType.value;
+    if (searchKeyword.value.trim()) params.keyword = searchKeyword.value.trim();
     const data = await getWrongQuestions(params);
     list.value = data.list || [];
     total.value = data.total || 0;
@@ -141,6 +197,11 @@ const loadData = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const handleSearch = () => {
+  page.value = 1;
+  loadData();
 };
 
 const handleRetry = async () => {
@@ -169,12 +230,30 @@ const handleRetry = async () => {
   }
 };
 
-const handleSingleRetry = (id) => {
-  emit('toast', { message: '单题重练功能开发中', type: 'info' });
+const handleSingleRetry = async (questionId) => {
+  try {
+    emit('toast', { message: '正在生成单题练习...', type: 'info' });
+    const data = await startSingleQuestionPractice(questionId);
+    emit('toast', { message: '单题练习已生成', type: 'success' });
+    emit('start-exam', data.examId);
+  } catch (err) {
+    emit('toast', { message: err.message || '单题重练失败', type: 'error' });
+  }
 };
 
-const handleView = (id) => {
-  emit('toast', { message: '查看解析功能开发中', type: 'info' });
+const handleView = async (questionId) => {
+  detailVisible.value = true;
+  detailLoading.value = true;
+  detailData.value = null;
+  try {
+    const data = await startSingleQuestionPractice(questionId);
+    detailData.value = data.question || data;
+  } catch (err) {
+    emit('toast', { message: err.message || '加载解析失败', type: 'error' });
+    detailData.value = null;
+  } finally {
+    detailLoading.value = false;
+  }
 };
 
 onMounted(() => {
@@ -583,4 +662,86 @@ defineExpose({ loadData });
     gap: 6px;
   }
 }
+
+.filter-search {
+  padding: 6px 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 13px;
+  width: 200px;
+  font-family: inherit;
+}
+.filter-search:focus {
+  outline: none;
+  border-color: #6366F1;
+}
+.btn-search {
+  padding: 6px 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+}
+.btn-search:hover {
+  background: #F1F5F9;
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.6);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.modal-dialog {
+  background: #fff;
+  border-radius: 16px;
+  width: min(600px, 95vw);
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.detail-dialog { width: min(640px, 95vw); }
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #E2E8F0;
+}
+.modal-head h3 { margin: 0; font-size: 16px; color: #1E293B; }
+.close-btn {
+  border: 0;
+  background: #F1F5F9;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+}
+.modal-body { padding: 20px; overflow: auto; }
+.detail-section { margin-bottom: 16px; }
+.detail-section h4 { font-size: 13px; color: #64748B; margin: 0 0 6px 0; }
+.detail-text { font-size: 14px; color: #1E293B; line-height: 1.6; margin: 0; }
+.detail-answer { font-size: 15px; color: #047857; font-weight: 600; margin: 0; }
+.detail-options { list-style: none; padding: 0; margin: 0; }
+.detail-options li {
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #475569;
+  background: #F8FAFC;
+}
+.detail-options li.correct {
+  background: #ECFDF5;
+  color: #047857;
+  font-weight: 500;
+}
+.opt-label { font-weight: 600; margin-right: 6px; }
 </style>
