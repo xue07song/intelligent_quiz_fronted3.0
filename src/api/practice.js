@@ -65,10 +65,6 @@ export const startExamApi = (id) => {
   return request.post(`/practice/exams/${id}/start`);
 };
 
-// 试卷维度分析（每题正确率 + 学生成绩 + 整体统计 + 班级对比 + 分数段）
-export const getExamAnalytics = (id) => {
-  return request.get(`/practice/exams/${id}/analytics`);
-};
 
 // 试卷状态管理（教师本人/管理员）
 export const updateExamStatusApi = (id, status) => {
