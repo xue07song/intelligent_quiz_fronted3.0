@@ -32,18 +32,20 @@
             {{ allChaptersSelected ? '✅ 已选全部' : '☐ 选择全部章节' }}
           </button>
         </div>
+        <el-select v-model="form.subject" filterable placeholder="请先选择练习科目" style="width:100%;margin-bottom:14px" @change="loadChapters">
+          <el-option v-for="item in subjects" :key="item" :label="item" :value="item" />
+        </el-select>
 
         <div class="chapter-grid">
           <button
-              v-for="n in 10"
-              :key="n"
+              v-for="item in chapterOptions"
+              :key="item.chapterNo"
               class="chapter"
-              :class="{ active: form.chapters.includes(n) }"
-              @click="toggleChapter(n)"
+              :class="{ active: form.chapters.includes(item.chapterNo) }"
+              @click="toggleChapter(item.chapterNo)"
           >
-            <b>第{{ n }}章</b>
-            <strong>{{ getChapterName(n) }}</strong>
-            <span>{{ form.chapters.includes(n) ? '✅ 已选' : '点击选择' }}</span>
+            <b>第{{ item.chapterNo }}章</b><strong>{{ item.title }}</strong>
+            <span>{{ form.chapters.includes(item.chapterNo) ? '✅ 已选' : `${item.questionCount}题` }}</span>
           </button>
         </div>
 
@@ -265,10 +267,11 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { checkAdaptiveInventory, startAdaptivePractice, submitAdaptiveAnswer } from '@/api/practice';
 import { askTutor as askTutorApi } from '@/api/ai';
 import { getChapterLabel, getChapterName } from '@/utils/constants';
+import { getSubjects, getSubjectChapters } from '@/api/subject';
 
 const props = defineProps({
   initialFilters: { type: Object, default: () => ({}) },
@@ -298,11 +301,15 @@ const summary = ref({ answered: 0, correct: 0, accuracy: 0, difficulty: 1, traje
 
 // ===== 表单 =====
 const form = ref({
+  subject: props.initialFilters.subject || '',
   chapters: props.initialFilters.chapters || [],
   knowledgeKeyword: props.initialFilters.knowledgeKeyword || '',
   questionCount: 10,
   questionTypes: [1, 2, 3, 4, 5, 6],
 });
+const subjects = ref([]), chapterOptions = ref([]);
+const loadChapters = async () => { form.value.chapters=[]; chapterOptions.value=form.value.subject ? await getSubjectChapters(form.value.subject) : []; report.value=null; };
+onMounted(async()=>{subjects.value=await getSubjects({hasQuestions:1});if(form.value.subject) await loadChapters();});
 
 const types = [
   { value: 1, label: '判断题' },
@@ -314,7 +321,7 @@ const types = [
 ];
 
 // ===== 计算属性 =====
-const allChaptersSelected = computed(() => form.value.chapters.length === 10);
+const allChaptersSelected = computed(() => chapterOptions.value.length > 0 && form.value.chapters.length === chapterOptions.value.length);
 
 const ready = computed(() => {
   if (mode.value === 'preset') return !!selectedPlan.value;
@@ -353,7 +360,7 @@ const toggleChapter = (n) => {
 };
 
 const selectAllChapters = async (reload = false) => {
-  form.value.chapters = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  form.value.chapters = chapterOptions.value.map(item=>item.chapterNo);
   invalidate();
   if (reload) await loadPlans();
 };
@@ -366,6 +373,7 @@ const openManual = () => {
 };
 
 const loadPlans = async () => {
+  if (!form.value.subject) { errorText.value='请先选择练习科目'; return; }
   checking.value = true;
   errorText.value = '';
   try {
@@ -409,13 +417,14 @@ const apply = (suggestion) => {
   if (suggestion.code === 'reduce-count') form.value.questionCount = suggestion.value;
   if (suggestion.code === 'remove-keyword') form.value.knowledgeKeyword = '';
   if (suggestion.code === 'all-objective-types') form.value.questionTypes = [1, 2, 3, 4];
-  if (suggestion.code === 'all-chapters') form.value.chapters = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  if (suggestion.code === 'all-chapters') form.value.chapters = chapterOptions.value.map(item=>item.chapterNo);
   checkManual();
 };
 
 const chosen = () => {
   if (mode.value === 'preset') {
     return {
+      subject: form.value.subject,
       chapters: selectedPlan.value.chapters,
       knowledgeKeyword: '',
       questionCount: selectedPlan.value.questionCount,

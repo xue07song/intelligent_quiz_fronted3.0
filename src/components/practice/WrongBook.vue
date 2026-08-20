@@ -93,6 +93,10 @@
             <span class="meta-label">最近做错</span>
             <span class="meta-value">{{ formatTime(item.last_wrong_at) }}</span>
           </span>
+          <span class="meta-item" v-if="item.exam_title">
+            <span class="meta-label">来源试卷</span>
+            <span class="meta-value">{{ item.exam_title }}</span>
+          </span>
         </div>
 
         <div class="wrong-card-footer">

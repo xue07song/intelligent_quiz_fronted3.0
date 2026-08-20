@@ -3,8 +3,8 @@
     <header class="ar-hero">
       <div>
         <span class="ar-badge">自适应复核</span>
-        <h1>自适应主观题复核</h1>
-        <p>AI 无法可靠判定或待复核的自适应答题，由教师人工确认</p>
+        <h1>主观题复核</h1>
+        <p>统一复核试卷练习和自适应练习中需要教师二次判断的答案</p>
       </div>
       <button class="ar-btn" @click="load">刷新</button>
     </header>
@@ -20,9 +20,10 @@
     <div v-if="loading" class="ar-empty">加载中...</div>
     <div v-else-if="list.length === 0" class="ar-empty">暂无待复核的自适应主观题</div>
     <div v-else class="ar-list">
-      <div v-for="item in list" :key="item.id" class="ar-card">
+      <div v-for="item in list" :key="`${item.source}-${item.id}`" class="ar-card">
         <div class="ar-head">
           <span class="ar-id">#{{ item.id }}</span>
+          <span class="ar-id">{{ item.source === 'exam' ? '试卷练习' : '自适应练习' }}</span>
           <span class="ar-student">{{ item.nickname || item.username }}</span>
           <span class="ar-time">{{ formatTime(item.answered_at) }}</span>
         </div>
@@ -56,7 +57,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { listAdaptiveAnswers, reviewAdaptiveAnswerApi } from '@/api/practice';
+import { listAdaptiveAnswers, reviewAdaptiveAnswerApi, reviewSubjectiveAnswer } from '@/api/practice';
 import { formatTime } from '@/utils/format';
 
 const emit = defineEmits(['toast']);
@@ -100,7 +101,8 @@ const review = async (item, result) => {
   body.comment = comment;
   reviewing.value = true;
   try {
-    await reviewAdaptiveAnswerApi(item.id, body);
+    if (item.source === 'exam') await reviewSubjectiveAnswer(item.id, body);
+    else await reviewAdaptiveAnswerApi(item.id, body);
     toast('复核结果已保存');
     await load();
   } catch (err) {

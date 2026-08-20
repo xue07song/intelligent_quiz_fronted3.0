@@ -54,6 +54,9 @@ export const getUnassignedStudents = (params = {}) => {
 };
 
 export const getTeacherOptions = (params = {}) => request.get('/classes/teachers/options', { params });
+export const getAllClassOptions = (params = {}) => request.get('/classes/options/all', { params });
+export const getMyClassIds = () => request.get('/classes/mine');
+export const updateMyClassIds = (classIds) => request.put('/classes/mine', { classIds });
 export const getAcademicStructure = () => request.get('/classes/academic/structure');
 export const createCollege = (name) => request.post('/classes/academic/colleges', { name });
 export const createMajor = (collegeId, name) => request.post('/classes/academic/majors', { collegeId, name });

@@ -1,6 +1,6 @@
 <template>
   <!-- ===== 未登录：显示登录页 ===== -->
-  <Login v-if="!currentUser" @success="handleLoginSuccess" @open-register="registerVisible = true" />
+  <Login v-if="!currentUser" @success="handleLoginSuccess" @open-register="registerVisible = true" @feature="handleGuestFeature" />
 
   <RegistrationDialog
       v-if="!currentUser"
@@ -187,11 +187,12 @@
               <span class="iq-nav-icon">📊</span> 自适应学情
             </button>
             <button
+                v-if="currentUser.role !== 'admin'"
                 class="iq-nav-item"
                 :class="{ active: currentView === 'practice' && practiceView === 'adaptive-review' }"
                 @click="openPracticeView('adaptive-review'); sidebarOpen = false"
             >
-              <span class="iq-nav-icon">📝</span> 自适应复核
+              <span class="iq-nav-icon">📝</span> 主观题复核
             </button>
           </div>
 
@@ -307,10 +308,15 @@
                 <div class="iq-stat-label">📊 题库总量</div>
                 <div class="iq-stat-value">{{ stats.total }}</div>
               </div>
-              <div class="iq-card iq-stat-card">
-                <div class="iq-stat-label">📂 章节数</div>
-                <div class="iq-stat-value">{{ stats.byChapter?.length || 0 }}</div>
-              </div>
+              <div class="iq-card iq-stat-card"><div class="iq-stat-label">📚 科目数</div><div class="iq-stat-value">{{ stats.bySubject?.length || 0 }}</div></div>
+            </div>
+            <div v-if="stats" class="iq-subject-summary">
+              <section v-for="subject in stats.bySubject" :key="subject.subject" class="iq-card iq-subject-summary-card">
+                <h3>{{ subject.subject }} <small>共 {{ subject.count }} 题</small></h3>
+                <div v-for="chapter in stats.bySubjectChapter?.filter(c => c.subject === subject.subject)" :key="chapter.chapter" class="iq-subject-chapter-row">
+                  <span>第{{ chapter.chapter }}章 {{ chapter.title }}</span><b>{{ chapter.count }}题</b>
+                </div>
+              </section>
             </div>
 
             <!-- 筛选栏 -->
@@ -417,7 +423,7 @@
           />
 
           <AdaptiveReview
-              v-if="practiceView === 'adaptive-review'"
+              v-if="practiceView === 'adaptive-review' && currentUser.role !== 'admin'"
               @toast="handleToastFromChild"
           />
 
@@ -476,14 +482,14 @@
           @success="handleImportSuccess"
       />
 
-      <Toast :message="toastMessage" :type="toastType" />
     </div>
 
     <AIAssistant @start-exam="startExam" />
   </div>
 
   <!-- ===== Toast ===== -->
-  <Toast :message="toastMessage" :type="toastType" v-if="currentUser" />
+  <ChangePassword v-if="currentUser?.role === 'student'" :visible="pwdVisible" @close="pwdVisible=false" @success="handlePwdChanged" />
+  <Toast :message="toastMessage" :type="toastType" />
 </template>
 
 <script setup>
@@ -553,6 +559,7 @@ const studentTabs = [
 const currentUser = ref(null);
 const registerVisible = ref(false);
 const currentView = ref('papers');
+const pendingFeature = ref('');
 const sidebarOpen = ref(false);
 const pwdVisible = ref(false);
 
@@ -729,7 +736,7 @@ const currentBreadcrumb = computed(() => {
       'wrong-book': '错题本',
       adaptive: '自适应练习',
       'adaptive-overview': '自适应学情',
-      'adaptive-review': '自适应复核',
+      'adaptive-review': '主观题复核',
       'adaptive-progress': '自适应成果',
       'learning-analysis': '学习分析',
       practice: '答题中',
@@ -751,7 +758,7 @@ const pageTitle = computed(() => {
     'wrong-book': '📕 错题本',
     adaptive: '🧭 自适应练习',
     'adaptive-overview': '📈 自适应学情',
-    'adaptive-review': '📝 自适应复核',
+    'adaptive-review': '📝 主观题复核',
     'adaptive-progress': '🏅 自适应成果',
     'learning-analysis': '📉 学习分析',
     practice: '✍️ 答题中',
@@ -851,6 +858,24 @@ const restoreSession = () => {
 
 const handleLoginSuccess = (user) => {
   currentUser.value = user;
+  const requested = pendingFeature.value;
+  pendingFeature.value = '';
+  if (requested === 'generate' && user.role === 'teacher') {
+    currentView.value = 'practice';
+    practiceView.value = 'generate';
+  } else if (requested === 'adaptive' && user.role === 'student') {
+    currentView.value = 'adaptive';
+  } else if (requested === 'analysis') {
+    currentView.value = user.role === 'student' ? 'analysis' : 'practice';
+    if (user.role !== 'student') practiceView.value = 'learning-analysis';
+  } else if (requested === 'profile') {
+    currentView.value = 'profile';
+  } else if (requested) {
+    showToast(requested === 'generate' ? '智能组卷需使用教师账号' : '自适应练习需使用学生账号', 'warning');
+    if (user.role === 'student') currentView.value = 'papers';
+    else if (user.role === 'admin') { currentView.value = 'practice'; practiceView.value = 'exams'; }
+    else currentView.value = 'main';
+  } else
   if (user.role === 'student') {
     currentView.value = 'papers';
   } else if (user.role === 'admin') {
@@ -862,6 +887,17 @@ const handleLoginSuccess = (user) => {
   loadData();
   loadStats();
   loadPendingCount();
+};
+
+const handleGuestFeature = (feature) => {
+  pendingFeature.value = feature;
+  const messages = {
+    generate: '请先登录教师端，登录后将进入智能组卷',
+    adaptive: '请先登录学生端，登录后将进入自适应练习',
+    analysis: '请先登录账号，登录后将进入对应角色的学情分析',
+    profile: '请先登录账号，登录后将进入个人中心',
+  };
+  showToast(messages[feature] || '请先登录', 'info');
 };
 
 const handleLogout = () => {
@@ -1160,7 +1196,7 @@ onUnmounted(() => {
 .student-layout {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   background: #F8FAFC;
 }
 
@@ -1168,12 +1204,16 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  height: 60px;
+  width:260px;
+  height:100vh;
+  position:fixed;
+  left:0;
+  top:0;
+  flex-direction:column;
+  align-items:stretch;
+  padding:18px 14px;
   background: #FFFFFF;
-  border-bottom: 1px solid #E2E8F0;
-  position: sticky;
-  top: 0;
+  border-right: 1px solid #E2E8F0;
   z-index: 100;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   gap: 12px;
@@ -1205,12 +1245,12 @@ onUnmounted(() => {
 
 .header-nav {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 2px;
   flex: 1;
-  justify-content: center;
-  overflow-x: auto;
-  padding: 0 8px;
+  justify-content: flex-start;
+  padding: 22px 0 0;
 }
 
 .nav-tab {
@@ -1225,6 +1265,7 @@ onUnmounted(() => {
   transition: all 0.2s;
   font-family: inherit;
   white-space: nowrap;
+  text-align: left;
 }
 .nav-tab:hover {
   background: #F1F5F9;
@@ -1379,9 +1420,10 @@ onUnmounted(() => {
 .student-main {
   flex: 1;
   padding: 24px;
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
+  max-width: none;
+  width: calc(100% - 260px);
+  min-height: 100vh;
+  margin-left: 260px;
 }
 
 @media (max-width: 768px) {
@@ -1797,6 +1839,8 @@ onUnmounted(() => {
   font-weight: 700;
   color: #6366F1;
 }
+.student-layout .header-nav{flex-direction:column;justify-content:flex-start;align-items:stretch;padding-top:22px}.student-layout .nav-tab{text-align:left;padding:10px 14px}.student-layout .header-right{margin-top:auto}.student-layout .user-menu-trigger{width:100%}.student-layout .user-dropdown{bottom:48px;top:auto;left:0;right:auto}.student-layout .student-main{margin-left:260px;max-width:none;width:calc(100% - 260px)}
+.iq-subject-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.iq-subject-summary-card{padding:16px}.iq-subject-summary-card h3{margin:0 0 10px;color:#312e81}.iq-subject-summary-card h3 small{float:right;color:#64748b;font-weight:500}.iq-subject-chapter-row{display:flex;justify-content:space-between;padding:7px 0;border-top:1px solid #eef2f7;font-size:13px}.iq-subject-chapter-row b{color:#6366f1}
 
 /* ===== 顶部横幅 ===== */
 .iq-page-hero {

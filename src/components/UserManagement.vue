@@ -187,22 +187,10 @@
               </div>
               <div class="iq-form-field" v-if="form.role === 'teacher'">
                 <label class="iq-form-label">所教科目</label>
-                <div class="iq-subject-checkboxes">
-                  <label
-                    v-for="opt in teacherSubjectOptions"
-                    :key="opt"
-                    class="iq-checkbox-item"
-                  >
-                    <input
-                      type="checkbox"
-                      class="iq-checkbox"
-                      :value="opt"
-                      v-model="form.subjects"
-                    />
-                    <span>{{ opt }}</span>
-                  </label>
-                  <span v-if="teacherSubjectOptions.length === 0" class="iq-text-sm iq-text-muted">请先选择学院</span>
-                </div>
+                <el-select v-model="form.subjects" multiple filterable allow-create default-first-option
+                           placeholder="搜索、新增或取消科目" style="width:100%">
+                  <el-option v-for="opt in teacherSubjectOptions" :key="opt" :label="opt" :value="opt" />
+                </el-select>
               </div>
               <div class="iq-form-field" v-if="form.role === 'student'">
                 <label class="iq-form-label">学院</label>
@@ -293,18 +281,13 @@ const majorOptions = computed(() => {
 const teacherSubjectOptions = computed(() => {
   if (!form.college) return allSubjects.value;
   const byCollege = getSubjectsByCollege(form.college);
-  return byCollege.length ? byCollege : allSubjects.value;
+  return [...new Set([...allSubjects.value, ...byCollege])];
 });
 
 watch(() => form.college, () => {
   if (form.role === 'student') {
     if (form.major && !getMajorsByCollege(form.college).includes(form.major)) {
       form.major = '';
-    }
-  } else if (form.role === 'teacher') {
-    const valid = getSubjectsByCollege(form.college);
-    if (valid.length) {
-      form.subjects = form.subjects.filter((s) => valid.includes(s));
     }
   }
 });

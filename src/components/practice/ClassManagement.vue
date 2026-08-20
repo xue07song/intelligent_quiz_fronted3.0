@@ -8,12 +8,27 @@
         <p class="hero-desc">管理班级、添加学生、调班或移出，轻松组织教学</p>
       </div>
       <div class="hero-actions">
+        <button v-if="role === 'teacher'" class="iq-btn iq-btn-secondary-light" @click="openManagedClasses">设置管理班级</button>
         <button class="iq-btn iq-btn-secondary-light" @click="openUnassignedDialog">
           👥 可添加学生 ({{ unassignedCount }})
         </button>
         <button class="iq-btn iq-btn-primary" @click="openCreateClass">+ 新建班级</button>
       </div>
     </header>
+
+    <Teleport to="body">
+      <div v-if="managedVisible" class="iq-modal-overlay" @click.self="managedVisible=false">
+        <div class="iq-modal iq-modal-md">
+          <div class="iq-modal-header"><div><h3 class="iq-modal-title">设置管理班级</h3><p class="iq-modal-subtitle">从管理员已经创建的班级中搜索并多选</p></div><button class="iq-modal-close" @click="managedVisible=false">×</button></div>
+          <div class="iq-modal-body">
+            <el-select v-model="managedClassIds" multiple filterable clearable placeholder="输入关键词搜索班级" style="width:100%">
+              <el-option v-for="item in allClassOptions" :key="item.id" :value="item.id" :label="`${item.name}${item.subject ? `（${item.subject}）` : ''}`" />
+            </el-select>
+          </div>
+          <div class="iq-modal-footer"><button class="iq-btn iq-btn-secondary" @click="managedVisible=false">取消</button><button class="iq-btn iq-btn-primary" @click="saveManagedClasses">保存</button></div>
+        </div>
+      </div>
+    </Teleport>
 
     <div class="class-mgmt-layout">
       <!-- 班级列表 -->
@@ -22,6 +37,7 @@
           <b>班级列表</b>
           <span class="iq-text-sm iq-text-muted">共 {{ classList.length }} 个班</span>
         </div>
+        <input v-model="classKeyword" class="iq-input class-search" placeholder="搜索班级名称、年级或备注" @input="scheduleClassSearch" />
         <div v-if="classLoading" class="iq-table-loading" style="padding:40px 0;">
           <span class="iq-loading-spinner"></span>
           <span class="iq-text-sm iq-text-muted">加载中...</span>
@@ -550,6 +566,9 @@ import {
   removeStudentFromClass,
   getUnassignedStudents,
   getTeacherOptions,
+  getAllClassOptions,
+  getMyClassIds,
+  updateMyClassIds,
 } from '@/api/class';
 import { adminListUserRecords, adminGetRecord } from '@/api/practice';
 import { formatTime, formatDuration } from '@/utils/format';
@@ -572,20 +591,46 @@ const showToast = (message, type = 'success') => emit('toast', { message, type }
 
 // ===== 班级列表 =====
 const classList = ref([]);
+const classKeyword = ref('');
 const classLoading = ref(false);
 const selectedClassId = ref(null);
 const currentClass = ref(null);
+const managedVisible = ref(false);
+const managedClassIds = ref([]);
+const allClassOptions = ref([]);
+
+const openManagedClasses = async () => {
+  try {
+    const [options, ids] = await Promise.all([getAllClassOptions(), getMyClassIds()]);
+    allClassOptions.value = Array.isArray(options) ? options : (options.list || []);
+    managedClassIds.value = Array.isArray(ids) ? ids.map(Number) : [];
+    managedVisible.value = true;
+  } catch (err) { showToast(err.message || '读取班级选项失败', 'error'); }
+};
+const saveManagedClasses = async () => {
+  try {
+    await updateMyClassIds(managedClassIds.value);
+    managedVisible.value = false;
+    await loadClasses();
+    showToast('管理班级已更新');
+  } catch (err) { showToast(err.message || '保存管理班级失败', 'error'); }
+};
 
 const loadClasses = async () => {
   classLoading.value = true;
   try {
-    const data = await getClasses();
+    const data = await getClasses({ keyword: classKeyword.value.trim() || undefined });
     classList.value = Array.isArray(data) ? data : (data.list || []);
   } catch (err) {
     showToast(err.message || '加载班级列表失败', 'error');
   } finally {
     classLoading.value = false;
   }
+};
+let classSearchTimer;
+const scheduleClassSearch = () => {
+  clearTimeout(classSearchTimer);
+  classSearchTimer = setTimeout(loadClasses, 250);
 };
 
 const selectClass = async (id) => {

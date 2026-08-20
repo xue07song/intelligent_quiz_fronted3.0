@@ -11,10 +11,10 @@
           <h1 class="brand-slogan">新一代智慧学习平台</h1>
           <p class="brand-desc">助力学校构建 · 高效出题 · 智能练习 · 精准分析</p>
           <div class="brand-features">
-            <span class="feature-tag">📝 智能组卷</span>
-            <span class="feature-tag">🎯 自适应练习</span>
-            <span class="feature-tag">📊 学情分析</span>
-            <span class="feature-tag">☁️ 云端同步</span>
+            <button type="button" class="feature-tag" @click="$emit('feature', 'generate')">📝 智能组卷</button>
+            <button type="button" class="feature-tag" @click="$emit('feature', 'adaptive')">🎯 自适应练习</button>
+            <button type="button" class="feature-tag" @click="$emit('feature', 'analysis')">📊 学情分析</button>
+            <button type="button" class="feature-tag" @click="$emit('feature', 'profile')">☁️ 云端同步</button>
           </div>
         </div>
         <div class="login-left-footer">
@@ -104,7 +104,7 @@
 import { reactive, ref } from 'vue';
 import { login } from '@/api/auth';
 
-const emit = defineEmits(['success', 'open-register']);
+const emit = defineEmits(['success', 'open-register', 'feature']);
 
 const form = reactive({
   username: '',
@@ -261,7 +261,11 @@ const handleForgotPassword = () => {
   color: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s, transform 0.2s;
 }
+.feature-tag:hover { background: rgba(255, 255, 255, 0.22); transform: translateY(-1px); }
 
 .login-left-footer {
   position: relative;

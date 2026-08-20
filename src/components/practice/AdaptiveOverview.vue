@@ -72,6 +72,7 @@
           <tr>
             <th>学生</th>
             <th>有效练习</th>
+            <th>练习进度</th>
             <th>已完成题数</th>
             <th>正确率</th>
             <th>最高难度</th>
@@ -86,6 +87,7 @@
               <small>{{ u.username }}</small>
             </td>
             <td>{{ u.sessionCount }} 次</td>
+            <td>{{ progressOf(u) }}%</td>
             <td>{{ u.answeredCount }} 题</td>
             <td>
                 <span class="accuracy" :class="accuracyClass(u.accuracy)">
@@ -189,6 +191,12 @@ const accuracyClass = (n) => {
   if (num >= 80) return 'good';
   if (num <= 40) return 'weak';
   return 'normal';
+};
+
+const progressOf = (u) => {
+  const planned = Number(u.plannedCount || 0);
+  const answered = Number(u.answeredCount || 0);
+  return planned ? Math.min(100, Math.round(answered * 100 / planned)) : 0;
 };
 
 const advice = (u) => {

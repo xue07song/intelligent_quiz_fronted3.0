@@ -18,7 +18,7 @@
         <el-form-item label="邮箱"><el-input v-model="editForm.email" placeholder="请输入常用邮箱" /></el-form-item>
         <el-form-item label="手机号"><el-input v-model="editForm.phone" placeholder="请输入中国大陆手机号" maxlength="11" /></el-form-item>
         <el-form-item label="学校"><el-input v-model="editForm.school" placeholder="请输入学校名称" /></el-form-item>
-        <el-form-item label="学院"><el-input v-model="editForm.college" placeholder="请输入学院名称" /></el-form-item>
+        <el-form-item label="学院"><el-select v-model="editForm.college" filterable placeholder="请选择学院" style="width:100%"><el-option v-for="item in collegeOptions" :key="item" :label="item" :value="item" /></el-select></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editVisible = false">取消</el-button>
@@ -93,9 +93,22 @@
             </el-tag>
           </template>
           <span v-else class="iq-text-muted">暂未设置</span>
+          <el-button size="small" plain style="margin-left:8px" @click="openSubjectDialog">修改科目</el-button>
         </el-descriptions-item>
       </el-descriptions>
     </div>
+
+    <el-dialog v-model="subjectVisible" title="修改所教科目" width="560px" destroy-on-close>
+      <el-select v-model="subjectForm" multiple filterable allow-create default-first-option
+                 placeholder="搜索或输入新科目后回车" style="width:100%">
+        <el-option v-for="item in subjectOptions" :key="item" :label="item" :value="item" />
+      </el-select>
+      <p class="iq-text-xs iq-text-muted">可搜索、多选，也可直接输入新科目。</p>
+      <template #footer>
+        <el-button @click="subjectVisible=false">取消</el-button>
+        <el-button type="primary" :loading="subjectLoading" @click="saveSubjects">保存</el-button>
+      </template>
+    </el-dialog>
 
     <!-- ===== 功能入口 ===== -->
     <div class="iq-card profile-card">
@@ -189,8 +202,11 @@ import { getStudentProfile, updateProfile } from '@/api/student';
 import { changePassword } from '@/api/auth';
 import { createFeedback } from '@/api/feedback';
 import { getClasses } from '@/api/class';
+import { getSubjects, updateMySubjects } from '@/api/subject';
+import { COLLEGE_NAMES } from '@/utils/colleges';
 
 const emit = defineEmits(['profile-updated']);
+const collegeOptions = COLLEGE_NAMES;
 
 // ===== 工具：把后端返回的班级信息规范为 classes 数组 =====
 // 优先使用 data.classes / data.compulsoryClasses / data.electiveClasses；
@@ -254,6 +270,10 @@ const profile = ref({});
 const profileLoading = ref(false);
 const editVisible = ref(false);
 const editLoading = ref(false);
+const subjectVisible = ref(false);
+const subjectLoading = ref(false);
+const subjectOptions = ref([]);
+const subjectForm = ref([]);
 const editForm = ref({
   username: '',
   role: '',
@@ -320,6 +340,8 @@ const openEditDialog = () => {
 const handleSaveProfile = async () => {
   const email = editForm.value.email.trim();
   const phone = editForm.value.phone.trim();
+  const school = editForm.value.school.trim();
+  if (school && (school.length < 4 || !/(大学|学院|学校)$/.test(school))) { ElMessage.warning('请输入规范学校全称，例如“某某大学”或“某某学院”'); return; }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     ElMessage.warning('邮箱格式不正确');
     return;
@@ -335,7 +357,7 @@ const handleSaveProfile = async () => {
       nickname: editForm.value.nickname.trim(),
       email,
       phone,
-      school: editForm.value.school.trim(),
+      school,
       college: editForm.value.college.trim(),
     });
     ElMessage.success('资料更新成功');
@@ -350,6 +372,28 @@ const handleSaveProfile = async () => {
   } finally {
     editLoading.value = false;
   }
+};
+
+const openSubjectDialog = async () => {
+  subjectForm.value = [...(profile.value.subjects || [])];
+  subjectOptions.value = await getSubjects();
+  subjectVisible.value = true;
+};
+
+const saveSubjects = async () => {
+  if (!subjectForm.value.length) { ElMessage.warning('请至少保留一个科目'); return; }
+  subjectLoading.value = true;
+  try {
+    const subjects = await updateMySubjects(subjectForm.value);
+    profile.value.subjects = subjects;
+    const current = JSON.parse(localStorage.getItem('user') || '{}');
+    const updated = { ...current, subjects };
+    localStorage.setItem('user', JSON.stringify(updated));
+    emit('profile-updated', updated);
+    subjectVisible.value = false;
+    ElMessage.success('所教科目已更新');
+  } catch (error) { ElMessage.error(error.message || '更新失败'); }
+  finally { subjectLoading.value = false; }
 };
 
 // ===== 修改密码 =====

@@ -105,14 +105,11 @@
               </div>
               <div class="iq-form-field">
                 <label class="iq-form-label">所教科目 <span class="iq-form-required">*</span></label>
-                <div class="iq-subject-checkboxes">
-                  <label v-for="opt in teacherSubjectOptions" :key="opt" class="iq-checkbox-item">
-                    <input type="checkbox" class="iq-checkbox" :value="opt" v-model="form.subjects" />
-                    <span>{{ opt }}</span>
-                  </label>
-                  <span v-if="teacherSubjectOptions.length === 0" class="iq-text-sm iq-text-muted">请先选择学院</span>
-                </div>
-                <span class="iq-text-xs iq-text-muted">至少选择一个所教科目；如列表不含目标科目，可在审核通过后由管理员补充</span>
+                <el-select v-model="form.subjects" multiple filterable allow-create default-first-option
+                           placeholder="搜索或输入新科目后回车" style="width:100%">
+                  <el-option v-for="opt in teacherSubjectOptions" :key="opt" :label="opt" :value="opt" />
+                </el-select>
+                <span class="iq-text-xs iq-text-muted">可多选；输入不存在的科目后按回车即可创建</span>
               </div>
             </template>
 
@@ -184,7 +181,7 @@ const majorOptions = computed(() => {
 const teacherSubjectOptions = computed(() => {
   if (!form.college) return subjectOptions.value.length ? subjectOptions.value : ALL_SUBJECTS;
   const byCollege = getSubjectsByCollege(form.college);
-  return byCollege.length ? byCollege : (subjectOptions.value.length ? subjectOptions.value : ALL_SUBJECTS);
+  return [...new Set([...(subjectOptions.value.length ? subjectOptions.value : ALL_SUBJECTS), ...byCollege])];
 });
 
 // 学院切换时重置非法的专业/科目
@@ -192,11 +189,6 @@ watch(() => form.college, () => {
   if (form.role === 'student') {
     if (form.major && !getMajorsByCollege(form.college).includes(form.major)) {
       form.major = '';
-    }
-  } else if (form.role === 'teacher') {
-    const valid = getSubjectsByCollege(form.college);
-    if (valid.length) {
-      form.subjects = form.subjects.filter((s) => valid.includes(s));
     }
   }
 });

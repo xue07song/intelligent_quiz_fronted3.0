@@ -49,50 +49,38 @@
             >{{ s }}</option>
           </select>
         </label>
-        <label><span>目标班级（可选）</span>
-          <select v-model="form.classId" class="iq-input" style="height:38px;border:1px solid var(--iq-border);border-radius:8px;padding:0 10px;background:#fff;">
-            <option value="">不限班级（全开放）</option>
-            <option v-for="c in classList" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
+        <label><span>目标班级（可多选）</span>
+          <el-select v-model="form.classIds" multiple filterable clearable placeholder="搜索并选择自己管理的班级" style="width:100%">
+            <el-option v-for="c in availableClasses" :key="c.id" :label="c.name" :value="c.id" />
+          </el-select>
         </label>
         <label><span>试卷标题</span><input v-model="form.title" class="iq-input" placeholder="留空则自动生成" /></label>
         <label><span>总题数</span><input v-model.number="form.count" type="number" min="1" max="100" class="iq-input" :disabled="!!activePaperPreset" @change="handleCountChange" /></label>
         <label><span>最少知识点覆盖</span><input v-model.number="form.minKnowledgePoints" type="number" min="1" :max="inventory?.knowledgePoints.length || 111" class="iq-input" :disabled="!!activePaperPreset" @input="markTypeCustom" /></label>
+        <label><span>指定知识点（可多选）</span>
+          <el-select v-model="form.knowledgePoints" multiple filterable clearable placeholder="搜索并选择知识点" style="width:100%">
+            <el-option v-for="point in knowledgeOptions" :key="point.name" :label="`${point.name}（${point.questionCount}题）`" :value="point.name" />
+          </el-select>
+        </label>
         <label><span>考试时长（分钟，留空不限）</span><input v-model.number="form.durationMinutes" type="number" min="1" class="iq-input" /></label>
         <label><span>截止时间（可选）</span><input v-model="form.endAt" type="datetime-local" class="iq-input" /></label>
         <label><span>最多作答次数（留空不限）</span><input v-model.number="form.maxAttempts" type="number" min="1" class="iq-input" /></label>
       </div>
       <div class="chapter-selector">
         <div class="chapter-selector-head">
-          <div><b>章节范围</b><small>支持多选；不选择表示使用全题库</small></div>
+          <div><b>章节范围</b><small>先选择科目，再从数据库中选择对应章节</small></div>
           <div class="chapter-actions">
             <button type="button" class="chapter-action" @click="clearChapters">不限章节</button>
             <button type="button" class="chapter-action" @click="selectAllChapters">选择全部</button>
           </div>
         </div>
-        <div class="selected-summary" :class="{ empty: !form.chapters.length }">
-          <span class="summary-icon">{{ form.chapters.length ? '✓' : '○' }}</span>
-          <div>
-            <b>{{ selectedChapterTitle }}</b>
-            <small>{{ selectedChapterDetail }}</small>
-          </div>
-        </div>
-        <div class="chapter-grid">
-          <button
-              v-for="chapter in 10"
-              :key="chapter"
-              type="button"
-              class="chapter-chip"
-              :class="{ active: form.chapters.includes(chapter) }"
-              :aria-pressed="form.chapters.includes(chapter)"
-              @click="toggleChapter(chapter)"
-          >
-            <span class="chapter-check">{{ form.chapters.includes(chapter) ? '✓' : '' }}</span>
-            <span class="chapter-name"><b>第{{ chapter }}章</b><em>{{ getChapterName(chapter) }}</em></span>
-            <small>{{ chapterCounts[chapter] || 0 }}题</small>
-          </button>
-        </div>
-        <p class="chapter-help">点击任意章节即可选中或取消；可以连续点击选择多个章节。</p>
+        <el-select v-model="form.chapters" multiple filterable collapse-tags clearable
+                   :disabled="!form.subject" placeholder="请先选择科目" style="width:100%">
+          <el-option v-for="chapter in chapterOptions" :key="chapter.chapterNo"
+                     :label="`第${chapter.chapterNo}章 ${chapter.title}（${chapter.questionCount}题）`"
+                     :value="chapter.chapterNo" />
+        </el-select>
+        <p class="chapter-help">{{ selectedChapterDetail }}</p>
       </div>
     </section>
 
@@ -180,8 +168,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { generateRuleExam, getExamInventory, previewRuleExam } from '@/api/practice';
 import { smartExam } from '@/api/ai';
 
-import { TYPE_OPTIONS, getChapterLabel, getChapterName } from '@/utils/constants';
-import { getSubjects } from '@/api/subject';
+import { TYPE_OPTIONS } from '@/utils/constants';
+import { getSubjects, getSubjectChapters, getSubjectKnowledgePoints } from '@/api/subject';
 import { getClasses } from '@/api/class';
 import ExamExportDialog from '@/components/ExamExportDialog.vue';
 
@@ -212,11 +200,14 @@ const paperPresets = [
       { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[10,15,25,30,20] },
     ]},
 ];
-const form = reactive({ title: '', chapters: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classId: '', durationMinutes: '', endAt: '', maxAttempts: '' });
+const form = reactive({ title: '', chapters: [], knowledgePoints: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classIds: [], durationMinutes: '', endAt: '', maxAttempts: '' });
 const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), result = ref(null), aiResult = ref(false), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref('standard'), activePaperPreset = ref('standard'), activePaperVariant = ref('standard-balanced');
 const exportVisible = ref(false);
 const allSubjects = ref([]);
+const chapterOptions = ref([]);
+const knowledgeOptions = ref([]);
 const classList = ref([]);
+const availableClasses = computed(()=>classList.value.filter(c=>!form.subject || c.subject===form.subject));
 const chapterCounts = computed(() => {
   const counts = {};
   Object.entries(inventory.value?.byChapter || {}).forEach(([key, value]) => {
@@ -244,12 +235,11 @@ const configurationModeText = computed(() => {
 });
 const selectedChapterTitle = computed(() => form.chapters.length ? `已选择 ${form.chapters.length} 个章节` : '当前使用全部章节');
 const selectedChapterDetail = computed(() => form.chapters.length
-    ? [...form.chapters].sort((a,b)=>a-b).map(getChapterLabel).join('、')
-    : `第1章至第10章，共${inventory.value?.total ?? 0}道题`);
+    ? chapterOptions.value.filter(item => form.chapters.includes(item.chapterNo)).map(item => `第${item.chapterNo}章 ${item.title}`).join('、')
+    : `共${chapterOptions.value.length}个章节，${inventory.value?.total ?? 0}道题`);
 const sumClass = (sum) => sum === form.count ? 'sum-ok' : 'sum-bad';
-const toggleChapter = (chapter) => { const index=form.chapters.indexOf(chapter); index>=0 ? form.chapters.splice(index,1) : form.chapters.push(chapter); form.chapters.sort((a,b)=>a-b); };
 const clearChapters = () => { form.chapters = []; };
-const selectAllChapters = () => { form.chapters = Array.from({ length: 10 }, (_, index) => index + 1); };
+const selectAllChapters = () => { form.chapters = chapterOptions.value.map(item => item.chapterNo); };
 const allocate = (total, values) => { const raw=values.map(v=>total*v/100); const out=raw.map(Math.floor); let left=total-out.reduce((a,b)=>a+b,0); raw.map((v,i)=>({i,r:v%1})).sort((a,b)=>b.r-a.r).forEach(x=>{if(left>0){out[x.i]++;left--;}}); return out; };
 const presetTypeText = (variant) => typeOptions.map((type,index) => `${type.label}${allocate(variant.count,variant.typeWeights)[index]}题`).join('、');
 const presetDifficultyText = (variant) => allocate(variant.count,variant.difficultyWeights).map((count,index) => `${index+1}级${count}题`).join('、');
@@ -308,32 +298,36 @@ const handleCountChange = () => {
 const buildRulePayload = () => ({
   title: form.title,
   chapters: [...form.chapters],
+  knowledgePoints: [...form.knowledgePoints],
   count: Number(form.count),
   minKnowledgePoints: Number(form.minKnowledgePoints),
   typeDistribution: { ...form.typeDistribution },
   difficultyDistribution: { ...form.difficultyDistribution },
   subject: form.subject || undefined,
-  classId: form.classId || undefined,
+  classIds: form.classIds,
   durationMinutes: form.durationMinutes || undefined,
   endAt: form.endAt || undefined,
   maxAttempts: form.maxAttempts || undefined,
 });
 const subjectOptions = computed(() => {
   // 教师：限自己所教科目；管理员：全部科目
-  if (props.role === 'teacher' && props.subjects?.length > 0) return props.subjects;
+  if (props.role === 'teacher' && props.subjects?.length > 0) return props.subjects.filter(item=>allSubjects.value.includes(item));
   return allSubjects.value;
 });
-const handleSubjectChange = () => {
+const handleSubjectChange = async () => {
   // 切换科目：重载库存与预览
+  form.chapters = [];
+  form.knowledgePoints = [];
+  form.classIds = form.classIds.filter(id => classList.value.some(c => c.id === id && c.subject === form.subject));
+  chapterOptions.value = form.subject ? await getSubjectChapters(form.subject) : [];
+  knowledgeOptions.value = form.subject ? await getSubjectKnowledgePoints(form.subject) : [];
   preview.value = null;
-  loadInventory();
+  await loadInventory();
 };
 onMounted(async () => {
   try {
     // 加载科目和班级列表
-    if (props.role !== 'teacher' || !props.subjects?.length) {
-      allSubjects.value = await getSubjects();
-    }
+    allSubjects.value = await getSubjects({ hasQuestions: 1 });
     try {
       const clsData = await getClasses();
       classList.value = Array.isArray(clsData) ? clsData : (clsData.list || []);
@@ -341,6 +335,8 @@ onMounted(async () => {
     // 教师只有一个科目时默认选中
     if (props.role === 'teacher' && props.subjects?.length === 1) {
       form.subject = props.subjects[0];
+      chapterOptions.value = await getSubjectChapters(form.subject);
+      knowledgeOptions.value = await getSubjectKnowledgePoints(form.subject);
     }
   } catch { /* ignore */ }
   loadInventory();
@@ -379,8 +375,11 @@ const loadInventory = async () => {
     if (preset && variant) applyPaperVariant(preset, variant); else schedulePreview();
   }
 };
-watch(() => [...form.chapters], loadInventory);
-watch(() => form.subject, loadInventory);
+watch(() => [...form.chapters], async () => {
+  knowledgeOptions.value = form.subject ? await getSubjectKnowledgePoints(form.subject, form.chapters) : [];
+  form.knowledgePoints = form.knowledgePoints.filter(point => knowledgeOptions.value.some(item => item.name === point));
+  loadInventory();
+});
 watch(() => [form.count, form.minKnowledgePoints, ...Object.values(form.typeDistribution), ...Object.values(form.difficultyDistribution)], schedulePreview);
 const validateSubject = () => {
   if (props.role === 'teacher' && !form.subject) {
@@ -418,7 +417,7 @@ const handleRegenerate = async () => {
   } catch (err) { errorMsg.value=err.message||'重新生成失败'; schedulePreview(); }
   finally { loading.value=false; }
 };
-const handleSmartExam = async () => { errorMsg.value='';aiLoading.value=true;try{const body={count:form.count,subject:form.subject||undefined,classId:form.classId||undefined};if(form.chapters.length===1)body.章节=form.chapters[0];const activeTypes=Object.entries(form.typeDistribution||{}).filter(([,v])=>Number(v)>0).map(([k])=>Number(k));if(activeTypes.length===1)body.题型=activeTypes[0];const activeDifficulty=Object.entries(form.difficultyDistribution||{}).filter(([,v])=>Number(v)>0).map(([k])=>Number(k));if(activeDifficulty.length===1)body.难度=String(activeDifficulty[0]);result.value=await smartExam(body);aiResult.value=true;emit('toast',{message:'AI辅助组卷成功',type:'success'});}catch(err){errorMsg.value=err.message||'AI辅助组卷失败';}finally{aiLoading.value=false;} };
+const handleSmartExam = async () => { errorMsg.value='';aiLoading.value=true;try{const body={count:form.count,subject:form.subject||undefined,classIds:[...form.classIds]};if(form.chapters.length===1)body.章节=form.chapters[0];const activeTypes=Object.entries(form.typeDistribution||{}).filter(([,v])=>Number(v)>0).map(([k])=>Number(k));if(activeTypes.length===1)body.题型=activeTypes[0];const activeDifficulty=Object.entries(form.difficultyDistribution||{}).filter(([,v])=>Number(v)>0).map(([k])=>Number(k));if(activeDifficulty.length===1)body.难度=String(activeDifficulty[0]);result.value=await smartExam(body);aiResult.value=true;emit('toast',{message:'辅助组卷成功',type:'success'});}catch(err){errorMsg.value=err.message||'辅助组卷失败';}finally{aiLoading.value=false;} };
 </script>
 
 <style scoped>
