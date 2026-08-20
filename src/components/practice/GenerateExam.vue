@@ -245,7 +245,7 @@ const configurationModeText = computed(() => {
 const selectedChapterTitle = computed(() => form.chapters.length ? `已选择 ${form.chapters.length} 个章节` : '当前使用全部章节');
 const selectedChapterDetail = computed(() => form.chapters.length
     ? [...form.chapters].sort((a,b)=>a-b).map(getChapterLabel).join('、')
-    : '第1章至第10章，共375道题');
+    : `第1章至第10章，共${inventory.value?.total ?? 0}道题`);
 const sumClass = (sum) => sum === form.count ? 'sum-ok' : 'sum-bad';
 const toggleChapter = (chapter) => { const index=form.chapters.indexOf(chapter); index>=0 ? form.chapters.splice(index,1) : form.chapters.push(chapter); form.chapters.sort((a,b)=>a-b); };
 const clearChapters = () => { form.chapters = []; };
@@ -289,6 +289,8 @@ const applyPaperVariant = async (preset, variant) => {
   form.minKnowledgePoints = Math.min(variant.knowledge, inventory.value?.knowledgePoints.length || variant.knowledge);
   try {
     const checked = await previewRuleExam(buildRulePayload());
+    preview.value = checked;
+    previewLoading.value = false;
     if (!checked.feasible && checked.alternativePlans?.length) {
       setAlternativePlan(checked.alternativePlans[0], true);
       presetNotice.value = `${variant.name}的原始比例与当前章节库存不完全匹配，系统已${checked.alternativePlans[0].description}，调整后的只读方案已经过可行性验证。`;
