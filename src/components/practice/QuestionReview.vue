@@ -141,11 +141,15 @@
     <div v-if="activeTab === 'today'" class="tab-panel">
       <div class="review-toolbar">
         <div class="review-left">
-          <span class="toolbar-title">今日待复习</span>
-          <span class="toolbar-count">{{ scheduleTotal }} 题到期，{{ neverReviewedTotal }} 题未复习</span>
+          <span class="toolbar-title">今日复习</span>
+          <select v-model="reviewFilter" class="filter-select">
+            <option value="unreviewed">未复习</option>
+            <option value="reviewed">已复习</option>
+          </select>
+          <span class="toolbar-count">{{ reviewFilter === 'reviewed' ? reviewedTotal : neverReviewedTotal }} 题</span>
         </div>
         <div class="review-right">
-          <button class="btn-practice-all" :disabled="scheduleTotal === 0 && neverReviewedTotal === 0" @click="startReviewPractice">
+          <button class="btn-practice-all" :disabled="visibleReviewItems.length === 0" @click="startReviewPractice">
             🚀 开始复习
           </button>
         </div>
@@ -155,13 +159,13 @@
         <div class="loading-spinner"></div>
         <p>加载中...</p>
       </div>
-      <div v-else-if="dueList.length === 0 && neverReviewedList.length === 0" class="empty-state">
+      <div v-else-if="visibleReviewItems.length === 0" class="empty-state">
         <div class="empty-icon">🎉</div>
         <h3>暂无待复习</h3>
         <p>当前没有到期的复习任务，先去收藏一些题目吧</p>
       </div>
       <div v-else>
-        <div v-if="neverReviewedList.length > 0" class="review-section">
+        <div v-if="reviewFilter === 'unreviewed' && neverReviewedList.length > 0" class="review-section">
           <h3 class="review-section-title">新收藏未复习</h3>
           <div class="review-grid">
             <div v-for="item in neverReviewedList" :key="item.questionId" class="review-card">
@@ -186,10 +190,10 @@
           </div>
         </div>
 
-        <div v-if="dueList.length > 0" class="review-section">
-          <h3 class="review-section-title">已到期复习</h3>
+        <div v-if="reviewFilter === 'reviewed' && reviewedList.length > 0" class="review-section">
+          <h3 class="review-section-title">已复习题目</h3>
           <div class="review-grid">
-            <div v-for="item in dueList" :key="item.questionId" class="review-card">
+            <div v-for="item in reviewedList" :key="item.questionId" class="review-card">
               <div class="review-card-header">
                 <span class="review-id">#{{ item.questionId }}</span>
                 <span class="review-type-tag" :class="`type-${item.questionType}`">{{ getTypeName(item.questionType) }}</span>
@@ -198,7 +202,7 @@
               <div class="review-meta">
                 <span>第{{ item.chapter }}章</span>
                 <span>间隔 {{ item.intervalDays }} 天</span>
-                <span>下次 {{ formatDate(item.nextReviewAt) }}</span>
+                <span>最近复习 {{ formatDate(item.lastReviewedAt) }}</span>
               </div>
               <div class="review-card-footer">
                 <div class="self-assess">
@@ -596,9 +600,13 @@ const saveQuestionTags = async () => {
 // ===== 今日复习 =====
 const dueList = ref([]);
 const neverReviewedList = ref([]);
+const reviewedList = ref([]);
+const reviewFilter = ref('unreviewed');
 const scheduleTotal = ref(0);
 const neverReviewedTotal = ref(0);
+const reviewedTotal = ref(0);
 const scheduleLoading = ref(false);
+const visibleReviewItems = computed(() => reviewFilter.value === 'reviewed' ? reviewedList.value : neverReviewedList.value);
 
 const loadSchedule = async () => {
   scheduleLoading.value = true;
@@ -608,6 +616,8 @@ const loadSchedule = async () => {
     scheduleTotal.value = data.due?.total || 0;
     neverReviewedList.value = data.neverReviewed?.list || [];
     neverReviewedTotal.value = data.neverReviewed?.total || 0;
+    reviewedList.value = data.reviewed?.list || [];
+    reviewedTotal.value = data.reviewed?.total || 0;
   } catch (err) {
     // 404 时静默降级（后端尚未实现复习计划接口）
     if (!is404(err)) emit('toast', { message: err.message || '加载复习计划失败', type: 'error' });
@@ -615,6 +625,8 @@ const loadSchedule = async () => {
     scheduleTotal.value = 0;
     neverReviewedList.value = [];
     neverReviewedTotal.value = 0;
+    reviewedList.value = [];
+    reviewedTotal.value = 0;
   } finally {
     scheduleLoading.value = false;
   }
@@ -625,10 +637,7 @@ const startReviewPractice = async (singleQuestionId = null) => {
   if (singleQuestionId) {
     questionIds = [singleQuestionId];
   } else {
-    questionIds = [
-      ...neverReviewedList.value.map(i => i.questionId),
-      ...dueList.value.map(i => i.questionId),
-    ].slice(0, 20);
+    questionIds = visibleReviewItems.value.map(i => i.questionId).slice(0, 20);
   }
   if (questionIds.length === 0) {
     emit('toast', { message: '没有可复习的题目', type: 'warning' });
@@ -655,12 +664,8 @@ const submitReview = async (questionId, result) => {
       message: ok ? '已记录「记得」，复习间隔将延长' : '已记录「忘了」，复习间隔将重置',
       type: ok ? 'success' : 'warning',
     });
-    // 从当前列表移除并刷新统计/计划
-    neverReviewedList.value = neverReviewedList.value.filter(i => i.questionId !== questionId);
-    dueList.value = dueList.value.filter(i => i.questionId !== questionId);
-    scheduleTotal.value = dueList.value.length;
-    neverReviewedTotal.value = neverReviewedList.value.length;
-    loadStats();
+    // 重新读取服务端状态，确保“已复习/未复习”切换后立即准确。
+    await Promise.all([loadSchedule(), loadStats()]);
   } catch (err) {
     if (is404(err)) {
       emit('toast', { message: '复习接口尚未就绪，自评结果未保存', type: 'warning' });
