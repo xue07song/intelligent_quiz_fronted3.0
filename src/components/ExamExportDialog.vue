@@ -118,8 +118,8 @@ const handleExport = async () => {
     const suffix = format.value === 'xlsx' ? 'xlsx' : 'docx';
     const answerLabel = withAnswers.value ? '含答案' : '不含答案';
     const baseName = (props.title || '试卷').replace(/[\\/:*?"<>|]/g, '_');
-    downloadBlob(blob, `${baseName}_${answerLabel}.${suffix}`);
-    emit('toast', { message: '试卷导出成功', type: 'success' });
+    const filename = downloadBlob(blob, `${baseName}_${answerLabel}.${suffix}`);
+    emit('toast', { message: `试卷已下载：${filename}。请在浏览器下载列表或“下载”文件夹中查看。`, type: 'success' });
     emit('close');
   } catch (err) {
     errorMsg.value = err.message || '导出失败，请稍后重试';
