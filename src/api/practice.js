@@ -75,6 +75,9 @@ export const updateExamApi = (id, data) => {
   return request.put(`/practice/exams/${id}`, data);
 };
 
+// 修改已生成试卷的快照内容，不会改动题库原题
+export const updateExamContentApi = (id, data) => request.put(`/practice/exams/${id}/content`, data);
+
 // 删除试卷（仅无作答记录的试卷）
 export const deleteExamApi = (id) => {
   return request.delete(`/practice/exams/${id}`);
