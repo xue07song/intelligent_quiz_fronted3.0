@@ -76,18 +76,22 @@
       </div>
       <div class="chapter-selector">
         <div class="chapter-selector-head">
-          <div><b>章节范围</b><small>先选择科目，再从数据库中选择对应章节</small></div>
+          <div><b>章节范围</b><small>点击章节卡片选择/取消，不选则默认全部章节</small></div>
           <div class="chapter-actions">
             <button type="button" class="chapter-action" @click="clearChapters">不限章节</button>
             <button type="button" class="chapter-action" @click="selectAllChapters">选择全部</button>
           </div>
         </div>
-        <el-select v-model="form.chapters" multiple filterable collapse-tags clearable
-                   :disabled="!form.subject" placeholder="请先选择科目" style="width:100%">
-          <el-option v-for="chapter in chapterOptions" :key="chapter.chapterNo"
-                     :label="`第${chapter.chapterNo}章 ${chapter.title}（${chapter.questionCount}题）`"
-                     :value="chapter.chapterNo" />
-        </el-select>
+        <div v-if="form.subject && chapterOptions.length" class="chapter-grid">
+          <div v-for="chapter in chapterOptions" :key="chapter.chapterNo"
+               class="chapter-card" :class="{ active: form.chapters.includes(chapter.chapterNo) }"
+               @click="toggleChapter(chapter.chapterNo)">
+            <span class="chapter-card-no">第{{ chapter.chapterNo }}章</span>
+            <span class="chapter-card-title">{{ chapter.title }}</span>
+            <span class="chapter-card-count">{{ chapter.questionCount }}题</span>
+          </div>
+        </div>
+        <p v-else class="chapter-help" style="text-align:center;padding:12px">请先选择科目</p>
         <p class="chapter-help">{{ selectedChapterDetail }}</p>
       </div>
       <div class="step-actions"><button type="button" class="iq-btn iq-btn-secondary" @click="builderStep = 2">上一步</button><button type="button" class="iq-btn iq-btn-primary" @click="goToStructure">下一步：设置题型与难度</button></div>
@@ -293,6 +297,11 @@ const selectedChapterDetail = computed(() => form.chapters.length
 const sumClass = (sum) => sum === form.count ? 'sum-ok' : 'sum-bad';
 const clearChapters = () => { form.chapters = []; };
 const selectAllChapters = () => { form.chapters = chapterOptions.value.map(item => item.chapterNo); };
+const toggleChapter = (chapterNo) => {
+  const idx = form.chapters.indexOf(chapterNo);
+  if (idx >= 0) { form.chapters.splice(idx, 1); }
+  else { form.chapters.push(chapterNo); }
+};
 const allocate = (total, values) => { const raw=values.map(v=>total*v/100); const out=raw.map(Math.floor); let left=total-out.reduce((a,b)=>a+b,0); raw.map((v,i)=>({i,r:v%1})).sort((a,b)=>b.r-a.r).forEach(x=>{if(left>0){out[x.i]++;left--;}}); return out; };
 const variantTypeDistribution = (variant) => variant.fixedTypeDistribution
   ? { ...variant.fixedTypeDistribution }
@@ -385,7 +394,11 @@ const buildRulePayload = () => ({
 });
 const subjectOptions = computed(() => {
   // 教师：限自己所教科目；管理员：全部科目
-  if (props.role === 'teacher' && props.subjects?.length > 0) return props.subjects.filter(item=>allSubjects.value.includes(item));
+  if (props.role === 'teacher' && props.subjects?.length > 0) {
+    const filtered = props.subjects.filter(item => allSubjects.value.includes(item));
+    // 如果教师存储的科目与当前题库不匹配（如科目已迁移），fallback 到全部有题目的科目
+    return filtered.length > 0 ? filtered : allSubjects.value;
+  }
   return allSubjects.value;
 });
 const handleSubjectChange = async () => {
@@ -406,9 +419,13 @@ onMounted(async () => {
       const clsData = await getClasses();
       classList.value = Array.isArray(clsData) ? clsData : (clsData.list || []);
     } catch { /* ignore */ }
-    // 教师只有一个科目时默认选中
-    if (props.role === 'teacher' && props.subjects?.length === 1) {
+    // 教师只有一个科目时默认选中；或旧 session 科目不匹配时自动选唯一可用科目
+    if (props.role === 'teacher' && props.subjects?.length === 1 && allSubjects.value.includes(props.subjects[0])) {
       form.subject = props.subjects[0];
+      chapterOptions.value = await getSubjectChapters(form.subject);
+      knowledgeOptions.value = await getSubjectKnowledgePoints(form.subject);
+    } else if (allSubjects.value.length === 1) {
+      form.subject = allSubjects.value[0];
       chapterOptions.value = await getSubjectChapters(form.subject);
       knowledgeOptions.value = await getSubjectKnowledgePoints(form.subject);
     }
@@ -725,6 +742,14 @@ const handleSmartExam = async () => {
 .chapter-actions{display:flex;gap:8px}
 .chapter-action{padding:7px 12px;border:1px solid #c7d2fe;border-radius:7px;background:#fff;color:#4f46e5;font-size:12px;font-weight:600;cursor:pointer}
 .chapter-action:hover{background:#eef2ff}
+.chapter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:8px}
+.chapter-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px;border:2px solid #dbe3f0;border-radius:10px;background:#fff;cursor:pointer;transition:all .15s ease;text-align:center}
+.chapter-card:hover{border-color:#818cf8;background:#eef2ff}
+.chapter-card.active{border-color:#4f46e5;background:#4f46e5;color:#fff}
+.chapter-card-no{font-size:11px;opacity:.7;font-weight:600}
+.chapter-card-title{font-size:14px;font-weight:700;line-height:1.2}
+.chapter-card-count{font-size:11px;opacity:.6}
+.chapter-card.active .chapter-card-count{color:#c7d2fe}
 .selected-summary{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:12px;border:1px solid #a5b4fc;border-radius:9px;background:#eef2ff;color:#3730a3}
 .selected-summary.empty{border-color:#cbd5e1;background:#fff;color:#475569}
 .summary-icon{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;border-radius:50%;background:#4f46e5;color:#fff;font-weight:700}
