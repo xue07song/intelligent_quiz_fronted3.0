@@ -2,7 +2,7 @@ import request from '@/utils/request';
 
 // AI 接口调用大模型耗时较长（后端 GLM 默认 60s），单独放宽到 120s，避免被全局 10s timeout 误杀
 const AI_TIMEOUT = 120000;
-
+//这是wjp的提交测试
 // AI 配置状态（前端可据此提示用户）
 export const getAiStatus = () => {
   return request.get('/ai/status');
