@@ -34,6 +34,10 @@
                   <span>Word (.docx)</span>
                 </label>
                 <label class="export-option">
+                  <input type="radio" value="pdf" v-model="format" />
+                  <span>PDF (.pdf)</span>
+                </label>
+                <label class="export-option">
                   <input type="radio" value="xlsx" v-model="format" />
                   <span>Excel (.xlsx)</span>
                 </label>
@@ -115,7 +119,7 @@ const handleExport = async () => {
       format: format.value,
       withAnswers: withAnswers.value,
     });
-    const suffix = format.value === 'xlsx' ? 'xlsx' : 'docx';
+    const suffix = format.value;
     const answerLabel = withAnswers.value ? '含答案' : '不含答案';
     const baseName = (props.title || '试卷').replace(/[\\/:*?"<>|]/g, '_');
     const filename = downloadBlob(blob, `${baseName}_${answerLabel}.${suffix}`);
@@ -166,7 +170,7 @@ const handleExport = async () => {
 
 .export-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
 }
 
