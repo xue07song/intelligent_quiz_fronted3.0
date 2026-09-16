@@ -119,7 +119,7 @@
         <div class="preview-head">
           <div>
             <h2>{{ previewExam.title }}</h2>
-            <p>创建教师：{{ previewExam.creator_name || '-' }} · 共 {{ previewExam.questions?.length || 0 }} 题</p>
+            <p>创建教师：{{ previewExam.creator_name?.trim() || previewExam.creator_username || '-' }} · 共 {{ previewExam.questions?.length || 0 }} 题</p>
           </div>
           <button class="close-btn" @click="closePreview">✕</button>
         </div>
