@@ -5,11 +5,29 @@
       <span class="iq-text-sm iq-text-muted">加载中...</span>
     </div>
 
+    <div v-else-if="error" class="iq-card">
+      <div class="iq-empty-row">
+        <div class="iq-empty-box">
+          <div class="iq-empty-icon">{{ error.icon }}</div>
+          <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">{{ error.message }}</div>
+          <button
+              v-if="error.kind === 'failed'"
+              class="iq-btn iq-btn-ghost iq-btn-sm"
+              @click="loadRecord()"
+          >
+            重试
+          </button>
+          <button v-else class="iq-btn iq-btn-ghost iq-btn-sm" @click="$emit('back-list')">返回列表</button>
+        </div>
+      </div>
+    </div>
+
     <div v-else-if="!record" class="iq-card">
       <div class="iq-empty-row">
         <div class="iq-empty-box">
           <div class="iq-empty-icon">❓</div>
           <div class="iq-empty-text iq-text-base" style="color: var(--iq-neutral-600);">记录不存在</div>
+          <button class="iq-btn iq-btn-ghost iq-btn-sm" @click="$emit('back-list')">返回列表</button>
         </div>
       </div>
     </div>
@@ -119,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, watch } from 'vue';
 import { getRecord, adminGetRecord, reviewSubjectiveAnswer } from '@/api/practice';
 import { getTypeName } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
@@ -132,12 +150,29 @@ const props = defineProps({
   reviewable: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['back', 'toast']);
+/**
+ * `back`      —— 正常详情页头部那个「返回」：有可靠站内来源才后退，否则回列表（消费方决定）。
+ * `back-list` —— **错误 / 空状态**里的「返回列表」：语义是「我要去列表」，不是「后退一步」。
+ *                两者必须分开：A→B 之后按后退会落回 A 的详情，而用户点的是「返回列表」。
+ */
+const emit = defineEmits(['back', 'back-list', 'toast']);
 
 const loading = ref(true);
 const record = ref(null);
 const reviewing = ref(null);
 const reviewForms = ref({});
+// 加载失败/非法 ID/无权限时的明确状态（原来是「静默 toast + 记录不存在」）
+const error = ref(null);
+// 请求序号，用于丢弃过期回包（见 loadRecord）
+let reqSeq = 0;
+
+/** 把接口错误归类成页面状态：403 无权限 / 404 不存在 / 其它 加载失败。 */
+const classifyError = (err) => {
+  const status = err?.status;
+  if (status === 403) return { kind: 'forbidden', icon: '⛔', message: '无权查看该记录' };
+  if (status === 404) return { kind: 'notfound', icon: '❓', message: '记录不存在或已被删除' };
+  return { kind: 'failed', icon: '⚠️', message: err?.message || '加载记录失败，请稍后重试' };
+};
 const reviewStatusText = status => ({correct:'正确',partial:'部分掌握',incorrect:'需要巩固'}[status]||status);
 const prepareReviewForms = () => { const full=Math.round((record.value?.total_count?100/Number(record.value.total_count):100)*100)/100;reviewForms.value = Object.fromEntries((record.value?.answers||[]).map(a=>[a.id,{status:a.review_status||'correct',awardedScore:Math.round((Number(a.review_score_rate)||0.5)*full*100)/100,fullScore:full,comment:a.review_comment||''}])); };
 const saveReview = async a => { reviewing.value=a.id;try{await reviewSubjectiveAnswer(a.id,reviewForms.value[a.id]);emit('toast',{message:'复核结果已保存，成绩已更新',type:'success'});await loadRecord()}catch(err){emit('toast',{message:err.message||'保存复核失败',type:'error'})}finally{reviewing.value=null} };
@@ -170,22 +205,46 @@ const statusText = (a) => {
 };
 
 const loadRecord = async () => {
+  // 每次加载自增序号：回包时序号已经不是最新的，就丢弃这次结果。
+  // 目的：快速切换 A→B 时，A 的慢响应不能覆盖 B 的记录。
+  const seq = ++reqSeq;
+  const targetId = String(props.recordId ?? '').trim();
+
+  // 切记录前先清掉上一份数据，避免 A 的内容短暂显示在 B 的标题下
+  record.value = null;
+  error.value = null;
+  reviewForms.value = {};
+  reviewing.value = null;
+
+  // 非法 ID：不发请求，直接给出明确状态
+  if (!/^\d+$/.test(targetId) || Number(targetId) <= 0) {
+    loading.value = false;
+    error.value = { kind: 'invalid', icon: '🚫', message: '记录编号无效，无法查看' };
+    return;
+  }
+
   loading.value = true;
   try {
-    record.value = props.adminMode
-      ? await adminGetRecord(props.recordId)
-      : await getRecord(props.recordId);
-    prepareReviewForms();
+    const data = props.adminMode
+      ? await adminGetRecord(targetId)
+      : await getRecord(targetId);
+    if (seq !== reqSeq) return;
+    record.value = data || null;
+    if (record.value) prepareReviewForms();
   } catch (err) {
-    emit('toast', { message: err.message || '加载记录失败', type: 'error' });
+    if (seq !== reqSeq) return;
+    error.value = classifyError(err);
+    // 页面里给结论，toast 里保留服务端原文，便于排查
+    emit('toast', { message: err?.message || error.value.message, type: 'error' });
   } finally {
-    loading.value = false;
+    if (seq === reqSeq) loading.value = false;
   }
 };
 
-onMounted(() => {
-  loadRecord();
-});
+// recordId 变化（路由参数 /records/1 → /records/2，或父组件换 props）时重新加载。
+// 用参数监听而不是组件 key：key 只能重建组件，监听能精确控制「清旧数据 → 拉新数据」，
+// 而且对「同一个组件实例内换 props」的用法同样有效。
+watch(() => props.recordId, loadRecord, { immediate: true });
 </script>
 
 <style scoped>

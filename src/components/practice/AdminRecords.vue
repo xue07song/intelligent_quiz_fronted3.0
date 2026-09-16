@@ -100,11 +100,17 @@
     <!-- 视图：答题记录详情（复用 RecordDetail，管理端模式）          -->
     <!-- ============================================================ -->
     <template v-if="view === 'detail'">
+      <!--
+        `back-list` 是错误/空状态里的「返回列表」（与头部「返回」分开的事件）。
+        管理端这里必须**显式接住**：不接的话该按钮就成了死按钮；
+        更不能让它落到学生端的记录列表——管理端有自己的返回目标（backFromDetail）。
+      -->
       <RecordDetail
           :recordId="activeRecordId"
           adminMode
           :reviewable="role==='teacher'"
           @back="backFromDetail"
+          @back-list="backFromDetail"
           @toast="onToast"
       />
     </template>
