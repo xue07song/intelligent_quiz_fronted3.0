@@ -141,6 +141,34 @@
       </div>
       <div v-else-if="preview?.feasible" class="success-note">题型、难度和章节库存的交叉组合检查通过，可以生成 {{ form.count }} 题试卷。</div>
       <div v-if="errorMsg" class="error-note">{{ errorMsg }}</div>
+      <div class="section-title structure-title"><b>7. 考试性质</b><span>用于生成试卷封面信息</span></div>
+      <div class="base-grid">
+        <label><span>大学名称</span><input v-model="form.examNature.university" class="iq-input" placeholder="如：中国石油大学" /></label>
+        <label><span>学年（起始年）</span><input v-model="form.examNature.yearStart" class="iq-input" placeholder="如：2024" /></label>
+        <label><span>学年（结束年）</span><input v-model="form.examNature.yearEnd" class="iq-input" placeholder="如：2025" /></label>
+        <label><span>学期</span>
+          <select v-model="form.examNature.semester" class="iq-input" style="height:38px;border:1px solid var(--iq-border);border-radius:8px;padding:0 10px;background:#fff;">
+            <option value="春季">春季</option>
+            <option value="夏季">夏季</option>
+            <option value="秋季">秋季</option>
+          </select>
+        </label>
+        <label><span>考试名称前缀</span><input v-model="form.examNature.examPrefix" class="iq-input" placeholder="如：计算机导论" /></label>
+        <label><span>卷型</span>
+          <select v-model="form.examNature.paperType" class="iq-input" style="height:38px;border:1px solid var(--iq-border);border-radius:8px;padding:0 10px;background:#fff;">
+            <option value="A">A卷</option>
+            <option value="B">B卷</option>
+            <option value="C">C卷</option>
+            <option value="D">D卷</option>
+          </select>
+        </label>
+        <label><span>考试方式</span>
+          <select v-model="form.examNature.examMethod" class="iq-input" style="height:38px;border:1px solid var(--iq-border);border-radius:8px;padding:0 10px;background:#fff;">
+            <option value="闭卷">闭卷</option>
+            <option value="开卷">开卷</option>
+          </select>
+        </label>
+      </div>
       <div class="action-row"><button type="button" class="iq-btn iq-btn-secondary" @click="builderStep = 3">上一步</button><button class="iq-btn iq-btn-primary" :disabled="!canGenerate" @click="handleGenerate">{{ loading ? '正在组卷...' : '生成试卷' }}</button><button class="iq-btn ai-btn" :disabled="aiLoading" @click="handleSmartExam">{{ aiLoading ? '辅助组卷中...' : '辅助组卷' }}</button></div>
     </section>
 
@@ -160,7 +188,7 @@
 
     <section v-if="builderStep === 6 && result" class="iq-card section-card result-card">
       <template v-if="generatedExams.length">
-        <div class="result-head"><div><h3>已生成 5 套试卷</h3><p>可查看并修改每份试卷，勾选单套或多套后确定最终版本。</p></div><div class="result-actions"><button type="button" class="iq-btn iq-btn-secondary" :disabled="planGenerating" @click="regenerateFive">{{ planGenerating ? '正在重新生成...' : '重新生成 5 套' }}</button><button type="button" class="iq-btn iq-btn-secondary" @click="startNewExam">继续组卷</button></div></div>
+        <div class="result-head"><div><h3>已生成 5 套试卷</h3><p>可查看并修改每份试卷，勾选单套或多套后确定最终版本。</p></div><div class="result-actions"><button type="button" class="iq-btn iq-btn-secondary" @click="builderStep = 4">上一步</button><button type="button" class="iq-btn iq-btn-secondary" :disabled="planGenerating" @click="regenerateFive">{{ planGenerating ? '正在重新生成...' : '重新生成 5 套' }}</button><button type="button" class="iq-btn iq-btn-secondary" @click="startNewExam">继续组卷</button></div></div>
         <div class="selection-toolbar"><span>已选择 {{ selectedExamIds.length }} 套试卷</span><button type="button" class="iq-btn iq-btn-primary" :disabled="!selectedExamIds.length || selectionSaving" @click="confirmFinalSelection">{{ selectionSaving ? '正在确认...' : '确定最终版本' }}</button></div>
         <div class="generated-exam-grid">
           <article v-for="exam in visibleGeneratedExams" :key="exam.examId" class="generated-exam-card" :class="{ selected: selectedExamIds.includes(exam.examId) }">
@@ -171,9 +199,10 @@
             <div class="assistant-plan-footer"><button v-if="activePaperPreset === 'final'" type="button" class="iq-btn iq-btn-secondary" @click="openExamEditor(exam)">手动自定义</button><button type="button" class="iq-btn iq-btn-secondary" @click="openGeneratedExport(exam)">导出试卷</button><button type="button" class="iq-btn iq-btn-primary" @click="openExamViewer(exam)">查看试卷</button></div>
           </article>
         </div>
+        <div v-if="confirmedExamIds.length" class="step-actions" style="justify-content:center"><button type="button" class="iq-btn iq-btn-primary" @click="startNewExam">完成</button></div>
       </template>
       <template v-else>
-      <div class="result-head"><div><h3>{{ aiResult ? '辅助组卷成功' : '组卷成功' }}</h3><p>{{ result.title }} · 共 {{ result.total }} 题 · 客观题 {{ result.objectiveCount }} 题</p></div><div class="result-actions"><button type="button" class="iq-btn iq-btn-secondary" @click="startNewExam">继续组卷</button><button v-if="!aiResult" class="iq-btn iq-btn-secondary" :disabled="loading" @click="handleRegenerate">{{ loading ? '正在重新生成...' : '条件不变，换一套题' }}</button><button v-if="result.examId" class="iq-btn iq-btn-secondary" @click="exportVisible = true">导出试卷</button><button class="iq-btn iq-btn-primary" @click="emit('start-exam', result.examId)">开始答题</button></div></div>
+      <div class="result-head"><div><h3>{{ aiResult ? '辅助组卷成功' : '组卷成功' }}</h3><p>{{ result.title }} · 共 {{ result.total }} 题 · 客观题 {{ result.objectiveCount }} 题</p></div><div class="result-actions"><button type="button" class="iq-btn iq-btn-secondary" @click="builderStep = 4">上一步</button><button type="button" class="iq-btn iq-btn-secondary" @click="startNewExam">继续组卷</button><button v-if="!aiResult" class="iq-btn iq-btn-secondary" :disabled="loading" @click="handleRegenerate">{{ loading ? '正在重新生成...' : '条件不变，换一套题' }}</button><button v-if="result.examId" class="iq-btn iq-btn-secondary" @click="exportVisible = true">导出试卷</button><button class="iq-btn iq-btn-primary" @click="emit('start-exam', result.examId)">开始答题</button></div></div>
       <div v-if="!aiResult" class="info-note">如果对本次题目不满意，可以按相同章节、题型、难度和知识点要求重新抽取；新试卷会保留在试卷列表中。</div>
       <template v-if="result.report">
         <div class="report-grid">
@@ -199,7 +228,7 @@
       <section class="editor-dialog">
         <div v-if="editorMode === 'edit'" class="editor-head"><div><h2>手动自定义试卷</h2><p>可直接在卷面中修改题干、选项、答案和解析；保存只影响这一份试卷。</p></div><button type="button" @click="editorVisible = false">×</button></div><button v-else type="button" class="viewer-close" aria-label="关闭预览" @click="editorVisible = false">×</button>
         <template v-if="editorMode === 'edit'"><label class="editor-title"><span>试卷标题</span><input v-model="editableExam.title" class="iq-input" /></label><article v-for="question in editableExam.questions" :key="question.sort_order" class="editor-question"><b>第 {{ question.sort_order }} 题</b><textarea v-model="question.题目" rows="3" class="iq-input"></textarea><textarea v-model="question.选项" rows="2" class="iq-input" placeholder="选项"></textarea><div class="editor-two-col"><input v-model="question.答案" class="iq-input" placeholder="答案" /><input v-model="question.解析" class="iq-input" placeholder="解析" /></div></article><div class="editor-actions"><button type="button" class="iq-btn iq-btn-secondary" @click="editorVisible = false">取消</button><button type="button" class="iq-btn iq-btn-primary" :disabled="editorSaving" @click="saveExamEditor">{{ editorSaving ? '正在保存...' : '保存修改' }}</button></div></template>
-        <template v-else><article class="paper-preview"><h1>XXX大学</h1><h2>XXX-XXX学年XX学期</h2><h1>XXX期末考试（X卷）</h1><p>考试方式：闭卷</p><p>班级：______________　姓名：______________　学号：______________</p><table><tbody><tr><th>题号</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>总分</th></tr><tr><th>得分</th><td></td><td></td><td></td><td></td><td></td><td></td></tr></tbody></table><section v-for="group in previewQuestionGroups" :key="group.name"><h3>{{ group.name }}</h3><article v-for="(question, index) in group.questions" :key="question.sort_order"><b>{{ index + 1 }}. {{ question.题目 }}</b><p v-for="line in optionLines(question.选项)" :key="line">{{ line }}</p></article></section></article><div class="editor-actions"><button type="button" class="iq-btn iq-btn-primary" @click="editorVisible = false">返回</button></div></template>
+        <template v-else><article class="paper-preview"><h1>{{ editableExam.examNature?.university || 'XXXX大学' }}</h1><h2>{{ editableExam.examNature?.yearStart && editableExam.examNature?.yearEnd ? `${editableExam.examNature.yearStart}—${editableExam.examNature.yearEnd}学年${editableExam.examNature.semester || '秋季'}学期` : 'XXXX—XXXX学年XX学期' }}</h2><h1>《{{ editableExam.examNature?.examPrefix || '计算机导论' }}》期末考试试卷</h1><p>（{{ editableExam.examNature?.paperType || 'A' }}卷）</p><p>考试方式：{{ editableExam.examNature?.examMethod || '闭卷' }}</p><p>班级：______________　姓名：______________　学号：______________</p><table><tbody><tr><th>题号</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>总分</th></tr><tr><th>得分</th><td></td><td></td><td></td><td></td><td></td><td></td></tr></tbody></table><section v-for="group in previewQuestionGroups" :key="group.name"><h3>{{ group.name }}</h3><article v-for="(question, index) in group.questions" :key="question.sort_order"><b>{{ index + 1 }}. {{ question.题目 }}</b><p v-for="line in optionLines(question.选项)" :key="line">{{ line }}</p></article></section></article><div class="editor-actions"><button type="button" class="iq-btn iq-btn-primary" @click="editorVisible = false">返回</button></div></template>
       </section>
     </div>
   </div>
@@ -241,7 +270,7 @@ const paperPresets = [
       { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[10,15,25,30,20] },
     ]},
 ];
-const form = reactive({ title: '', chapters: [], knowledgePoints: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classIds: [], durationMinutes: '', endAt: '', maxAttempts: '' });
+const form = reactive({ title: '', chapters: [], knowledgePoints: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classIds: [], durationMinutes: '', endAt: '', maxAttempts: '', examNature: { university: '', yearStart: '', yearEnd: '', semester: '秋季', examPrefix: '计算机导论', paperType: 'A', examMethod: '闭卷' } });
 const builderStep = ref(1);
 const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), planGenerating = ref(false), result = ref(null), aiResult = ref(false), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref(''), activePaperPreset = ref(''), activePaperVariant = ref('');
 const assistPlans = ref([]);
@@ -391,6 +420,7 @@ const buildRulePayload = () => ({
   durationMinutes: form.durationMinutes || undefined,
   endAt: form.endAt || undefined,
   maxAttempts: form.maxAttempts || undefined,
+  examNature: { ...form.examNature },
 });
 const subjectOptions = computed(() => {
   // 教师：限自己所教科目；管理员：全部科目
@@ -575,7 +605,7 @@ const regenerateFive = async () => {
 const openExamEditor = async (exam) => {
   try {
     const detail = await getExam(exam.examId);
-    editableExam.value = { title: detail.title, examId: exam.examId, questions: (detail.questions || []).map(item => ({ ...item })) };
+    editableExam.value = { title: detail.title, examId: exam.examId, questions: (detail.questions || []).map(item => ({ ...item })), examNature: detail.examNature || form.examNature };
     editorMode.value = 'edit';
     editorVisible.value = true;
   } catch (err) { emit('toast', { message: err.message || '读取试卷内容失败', type: 'error' }); }
@@ -583,7 +613,7 @@ const openExamEditor = async (exam) => {
 const openExamViewer = async (exam) => {
   try {
     const detail = await getExam(exam.examId);
-    editableExam.value = { title: detail.title, examId: exam.examId, questions: (detail.questions || []).map(item => ({ ...item })) };
+    editableExam.value = { title: detail.title, examId: exam.examId, questions: (detail.questions || []).map(item => ({ ...item })), examNature: detail.examNature || form.examNature };
     editorMode.value = 'view';
     editorVisible.value = true;
   } catch (err) { emit('toast', { message: err.message || '读取试卷内容失败', type: 'error' }); }
@@ -710,7 +740,7 @@ const handleSmartExam = async () => {
 .section-title,.result-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px}
 .base-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
 .base-grid label,.distribution-item{display:flex;flex-direction:column;gap:6px;font-size:13px}
-.inline-actions,.template-actions,.action-row{display:flex;gap:8px;margin-top:12px}
+.inline-actions,.template-actions,.action-row{display:flex;justify-content:center;gap:24px;margin-top:12px}
 .distribution-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .difficulty-grid{grid-template-columns:repeat(5,1fr)}
 .distribution-item{padding:12px;border:1px solid var(--iq-neutral-200);border-radius:8px}
@@ -796,7 +826,7 @@ const handleSmartExam = async () => {
 .mode-status button{margin-left:auto;border:0;background:transparent;color:#4f46e5;font-size:12px;font-weight:600;cursor:pointer}
 .mode-status button:hover{text-decoration:underline}
 .preset-notice{padding:9px 11px;margin-bottom:14px;border-radius:8px;background:#f0fdf4;color:#047857;font-size:12px}
-.step-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.step-actions{display:flex;justify-content:center;gap:24px;margin-top:16px}
 .alternative-section{margin-top:13px}
 .alternative-heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:9px}
 .alternative-heading span{font-size:12px;color:#64748b}
