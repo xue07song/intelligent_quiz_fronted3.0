@@ -84,6 +84,14 @@ html.light,
   color-scheme: light;
 }
 
+/* Keep the page width unchanged when a route adds or removes the scrollbar. */
+html {
+  scrollbar-gutter: stable;
+}
+@supports not (scrollbar-gutter: stable) {
+  html { overflow-y: scroll; }
+}
+
 /* ========== Typography Utilities ========== */
 body {
   font-family: var(--iq-font-sans);

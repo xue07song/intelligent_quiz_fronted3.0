@@ -30,7 +30,7 @@
               v-for="tab in studentTabs"
               :key="tab.key"
               class="nav-tab"
-              :class="{ active: currentView === tab.key }"
+              :class="{ active: isTabActive(tab.key) }"
               @click="navigateTo(tab.key)"
           >
             {{ tab.icon }} {{ tab.label }}
@@ -73,52 +73,14 @@
       </header>
 
       <main class="student-main">
-        <ExamList
-            v-if="currentView === 'papers'"
-            :role="currentUser.role"
-            @start-exam="startExam"
-            @toast="handleToastFromChild"
-        />
-        <ExamPractice
-            v-if="currentView === 'practice' && activeExamId"
-            :examId="activeExamId"
-            @exit="exitExam"
-            @view-record="viewRecord"
-            @toast="handleToastFromChild"
-        />
-        <AdaptivePractice
-            v-if="currentView === 'adaptive'"
-            @toast="handleToastFromChild"
-        />
-        <QuestionReview
-            v-if="currentView === 'review'"
-            @start-exam="startExam"
-            @toast="handleToastFromChild"
-        />
-        <PracticeRecords
-            v-if="currentView === 'records'"
-            @view-record="viewRecord"
-            @toast="handleToastFromChild"
-        />
-        <RecordDetail
-            v-if="currentView === 'record-detail'"
-            :recordId="activeRecordId"
-            @back="backFromRecordDetail"
-            @toast="handleToastFromChild"
-        />
-        <LearningAnalysis
-            v-if="currentView === 'analysis'"
-            :role="currentUser.role"
-            @practice="handlePracticeFromAnalysis"
-            @navigate="handleNavigateFromAnalysis"
-            @toast="handleToastFromChild"
-        />
-        <Profile v-if="currentView === 'profile'" @profile-updated="handleProfileUpdated" />
-        <Feedback
-            v-if="currentView === 'feedback'"
-            :role="currentUser.role"
-            @toast="handleToastFromChild"
-        />
+        <!--
+          学生端正文**全部**由 URL 唯一驱动（R2A 的 5 个标签页 + R2B 的答题页）。
+          R2B 之前这里还有一支 `<template v-else>` 兜底渲染答题页（靠内存态 `activeExamId` +
+          地址停在 `#/legacy`）—— 现在答题页是 `#/exam/:examId`，那支分支已删除。
+          **删除它本身就是一条防线**：守卫已把学生的 `#/legacy` 无条件重定向到试卷列表，
+          若这里还留着分支，就会出现「守卫放行了一个渲染不出正文的地址」这类空白页。
+        -->
+        <router-view />
       </main>
     </div>
 
@@ -134,6 +96,12 @@
           <span class="brand-role" v-else>教师</span>
         </div>
 
+        <!--
+          侧栏入口（R3）。每条按钮现在只做一件事：跳到它的命名路由。
+          高亮判据从「内存里的 currentView/practiceView 枚举值」换成「地址是不是这一条」，
+          于是**刷新后高亮依然正确**（迁移前刷新会落回角色默认页、高亮也跟着跑掉）。
+          按钮文案、图标、顺序、显示条件（`v-if` 的角色判据）**逐字未改**。
+        -->
         <nav class="iq-sidebar-nav">
           <!-- ===== 教学管理 ===== -->
           <div class="iq-nav-group">
@@ -141,22 +109,28 @@
             <button
                 v-if="currentUser.role === 'teacher' || currentUser.role === 'admin'"
                 class="iq-nav-item"
-                :class="{ active: currentView === 'main' }"
-                @click="currentView = 'main'; sidebarOpen = false"
+                :class="{ active: isStaffActive(ROUTE.manageQuestions) }"
+                @click="goStaff(ROUTE.manageQuestions)"
             >
               <span class="iq-nav-icon">📚</span> 题库管理
             </button>
+            <!--
+              「出卷管理 / 试卷列表管理」这一条**按角色指向两条不同的路由**：
+              教师去智能组卷、管理员去试卷列表 —— 与迁移前 `openStaffPage('practice',
+              role === 'admin' ? 'exams' : 'generate')` 的分流逐字一致。
+              高亮也按同一分流判定（迁移前是 practiceView 的同一个三元表达式）。
+            -->
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'practice' && (currentUser.role === 'admin' ? practiceView === 'exams' : practiceView === 'generate') }"
-                @click="openPracticeView(currentUser.role === 'admin' ? 'exams' : 'generate'); sidebarOpen = false"
+                :class="{ active: isStaffActive(currentUser.role === 'admin' ? ROUTE.manageExams : ROUTE.manageGenerate) }"
+                @click="goStaff(currentUser.role === 'admin' ? ROUTE.manageExams : ROUTE.manageGenerate)"
             >
               <span class="iq-nav-icon">📝</span> {{ currentUser.role === 'admin' ? '试卷列表管理' : '出卷管理' }}
             </button>
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'practice' && practiceView === 'classes' }"
-                @click="openPracticeView('classes'); sidebarOpen = false"
+                :class="{ active: isStaffActive(ROUTE.manageClasses) }"
+                @click="goStaff(ROUTE.manageClasses)"
             >
               <span class="iq-nav-icon">🏫</span> 班级管理
             </button>
@@ -167,30 +141,31 @@
             <div class="iq-nav-group-label">教学数据</div>
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'practice' && practiceView === 'admin-records' }"
-                @click="openPracticeView('admin-records'); sidebarOpen = false"
+                :class="{ active: isStaffActive(ROUTE.manageExamAnalysis) }"
+                @click="goStaff(ROUTE.manageExamAnalysis)"
             >
               <span class="iq-nav-icon">📊</span> 试卷分析
             </button>
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'practice' && practiceView === 'learning-analysis' }"
-                @click="openPracticeView('learning-analysis'); sidebarOpen = false"
+                :class="{ active: isStaffActive(ROUTE.manageAnalysis) }"
+                @click="goStaff(ROUTE.manageAnalysis)"
             >
               <span class="iq-nav-icon">📈</span> {{ currentUser.role === 'admin' ? '学生个性化分析' : '学情分析' }}
             </button>
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'practice' && practiceView === 'adaptive-overview' }"
-                @click="openPracticeView('adaptive-overview'); sidebarOpen = false"
+                :class="{ active: isStaffActive(ROUTE.manageAdaptive) }"
+                @click="goStaff(ROUTE.manageAdaptive)"
             >
               <span class="iq-nav-icon">📊</span> 自适应学情
             </button>
+            <!-- 主观题复核：`role !== 'admin'` 的判据同时写在按钮与 `manage.review` 的 meta.roles 里 -->
             <button
                 v-if="currentUser.role !== 'admin'"
                 class="iq-nav-item"
-                :class="{ active: currentView === 'practice' && practiceView === 'adaptive-review' }"
-                @click="openPracticeView('adaptive-review'); sidebarOpen = false"
+                :class="{ active: isStaffActive(ROUTE.manageReview) }"
+                @click="goStaff(ROUTE.manageReview)"
             >
               <span class="iq-nav-icon">📝</span> 主观题复核
             </button>
@@ -201,15 +176,15 @@
             <div class="iq-nav-group-label">系统管理</div>
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'users' }"
-                @click="currentView = 'users'; sidebarOpen = false"
+                :class="{ active: isStaffActive(ROUTE.adminUsers) }"
+                @click="goStaff(ROUTE.adminUsers)"
             >
               <span class="iq-nav-icon">👥</span> 用户管理
             </button>
             <button
                 class="iq-nav-item"
-                :class="{ active: currentView === 'audit' }"
-                @click="currentView = 'audit'; sidebarOpen = false"
+                :class="{ active: isStaffActive(ROUTE.adminAudit) }"
+                @click="goStaff(ROUTE.adminAudit)"
             >
               <span class="iq-nav-icon">✅</span> 注册审核
               <span v-if="pendingCount > 0" class="iq-nav-badge">{{ pendingCount }}</span>
@@ -264,11 +239,8 @@
           </button>
           <nav class="iq-breadcrumb">
             <span class="breadcrumb-home" @click="goHome">首页</span>
-            <template v-for="(crumb, idx) in breadcrumbItems" :key="idx">
-              <span class="crumb-sep">/</span>
-              <span v-if="crumb.clickable" class="breadcrumb-link" @click="handleBreadcrumbClick(crumb.target)">{{ crumb.label }}</span>
-              <span v-else class="breadcrumb-current">{{ crumb.label }}</span>
-            </template>
+            <span class="crumb-sep">/</span>
+            <span class="breadcrumb-current">{{ currentBreadcrumb }}</span>
           </nav>
         </div>
         <!-- 右上角只保留头像和姓名，功能移至左下角下拉菜单 -->
@@ -287,204 +259,40 @@
 
       <!-- ===== 主内容区 ===== -->
       <main class="iq-layout-main">
-        <!-- ===== 题库管理（与学情分析宽度一致） ===== -->
-        <template v-if="currentView === 'main'">
-          <div class="question-bank-page">
-            <!-- 顶部横幅 -->
-            <header class="iq-page-hero">
-              <div class="hero-content">
-                <span class="hero-badge">📚 教学管理</span>
-                <h1 class="hero-title">题库管理</h1>
-                <p class="hero-desc">管理所有题目，支持 AI 出题和批量导入</p>
-              </div>
-              <div v-if="canEdit" class="hero-actions">
-                <button class="iq-btn iq-btn-secondary-light" @click="aiVisible = true">🤖 AI 出题</button>
-                <button class="iq-btn iq-btn-secondary-light" @click="importVisible = true">📥 批量导入</button>
-                <button class="iq-btn iq-btn-secondary-light" @click="imageRecognitionVisible = true">🖼️ 图片识别</button>
-                <button class="iq-btn iq-btn-primary" @click="openAddDialog">+ 新增题目</button>
-              </div>
-            </header>
+        <!--
+          R3 起**所有**页面都是真实路由，正文一律由 URL 唯一驱动 ——
+          原来的 `v-if="inMigrated"` + `v-else` legacy 分派（题库管理 / 用户管理 / 注册审核 /
+          出卷与学生管理的 8 个分支）已整体删除。
 
-            <!-- 统计卡片 -->
-            <div v-if="stats" class="iq-stat-grid">
-              <div class="iq-card iq-stat-card">
-                <div class="iq-stat-label">📊 题库总量</div>
-                <div class="iq-stat-value">{{ stats.total }}</div>
-              </div>
-              <div class="iq-card iq-stat-card"><div class="iq-stat-label">📚 科目数</div><div class="iq-stat-value">{{ stats.bySubject?.length || 0 }}</div></div>
-            </div>
-            <div v-if="stats" class="iq-subject-summary">
-              <section v-for="subject in stats.bySubject" :key="subject.subject" class="iq-card iq-subject-summary-card">
-                <h3>{{ subject.subject }} <small>共 {{ subject.count }} 题</small></h3>
-                <div v-for="chapter in stats.bySubjectChapter?.filter(c => c.subject === subject.subject)" :key="chapter.chapter" class="iq-subject-chapter-row">
-                  <span>第{{ chapter.chapter }}章 {{ chapter.title }}</span><b>{{ chapter.count }}题</b>
-                </div>
-              </section>
-            </div>
+          为什么可以无条件渲染 `<router-view>`：staff 布局只在已登录且非学生时出现，
+          而 `login` / `root` / `unknown` / `legacy` 四条地址标记路由**每一条都会被守卫重定向走**
+          （见 `guard.js`），所以这里不会停在一条「有地址但没正文」的路由上。
+          唯一会短暂经过的是「登录成功 → 守卫 replace 到角色首页」之间的那一瞬，
+          此时渲染空组件 —— 与迁移前那一瞬的空白正文**视觉一致**（旧代码在那一刻也没有匹配分支）。
 
-            <!-- 筛选栏 -->
-            <SearchBar
-                :initialFilters="filters"
-                :role="currentUser.role"
-                :subjects="currentUser.subjects || []"
-                @search="handleSearch"
-                @reset="handleReset"
-            />
-
-            <!-- 表格 -->
-            <QuestionTable
-                :list="list"
-                :loading="loading"
-                :role="currentUser.role"
-                :compact="currentUser.role === 'admin' || currentUser.role === 'teacher'"
-                v-model="selectedIds"
-                @view="openViewDialog"
-                @edit="openEditDialog"
-                @delete="handleDelete"
-            />
-
-            <!-- 分页 -->
-            <Pagination
-                v-model:page="page"
-                v-model:pageSize="pageSize"
-                :total="total"
-                @change="handlePageChange"
-            />
-          </div>
-        </template>
-
-        <!-- ===== 用户管理（仅管理员） ===== -->
-        <template v-if="currentView === 'users' && currentUser.role === 'admin'">
-          <div class="iq-page-titlebar"><h1>👥 用户管理</h1></div>
-          <UserManagement @toast="handleToastFromChild" />
-        </template>
-
-        <!-- ===== 注册审核（仅管理员） ===== -->
-        <template v-if="currentView === 'audit' && currentUser.role === 'admin'">
-          <div class="iq-page-titlebar"><h1>✅ 注册审核</h1></div>
-          <RegistrationAudit @toast="handleToastFromChild" @update:pending="loadPendingCount" />
-        </template>
-
-        <!-- ===== 个人中心 ===== -->
-        <template v-if="currentView === 'profile'">
-          <Profile @profile-updated="handleProfileUpdated" />
-        </template>
-
-        <!-- ===== 用户反馈 ===== -->
-        <template v-if="currentView === 'feedback'">
-          <div class="iq-page-titlebar"><h1>💬 用户反馈</h1></div>
-          <Feedback :role="currentUser.role" @toast="handleToastFromChild" />
-        </template>
-
-        <!-- ===== 出卷与学生管理 ===== -->
-        <template v-if="currentView === 'practice'">
-          <!-- 只在非独立视图且不是 generate 时显示标题（generate 自己显示横幅） -->
-          <div v-if="!standalonePracticeViews.includes(practiceView) && practiceView !== 'generate'" class="iq-page-titlebar">
-            <h1>{{ pageTitle }}</h1>
-          </div>
-
-          <!-- 子导航：只在试卷列表和智能组卷显示 -->
-          <div v-if="!standalonePracticeViews.includes(practiceView) && currentUser.role !== 'admin'" class="iq-practice-subnav">
-            <button class="iq-subnav-btn" :class="{ active: practiceView === 'exams' }" @click="practiceView = 'exams'">📋 试卷列表</button>
-            <button v-if="currentUser.role === 'teacher'" class="iq-subnav-btn" :class="{ active: practiceView === 'generate' }" @click="practiceView = 'generate'">📝 智能组卷</button>
-          </div>
-
-          <ExamList
-              v-if="practiceView === 'exams'"
-              :role="currentUser.role"
-              @generate="currentUser.role === 'teacher' && (practiceView = 'generate')"
-              @start-exam="startExam"
-              @toast="handleToastFromChild"
-          />
-
-          <ClassManagement
-              v-if="practiceView === 'classes'"
-              :role="currentUser.role"
-              :subjects="currentUser.subjects || []"
-              @toast="handleToastFromChild"
-          />
-
-          <LearningAnalysis
-              v-if="practiceView === 'learning-analysis'"
-              :role="currentUser.role"
-              @practice="handlePracticeFromAnalysis"
-              @navigate="handleNavigateFromAnalysis"
-              @toast="handleToastFromChild"
-          />
-
-          <AdaptiveOverview
-              v-if="practiceView === 'adaptive-overview'"
-              @toast="handleToastFromChild"
-          />
-
-          <AdaptiveReview
-              v-if="practiceView === 'adaptive-review' && currentUser.role !== 'admin'"
-              @toast="handleToastFromChild"
-          />
-
-          <AdminRecords
-              v-if="practiceView === 'admin-records'"
-              :role="currentUser.role"
-              @toast="handleToastFromChild"
-          />
-        </template>
-
-        <!-- ===== GenerateExam 独立挂载（v-show 保持状态不销毁） ===== -->
-        <GenerateExam
-            v-if="generateExamMounted"
-            v-show="currentView === 'practice' && practiceView === 'generate' && currentUser?.role === 'teacher'"
-            :role="currentUser?.role"
-            :subjects="currentUser?.subjects || []"
-            @start-exam="startExam"
-            @toast="handleToastFromChild"
-        />
+          智能组卷是唯一需要跨页面保留草稿状态的页面。main 曾用 `v-show` 永久挂载
+          `GenerateExam`；路由迁移后改成只缓存 `ManageGeneratePage`，避免切到题库管理时销毁
+          组卷步骤、表单和生成进度，同时不把其他管理页面一并缓存。退出登录会卸载整个 staff
+          布局，因此缓存不会带到下一个账号。
+        -->
+        <router-view v-slot="{ Component }">
+          <KeepAlive include="ManageGeneratePage">
+            <component :is="Component" />
+          </KeepAlive>
+        </router-view>
       </main>
 
       <!-- ===== 弹窗层 ===== -->
-      <QuestionForm
-          :visible="dialogVisible"
-          :data="formData"
-          :isEdit="isEdit"
-          :role="currentUser.role"
-          :subjects="currentUser.subjects || []"
-          @close="dialogVisible = false"
-          @submit="handleSubmit"
-      />
-
-      <QuestionDetail
-          :visible="viewVisible"
-          :data="viewData"
-          @close="viewVisible = false"
-      />
-
+      <!--
+        题库管理的 4 个弹窗（QuestionForm / QuestionDetail / ImportQuestions / AiGenerate /
+        ImageRecognition）随正文一起搬进了 `views/manage/QuestionBankPage.vue`。
+        `ChangePassword` **不属于题库管理**（教师/管理员由左下角菜单触发，学生端另有一处在
+        模板末尾），故留在根组件 —— 它是外壳级弹窗，与当前在哪一页无关。
+      -->
       <ChangePassword
           :visible="pwdVisible"
           @close="pwdVisible = false"
           @success="handlePwdChanged"
-      />
-
-      <ImportQuestions
-          :visible="importVisible"
-          :role="currentUser.role"
-          :subjects="currentUser.subjects || []"
-          @close="importVisible = false"
-          @success="handleImportSuccess"
-      />
-
-      <AiGenerate
-          :visible="aiVisible"
-          :role="currentUser.role"
-          :subjects="currentUser.subjects || []"
-          @close="aiVisible = false"
-          @success="handleAiSuccess"
-      />
-
-      <ImageRecognition
-          :visible="imageRecognitionVisible"
-          :role="currentUser.role"
-          :subjects="currentUser.subjects || []"
-          @close="imageRecognitionVisible = false"
-          @success="handleImportSuccess"
       />
 
     </div>
@@ -498,51 +306,57 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, provide, onMounted, onUnmounted, watch, nextTick } from 'vue';
+// R3 起**每一个**页面都由 URL 唯一驱动，所以这里不再需要 `watch` / `reactive`：
+// 原先 `reactive` 只服务于题库管理的筛选表单（随正文搬走），`watch` 只服务于
+// 「页码变化清空勾选」与「currentView 落到 main 时纠正为 papers」（前者搬走、后者删）。
+import { ref, computed, provide, readonly, onMounted, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
+
+// ===== 路由：页面身份的唯一来源就是地址 =====
+import { ROUTE_NAMES } from '@/router/routes';
+import {
+  goExam,
+  goRoleHome,
+  goAfterLogin,
+  goLogin,
+  goStudentPage,
+  goRoute,
+  goProfile,
+  goFeedback,
+  isRouteAllowed,
+  goLoginWithFeature,
+  goFeatureLanding,
+} from '@/router/nav';
+// 登录页 `?feature=` 的白名单判定（纯函数，权威表在 `router/feature.js`，与候选路由的
+// `meta.roles` 一起构成「登录后去哪」的**唯一**规则来源）。
+import { normalizeFeature } from '@/router/feature';
+// ⚠️ `clearSession` 曾经漏在这张名单外 —— `handleLogout` / `handlePwdChanged` / `handleAuthExpired`
+// 三个出口都在调它，于是三处**全部**在运行时抛 `ReferenceError: clearSession is not defined`：
+// 退出登录点了没反应、改密后不重登、401 不跳登录页。构建不会报（自由标识符被当成全局变量），
+// 在 Node 里跑守卫矩阵也看不见（那边直接 import `session.js`，不经过 App.vue）。
+// **是 R3 的真实浏览器验收把它抓出来的**（见 `docs/R3 验收报告.md`）。
+import { clearSession, clearExamReturn, currentUser as currentUserRef } from '@/router/session';
 
 // ===== 组件导入 =====
+// R3 之后 App.vue 只剩「外壳级」组件：登录闸门、注册弹窗、Toast、改密弹窗、AI 助手。
+// 所有业务正文都挂在路由上（`views/student/*`、`views/shared/*`、`views/manage/*`、
+// `views/admin/*`），根组件不再直接渲染任何一个业务页面 —— 这正是 R3 的目的：
+// **可见入口有稳定 URL，刷新/深链/前进后退都由地址说了算**。
 import Login from '@/components/Login.vue';
 import RegistrationDialog from '@/components/RegistrationDialog.vue';
 import Toast from '@/components/Toast.vue';
-import SearchBar from '@/components/SearchBar.vue';
-import QuestionTable from '@/components/QuestionTable.vue';
-import QuestionForm from '@/components/QuestionForm.vue';
-import QuestionDetail from '@/components/QuestionDetail.vue';
-import Pagination from '@/components/Pagination.vue';
-import UserManagement from '@/components/UserManagement.vue';
-import RegistrationAudit from '@/components/RegistrationAudit.vue';
 import ChangePassword from '@/components/ChangePassword.vue';
-import ImportQuestions from '@/components/ImportQuestions.vue';
-import ImageRecognition from '@/components/ImageRecognition.vue';
-import AiGenerate from '@/components/AiGenerate.vue';
-import Feedback from '@/components/Feedback.vue';
-import Profile from '@/components/Profile.vue';
-
-// ===== Practice 组件 =====
-import ExamList from '@/components/practice/ExamList.vue';
-import ExamPractice from '@/components/practice/ExamPractice.vue';
-import AdaptivePractice from '@/components/practice/AdaptivePractice.vue';
+// `ExamPractice` 的 import 随答题页迁移一并删除（R2B）：它现在只由 `#/exam/:examId` 的
+// 薄壳 `views/student/ExamPracticePage.vue` 渲染。App.vue 里若还留着这个 import，
+// 会让人以为这里仍是它的渲染点。
+// 既存的未使用导入（迁移前就没有任何模板引用）。本轮不动它——边界是「不清历史死代码」。
 import WrongBook from '@/components/practice/WrongBook.vue';
-import QuestionReview from '@/components/practice/QuestionReview.vue';
-import PracticeRecords from '@/components/practice/PracticeRecords.vue';
-import LearningAnalysis from '@/components/practice/LearningAnalysis.vue';
-import AdaptiveOverview from '@/components/practice/AdaptiveOverview.vue';
-import AdaptiveReview from '@/components/practice/AdaptiveReview.vue';
-import GenerateExam from '@/components/practice/GenerateExam.vue';
-import ClassManagement from '@/components/practice/ClassManagement.vue';
-import AdminRecords from '@/components/practice/AdminRecords.vue';
-import RecordDetail from '@/components/practice/RecordDetail.vue';
 import AIAssistant from '@/components/AIAssistant.vue';
 
 // ===== API =====
-import {
-  getQuestions,
-  addQuestion,
-  updateQuestion,
-  deleteQuestion,
-  getStatistics,
-  batchDeleteQuestions,
-} from '@/api/question';
+// 题库管理的 6 个接口（getQuestions / addQuestion / updateQuestion / deleteQuestion /
+// getStatistics / batchDeleteQuestions）随正文一起搬到了 `views/manage/QuestionBankPage.vue`。
+// 这里只剩注册审核角标用的那一个。
 import { getRegistrations } from '@/api/auth';
 
 // ================================================================
@@ -561,101 +375,202 @@ const studentTabs = [
 // ================================================================
 // 登录态管理
 // ================================================================
-const currentUser = ref(null);
+// 身份放在 router/session.js：守卫在组件之外运行，把 currentUser 放在根组件里会形成循环依赖。
+//
+// ⚠️ R3 删除了这里原本的两行 `const currentView = legacyView;` / `const practiceView =
+// legacyPracticeView;`。它们的 10 个取值在 R3 全部拿到了地址，于是**两个 ref 都没有剩余
+// 取值**，`currentView` 更没有任何模板消费方（原来唯一的用途是驱动已删除的 legacy 分派）。
+// 「已无活取值/写入点/模板消费方」由全项目检索 + `guard-matrix.mjs` 的静态断言钉住，
+// 不是靠阅读结论。
+const currentUser = currentUserRef;
 const registerVisible = ref(false);
-const currentView = ref('papers');
-const pendingFeature = ref('');
+// R4 删除了 `pendingFeature`（登录前点过的功能入口）：它现在由地址里的 `?feature=` 承载，
+// 因此**刷新不会丢**，也不再需要「登录成功时清掉它」这个动作。
 const sidebarOpen = ref(false);
 const pwdVisible = ref(false);
+
+/** 侧栏按钮与模板里要用命名路由常量，不拼字符串路径。 */
+const ROUTE = ROUTE_NAMES;
+
+// ================================================================
+// 路由派生值（**单向**：路由 → 这些 computed；没有任何 watch 反向同步）
+// ================================================================
+const route = useRoute();
+/**
+ * 当前路由的上下文键，供 AI 助手判断场景。
+ * R3 之后它是**唯一**的场景来源 —— 原来还要与 `practiceView` 哨兵二选一，那个哨兵已删除。
+ */
+const migratedContext = computed(() => route.meta?.context ?? null);
+
+/** 侧栏条目高亮：地址就是这一条吗。刷新后依然正确（迁移前靠内存值，刷新即丢）。 */
+const isStaffActive = (name) => route.name === name;
 
 // ================================================================
 // 答题练习状态
 // ================================================================
-// admin-records 已加入独立视图列表，试卷分析不显示子导航
-const practiceView = ref('exams');
-const generateExamMounted = ref(false);
-const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'adaptive-review', 'classes', 'admin-records'];
-const activeExamId = ref(null);
-const activeRecordId = ref(null);
-const recordDetailReturn = ref('records');
-const practiceReturnView = ref('papers');
+/**
+ * ⚠️ 这里**不再有任何答题会话状态**。
+ *
+ * R2A 期间这里曾有一份本地 `ref(null)` 与 `router/session.js` 里那份同名的 `activeExamId`
+ * 并存，而守卫读的是 session 那份 —— 于是「学生进 `#/legacy`」的判定永远看到 `null`，
+ * 每次点「开始答题」都被守卫当成「没有进行中的答题」原路送回 `#/papers`。
+ * 症状是**点了没反应**，`npm run build` 与静态断言都发现不了。
+ *
+ * R2B 的处置不是「合并成一份」，而是**让这份状态整体消失**：答题页的身份改由
+ * `#/exam/:examId` 的 `route.params.examId` 唯一驱动，`activeExamId` 与
+ * `examReturnRoute`（退出答题页该回哪里）都已删除/搬进 `router/nav.js`。
+ * 没有第二份状态，就没有第二个写入方。
+ */
 const analysisPracticeFilters = ref({});
 const currentQuestionId = ref(null);
 const currentQuestion = ref(null);
-const currentExamId = ref(null);
+/**
+ * AI 助手要的「当前试卷上下文」——**由路由派生**（R2B），不再是答题页上报的内存态。
+ *
+ * 为什么必须是 computed 而不是 `ref`：答题页的地址就是它的身份来源，任何时刻
+ * `#/exam/16` 的上下文都应当是 16。用 ref 就得有人在进入/退出/提交/卸载时把它清干净，
+ * 漏一处就会把**上一张卷**的 id 发给 AI 助手。
+ *
+ * `null` = 当前不在答题页上。非法 id（`#/exam/abc`）同样返回 `null`：
+ * 那种地址根本不会有答题页实例，助手也就不该拿到一个假 id。
+ */
+const currentExamId = computed(() => {
+  if (route.name !== ROUTE_NAMES.exam) return null;
+  const raw = route.params.examId;
+  return /^\d+$/.test(String(raw ?? '')) ? String(raw) : null;
+});
 
-const openPracticeView = (view) => {
-  practiceView.value = view;
-  currentView.value = 'practice';
+/**
+ * 教师/管理员侧边栏入口（题库管理 / 试卷列表管理 / 班级管理 / 用户管理 / 注册审核 …）。
+ *
+ * 入参是**命名路由常量**（模板里从 `ROUTE` 取），不是路径字符串 —— 展示地址里的 `#`
+ * 永远不进入组件代码（实施计划 §5.3）。
+ *
+ * R3 起这个函数退化成纯粹的一跳：`goRoute` 就是 `router.push`（同址则 no-op）。
+ * 迁移前它必须调 `goLegacyView`，因为那时侧栏写的是内存状态、而正文渲染由
+ * `inMigrated`（路由派生）决定 —— 从 `#/profile` 点「题库管理」会出现「地址不动、
+ * 正文还是个人资料」的假死。现在页面身份只在地址里，这种「两份状态不一致」的形态
+ * **不存在了**，所以不需要任何补偿动作。
+ */
+const goStaff = (name) => {
+  goRoute(name);
+  sidebarOpen.value = false;
 };
 
+/**
+ * 学情分析页的「去练习」。**按角色分流**（R3 之后两条支路都是真实路由）：
+ * - 学生端：`#/adaptive` / `#/papers`（R2A 起就是路由，本轮未改）；
+ * - 教师/管理员：`manage.exams`（迁移前是 `practiceView='exams'` 的 legacy 分派，落点相同）。
+ *
+ * 教师/管理员的 `wantsAdaptive` 分支在迁移前会写入 `practiceView='adaptive'` —— 那个值
+ * **没有任何渲染分支**（既不在 `standalonePracticeViews` 之外的任何 `v-if` 里，
+ * 也没有对应的模板分支），用户看到的是**空白正文**。本轮**不把它映射到任何一个形似页面**
+ * （那会凭空造出一个产品里不存在的功能），而是给出明确的不可用提示。
+ * 该分支目前**无调用点**（`LearningAnalysis` 从不 `$emit('practice')`），所以这个改动
+ * 在任何可达路径上都观察不到。
+ *
+ * `analysisPracticeFilters` 保持「只写不读」的既存行为——迁移前 AdaptivePractice 就没接收
+ * `initialFilters`（见 views/student/AdaptivePracticePage.vue 的注释），本轮不顺手接上它。
+ */
 const handlePracticeFromAnalysis = (filters) => {
   analysisPracticeFilters.value = filters || {};
-  currentView.value = 'practice';
 
-  if (filters?.adaptive) {
-    practiceView.value = 'adaptive';
-  } else if (filters?.questionTypes || filters?.chapters || filters?.knowledgeKeyword) {
-    practiceView.value = 'adaptive';
-    analysisPracticeFilters.value = filters;
-  } else {
-    practiceView.value = 'exams';
+  const isStudent = currentUser.value?.role === 'student';
+  const wantsAdaptive = !!(
+    filters?.adaptive ||
+    filters?.questionTypes ||
+    filters?.chapters ||
+    filters?.knowledgeKeyword
+  );
+
+  if (isStudent) {
+    goRoute(wantsAdaptive ? ROUTE_NAMES.adaptive : ROUTE_NAMES.papers);
+    sidebarOpen.value = false;
+    showToast('已跳转到练习页面', 'success');
+    return;
   }
 
+  if (wantsAdaptive) {
+    showToast('自适应练习仅学生端可用，暂时不能从这里跳转。', 'warning');
+    return;
+  }
+
+  goRoute(ROUTE_NAMES.manageExams);
   sidebarOpen.value = false;
   showToast('已跳转到练习页面', 'success');
 };
 
+/**
+ * 学情分析页的「智能组卷」（`LearningAnalysis.vue:87` 的 `$emit('navigate','generate')`）。
+ *
+ * 目标页 `manage.generate` 的 `meta.roles` 是 `['teacher']`。**管理员点了会被守卫挡回
+ * 管理员首页** —— 迁移前的行为是「写 `practiceView='generate'`，但正文分支要求
+ * `role === 'teacher'`」⇒ **空白正文**。所以这是把一处白屏换成明确拒绝，**没有放宽**任何权限：
+ * 管理员过去进不去组卷页，现在同样进不去（用户已就此裁决：不得开放 admin 进入
+ * `manage.generate`）。
+ *
+ * 这里用 `isRouteAllowed` 先问一次「守卫会不会放行」，**读的还是 `meta.roles` 同一份规则**，
+ * 目的只是不要在跳转注定失败时先弹一句「已跳转到智能组卷」再弹「无权访问」。
+ * 它不是权限判定 —— 真正的边界永远是守卫。
+ */
 const handleNavigateFromAnalysis = (target) => {
-  if (target === 'generate') {
-    currentView.value = 'practice';
-    practiceView.value = 'generate';
-    sidebarOpen.value = false;
-    showToast('已跳转到智能组卷', 'success');
+  if (target !== 'generate') return;
+  if (!isRouteAllowed(ROUTE_NAMES.manageGenerate)) {
+    showToast('智能组卷仅教师可用。', 'warning');
+    return;
   }
+  goRoute(ROUTE_NAMES.manageGenerate);
+  sidebarOpen.value = false;
+  showToast('已跳转到智能组卷', 'success');
 };
 
-const openRecommendedPractice = (filters = {}) => {
-  analysisPracticeFilters.value = { ...filters };
-  practiceView.value = 'adaptive';
-};
-
-const onEnterPractice = () => {
-  if (currentUser.value?.role === 'teacher') {
-    practiceView.value = 'admin-records';
-  } else if (currentUser.value?.role === 'student') {
-    practiceView.value = 'exams';
-  } else {
-    practiceView.value = 'exams';
-  }
-  currentView.value = 'practice';
-};
+// ⚠️ R3 删除了 `openRecommendedPractice` 与 `onEnterPractice`。
+// 二者都是**零调用点**的死代码（模板全文无引用），而函数体恰好就是
+// `practiceView.value = 'adaptive'` / `currentView.value = 'practice'` —— 它们引用的两个 ref
+// 在本轮被删除，因此**无法原样存活**。实施计划 §6.4 把「清理死代码」归到 R6，
+// 但那里清理的是**与本次迁移无关**的既存死代码；这两个是本次迁移的直接后果，不在此列。
+// 用户已裁决接受这一处例外。
+//
+// `handlePracticeFromAnalysis` / `analysisPracticeFilters` 按 §6.4 保留（它们不引用被删的 ref），
+// 只把 jumps 改成路由。
 
 provide('assistantState', {
-  currentView,
-  practiceView,
+  // 已迁移页面的上下文**只**由路由派生（D5）。R1 时这个键叫 `pilotView`，
+  // R2A 随 `meta.migrated` 一起改名 —— 「试点」一词在页面变多后已不准确。
+  //
+  // R3 删除了同一对象里的 `currentView` / `practiceView` 两个只读键：它们喂给 AI 助手的
+  // `currentPage` / `contextMode` 两个 computed，而那两个 computed 本来就已经
+  // 「migratedView 优先」，遗留状态那一支在 R3 之后永远取不到有效值。
+  // **留着一个没有写入方的 ref 比删掉它更危险** —— R2A 的「两份 activeExamId」事故
+  // 正是「状态声明与状态消费分处两个模块」造成的（见下方答题会话状态的注释）。
+  migratedView: readonly(migratedContext),
   currentQuestionId,
   currentQuestion,
   currentExamId,
   currentUser,
 });
 
+
 // ================================================================
 // 导航
 // ================================================================
-const navigateTo = (view) => {
-  currentView.value = view;
+/** 学生顶部标签：5 个标签全是真实路由，由统一入口按路由跳。 */
+const navigateTo = (key) => {
+  // `goStudentPage` 返回 false 只可能是「标签表里出现了一个没在 `STUDENT_PAGE_ROUTES` 里
+  // 登记的键」—— 5 个键当前都有路由，这是**不可达**的编程错误分支。
+  // 迁移前这里会退回 `goLegacyView(key)`，写一个没有任何渲染分支的遗留状态值 ⇒ 空白正文。
+  // R3 之后没有 legacy 出口可退，改成明确提示（同样是不可达分支，只是不再制造白屏）。
+  if (!goStudentPage(key)) showToast('这个入口暂时不可用。', 'warning');
 };
 
+/**
+ * 标签高亮：**只**由 `meta.tab` 派生（详情页也高亮「答题记录」，因为它的 tab 就是 records）。
+ * 迁移前是「已迁移看 meta.tab，未迁移看 currentView」的二选一，后者已随遗留状态删除。
+ */
+const isTabActive = (key) => route.meta?.tab === key;
+
 const goHome = () => {
-  if (currentUser.value?.role === 'student') {
-    currentView.value = 'papers';
-  } else if (currentUser.value?.role === 'admin') {
-    currentView.value = 'practice';
-    practiceView.value = 'exams';
-  } else {
-    currentView.value = 'main';
-  }
+  goRoleHome(currentUser.value?.role);
   sidebarOpen.value = false;
 };
 
@@ -690,15 +605,9 @@ const closeSidebarUserMenu = () => {
 // 公共操作
 // ================================================================
 const goToProfile = () => {
-  currentView.value = 'profile';
+  goProfile();
   closeUserMenu();
   closeSidebarUserMenu();
-};
-
-const handleProfileUpdated = (updated) => {
-  if (updated && currentUser.value) {
-    currentUser.value = { ...currentUser.value, ...updated };
-  }
 };
 
 const openChangePasswordFromMenu = () => {
@@ -708,7 +617,7 @@ const openChangePasswordFromMenu = () => {
 };
 
 const openFeedbackFromMenu = () => {
-  currentView.value = 'feedback';
+  goFeedback();
   closeUserMenu();
   closeSidebarUserMenu();
 };
@@ -722,126 +631,68 @@ const handleClickOutside = (event) => {
 // ================================================================
 // 计算属性
 // ================================================================
-const canEdit = computed(() => currentUser.value?.role === 'admin' || currentUser.value?.role === 'teacher');
+// ⚠️ R3 删除了 `canEdit`：它唯一的消费方是题库管理横幅里的「AI 出题 / 批量导入 /
+// 图片识别 / 新增题目」按钮组，已随正文搬到 `views/manage/QuestionBankPage.vue`
+// （那里有一份逐字相同的 `canEdit`，因为 `QuestionTable` 的编辑/删除列判的是同一个条件）。
 
 const avatarChar = computed(() => {
   const name = currentUser.value?.nickname || currentUser.value?.username || 'U';
   return name.charAt(0).toUpperCase();
 });
 
-const breadcrumbItems = computed(() => {
-  const items = [];
-  if (currentView.value === 'main') {
-    items.push({ label: '题库管理' });
-  } else if (currentView.value === 'users') {
-    items.push({ label: '用户管理' });
-  } else if (currentView.value === 'audit') {
-    items.push({ label: '注册审核' });
-  } else if (currentView.value === 'feedback') {
-    items.push({ label: '用户反馈' });
-  } else if (currentView.value === 'profile') {
-    items.push({ label: '个人中心' });
-  } else if (currentView.value === 'practice') {
-    const subMap = {
-      exams: '试卷列表',
-      generate: '智能组卷',
-      'wrong-book': '错题本',
-      adaptive: '自适应练习',
-      'adaptive-overview': '自适应学情',
-      'adaptive-review': '主观题复核',
-      'adaptive-progress': '自适应成果',
-      'learning-analysis': '学习分析',
-      practice: '答题中',
-      records: '答题记录',
-      'record-detail': '记录详情',
-      stats: '统计分析',
-      'admin-records': '试卷分析',
-      classes: '班级管理',
-    };
-    const examViews = ['exams', 'generate', 'classes', 'wrong-book', 'practice', 'records', 'record-detail', 'stats'];
-    const dataViews = ['admin-records', 'learning-analysis', 'adaptive-overview', 'adaptive-review', 'adaptive-progress'];
-    if (examViews.includes(practiceView.value)) {
-      items.push({ label: '出卷与学生管理', clickable: true, target: 'exam-management' });
-    } else if (dataViews.includes(practiceView.value)) {
-      items.push({ label: '教学数据', clickable: true, target: 'data-analysis' });
-    }
-    if (practiceView.value === 'record-detail') {
-      items.push({ label: '答题记录', clickable: true, target: 'records' });
-    }
-    items.push({ label: subMap[practiceView.value] || '' });
-  }
-  return items;
-});
-const handleBreadcrumbClick = (target) => {
-  if (target === 'exam-management') {
-    openPracticeView(currentUser.value.role === 'admin' ? 'exams' : 'generate');
-  } else if (target === 'data-analysis') {
-    openPracticeView('admin-records');
-  } else if (target === 'records') {
-    openPracticeView('records');
-  }
-  sidebarOpen.value = false;
-};
+/**
+ * staff 面包屑：**只**来自 `meta.crumb`（R3）。
+ *
+ * 迁移前这里是一张按 `currentView` / `practiceView` 查表的手写映射，与路由表里的
+ * `meta.crumb` **两份数据描述同一件事** —— 典型的双份真相：改了一处忘了另一处，
+ * 面包屑就会与页面不符。现在 10 条 staff 路由各自在 `meta.crumb` 里写自己的名字
+ * （`manage.*` 带「出卷与学生管理 / 」前缀，与迁移前 `practice` 分支的拼接结果逐字相同），
+ * 查表整张删除。
+ *
+ * 登录/根/未知/legacy 四条地址标记路由没有 `crumb`，返回空串 —— 与迁移前
+ * 「没有匹配分支时返回 ''」一致；而这些地址会被守卫立刻重定向走，用户看不到这一瞬。
+ */
+const currentBreadcrumb = computed(() => route.meta?.crumb || '');
 
-const pageTitle = computed(() => {
-  const map = {
-    exams: '📋 试卷列表',
-    generate: '📝 智能组卷',
-    'wrong-book': '📕 错题本',
-    adaptive: '🧭 自适应练习',
-    'adaptive-overview': '📈 自适应学情',
-    'adaptive-review': '📝 主观题复核',
-    'adaptive-progress': '🏅 自适应成果',
-    'learning-analysis': '📉 学习分析',
-    practice: '✍️ 答题中',
-    records: '📊 答题记录',
-    'record-detail': '📝 答题详情',
-    stats: '📈 统计分析',
-    'admin-records': '👥 试卷分析',
-    classes: '🏫 班级管理',
-  };
-  return map[practiceView.value] || '';
-});
+/**
+ * 「开始答题」——**学生端唯一入口**（试卷列表「开始答题」、题目复盘「重新练习」，
+ * 以及 AI 助手生成练习卷后 @start-exam）。
+ *
+ * R2B 起它只做两件事：校验角色 → 交给 `nav.js: goExam` 跳 `#/exam/:examId`。
+ * 「记住退出时要回哪里」（含角色校验、拒绝把另一张答题页当兜底）也在 `goExam` 里，
+ * 所以**入口只有这一处、来源记录也只有一个写入方**。
+ *
+ * 角色校验保留在本组件（而不是下沉到 nav.js）：`#/exam/:examId` 的 `meta.roles` 是
+ * `['student']`，教师/管理员误入会被守卫挡走；这里的 `currentUser` 是权威身份来源。
+ * （R3 起这句话的依据从「教师侧没有 practice 分支 ⇒ 空白正文」换成了 `meta.roles`，
+ * 行为不变：非学生调 `startExam` 一律什么都不做。）
+ */
 const startExam = (examId) => {
-  activeExamId.value = examId;
-  if (currentUser.value?.role === 'student') {
-    practiceReturnView.value = currentView.value;
-    currentView.value = 'practice';
-  } else {
-    practiceView.value = 'practice';
-  }
+  if (currentUser.value?.role !== 'student') return;
+  goExam(examId);
 };
 
-const exitExam = () => {
-  activeExamId.value = null;
-  if (currentUser.value?.role === 'student') {
-    currentView.value = practiceReturnView.value || 'papers';
-  } else {
-    practiceView.value = 'exams';
-  }
-};
-
-const viewRecord = (recordId) => {
-  activeRecordId.value = recordId;
-  if (currentUser.value?.role === 'student') {
-    recordDetailReturn.value = currentView.value;
-    currentView.value = 'record-detail';
-  } else {
-    practiceView.value = 'record-detail';
-  }
-};
-
-const backFromRecordDetail = () => {
-  if (currentUser.value?.role === 'student') {
-    if (recordDetailReturn.value === 'practice') {
-      exitExam();
-    } else {
-      currentView.value = recordDetailReturn.value || 'records';
-    }
-  } else {
-    practiceView.value = 'admin-records';
-  }
-};
+/**
+ * 学情分析页（`views/student/LearningAnalysisPage.vue` 与
+ * `views/manage/ManageAnalysisPage.vue`）要触发的**跨页面动作**。
+ *
+ * 迁移前它存在的理由是「同一个 `LearningAnalysis` 组件被两种角色复用，而两边的落点不同」——
+ * 学生去 `#/adaptive` / `#/papers`，教师/管理员去 legacy 分派出来的页面。R3 之后
+ * **两边都是真实路由**，但分流这件事本身还在（学生去练习页、staff 去试卷列表），
+ * 所以这个通道保留：它是**唯一仍需 App.vue 上下文**的跨页动作。
+ *
+ * R2B 之前这里还有 `startExam` / `exitExam`，两者都因为依赖本组件的 `activeExamId` /
+ * `examReturnRoute` 而挂在这里。那两份状态已经不存在了（答题页的身份改由 URL 驱动），
+ * 所以两个键一并去掉 —— 薄壳改成直接从 `@/router/nav` import `goExam` / `exitExam`。
+ * 留着它们反而危险：`appNavigate` 看起来还能写导航状态，会诱使后来者再引入一个写入方。
+ *
+ * ⚠️ 与 `appToast` 同理，必须放在上述函数的 `const` **之后**：`provide` 在 setup 执行期
+ * 同步求值，写到前面会撞 TDZ（R1 的 appToast 就踩过一次，构建期发现不了）。
+ */
+provide('appNavigate', {
+  practiceFromAnalysis: handlePracticeFromAnalysis,
+  navigateFromAnalysis: handleNavigateFromAnalysis,
+});
 
 // ================================================================
 // 注册审核
@@ -858,6 +709,22 @@ const loadPendingCount = async () => {
   }
 };
 
+/**
+ * R3 新增的下行通道：**给已迁移的 staff 页面用的外壳级动作**。
+ *
+ * 目前只有一个消费者 —— `views/admin/AdminAuditPage.vue`。迁移前
+ * `RegistrationAudit` 的 `@update:pending` 是**直接**接到本组件的 `loadPendingCount`
+ * 上的（`App.vue` 旧第 332 行），因为那时审核正文与角标同处一棵树。正文搬到路由之后，
+ * 它们不再有父子关系，必须显式架一条通道 —— 与既有的 `appToast`（提示）/
+ * `appNavigate`（跨页跳转）是同一套 `provide` 机制。
+ *
+ * 消费端**取不到时静默跳过**：角标不刷新是可接受的降级，而抛错会让整个审核页白屏。
+ *
+ * ⚠️ 与 `appToast` 同理，必须放在 `loadPendingCount` 的 `const` **之后**：
+ * `provide` 在 setup 执行期同步求值，写到前面会撞 TDZ（R1 的 appToast 踩过一次）。
+ */
+provide('appStaff', { refreshPendingCount: loadPendingCount });
+
 const registerSuccess = () => {
   registerVisible.value = false;
   showToast('✅ 注册申请已提交，请等待管理员审核', 'success');
@@ -866,71 +733,62 @@ const registerSuccess = () => {
 // ================================================================
 // 登录/退出
 // ================================================================
-const restoreSession = () => {
-  const token = localStorage.getItem('token');
-  const userStr = localStorage.getItem('user');
-  if (token && userStr) {
-    try {
-      const user = JSON.parse(userStr);
-      currentUser.value = user;
-      if (user.role === 'student') {
-        currentView.value = 'papers';
-      } else if (user.role === 'admin') {
-        currentView.value = 'practice';
-        practiceView.value = 'exams';
-      } else {
-        currentView.value = 'main';
-      }
-    } catch {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    }
-  }
-};
+// 会话恢复已移到 router/session.js 的模块初始化：守卫在组件挂载前就要知道身份，
+// 而且恢复**只认 localStorage**——它绝不改写地址，所以不会覆盖已有的合法深链。
 
 const handleLoginSuccess = (user) => {
-  isNavigatingBack = true;
   currentUser.value = user;
-  const requested = pendingFeature.value;
-  pendingFeature.value = '';
-  if (requested === 'generate' && user.role === 'teacher') {
-    currentView.value = 'practice';
-    practiceView.value = 'generate';
-  } else if (requested === 'adaptive' && user.role === 'student') {
-    currentView.value = 'adaptive';
-  } else if (requested === 'analysis') {
-    currentView.value = user.role === 'student' ? 'analysis' : 'practice';
-    if (user.role !== 'student') practiceView.value = 'learning-analysis';
-  } else if (requested === 'profile') {
-    currentView.value = 'profile';
-  } else if (requested) {
-    showToast(requested === 'generate' ? '智能组卷需使用教师账号' : '自适应练习需使用学生账号', 'warning');
-    if (user.role === 'student') currentView.value = 'papers';
-    else if (user.role === 'admin') { currentView.value = 'practice'; practiceView.value = 'exams'; }
-    else currentView.value = 'main';
-  } else
-  if (user.role === 'student') {
-    currentView.value = 'papers';
-  } else if (user.role === 'admin') {
-    currentView.value = 'practice';
-    practiceView.value = 'exams';
-  } else {
-    currentView.value = 'main';
+
+  // 1) 带 redirect：优先回到登录前想去的站内地址（角色不符/非法/未知目标会被 goAfterLogin 拒绝）
+  const redirect = route.query?.redirect;
+  if (redirect) {
+    const landed = goAfterLogin(user.role, redirect);
+    if (landed) {
+      loadPendingCount();
+      return;
+    }
   }
-  window.history.pushState(getViewState(), '');
-  nextTick(() => {
-    isNavigatingBack = false;
-  });
-  loadData();
-  loadStats();
+
+  /**
+   * 2) 无 redirect 或 redirect 不可用：按「登录前点过的功能入口」→ 角色默认页。
+   *
+   * R4 起这个入口的**唯一来源是地址**（`#/login?feature=xxx`，见 `router/feature.js`）。
+   * 这里原来有一个内存 ref（`pendingFeature`）记着它：刷新即丢。现在地址在则意图在 ——
+   * 用户点了「智能组卷」→ 地址变成 `?feature=generate` → 刷新 → 登录 → 照样落到智能组卷。
+   *
+   * 落点**不再由本文件里的角色表决定**（那张表已删除）：候选路由自己的 `meta.roles` 说了算，
+   * 与守卫同源。一个候选都进不去时用的是守卫那份**统一越权提示**，然后回角色首页 ——
+   * 与「直接敲地址被守卫挡回」是同一种收尾，不因为入口不同而给出两套说法。
+   *
+   * ⚠️ 迁移前这里有 `resetLegacy()`：把遗留状态复位到该角色的默认页，免得换角色登录后
+   * 遗留状态还停在上一个角色的页面。遗留状态没了，这个动作随之消失；而「换角色登录不串页」
+   * 这件事现在由 `meta.roles` 保证 —— 上一个角色的地址会被新角色的规则挡回新角色首页。
+   *
+   * ⚠️ 原来的 `loadData()` / `loadStats()`（题库列表与统计）也已移出：它们现在挂在
+   * `views/manage/QuestionBankPage.vue` 的 `onMounted`，只在真正进入题库管理时执行。
+   * **`loadPendingCount()` 必须留在原处**：它刷新的是侧栏「注册审核」角标，与当前在哪一页无关。
+   */
+  const requested = normalizeFeature(route.query?.feature);
+  const landing = requested ? goFeatureLanding(requested, user.role) : null;
+  if (!landing?.ok) {
+    if (requested) showToast(landing.message, 'warning');
+    goRoleHome(user.role);
+  }
+
   loadPendingCount();
 };
 
+/**
+ * 未登录点击登录页的功能入口：把目标写进地址（`router/feature.js` 白名单），并给一句提示。
+ *
+ * 提示语是**登录前**说的，只描述意图，不承诺结果：真正能不能进由登录后候选路由的
+ * `meta.roles` 决定（例如学生点「智能组卷」会在登录后收到那条统一越权提示）。
+ */
 const handleGuestFeature = (feature) => {
-  pendingFeature.value = feature;
+  if (!goLoginWithFeature(feature)) return; // 白名单外的值：地址不动，也不提示
   const messages = {
-    generate: '请先登录教师端，登录后将进入智能组卷',
-    adaptive: '请先登录学生端，登录后将进入自适应练习',
+    generate: '请先登录教师账号，登录后将进入智能组卷',
+    adaptive: '请先登录学生账号，登录后将进入自适应练习',
     analysis: '请先登录账号，登录后将进入对应角色的学情分析',
     profile: '请先登录账号，登录后将进入个人中心',
   };
@@ -939,29 +797,40 @@ const handleGuestFeature = (feature) => {
 
 const handleLogout = () => {
   if (!window.confirm('确定要退出登录吗？')) return;
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  currentUser.value = null;
-  currentView.value = 'papers';
+  clearSession();
+  // 迁移前是 `resetLegacy()`（清遗留状态 + 清答题返回来源）。遗留状态没了，
+  // 现在只清 `examReturnLocation` —— 不清会把「上一个账号退出前所在页面」记进下一个账号。
+  clearExamReturn();
   pendingCount.value = 0;
   closeUserMenu();
   closeSidebarUserMenu();
+  // 退出登录回到登录页，且不带 redirect：重新登录应落角色首页，而不是回到退出前的地址
+  goLogin();
 };
 
 const handlePwdChanged = () => {
   pwdVisible.value = false;
   showToast('密码修改成功，请重新登录', 'success');
   setTimeout(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    currentUser.value = null;
+    clearSession();
+    clearExamReturn();
+    goLogin();
   }, 1500);
 };
 
+/** 401：清会话并回登录页，同时把当前站内地址记进 redirect（重登后能回到原页面）。 */
 const handleAuthExpired = () => {
-  currentUser.value = null;
-  currentView.value = 'papers';
+  const redirect = route.name === ROUTE_NAMES.login ? '' : route.fullPath;
+  clearSession();
+  clearExamReturn();
   showToast('登录已过期，请重新登录', 'warning');
+  goLogin({ redirect });
+};
+
+/** 守卫（组件之外）的提示通道：与 toast 共用同一个 showToast。 */
+const handleToastEvent = (event) => {
+  const detail = event?.detail;
+  if (detail?.message) showToast(detail.message, detail.type);
 };
 
 // ================================================================
@@ -978,305 +847,60 @@ const showToast = (message, type = 'info') => {
   }, 10);
 };
 
-const handleToastFromChild = ({ message, type }) => {
-  showToast(message, type);
-};
+// 子组件（含试点页面）统一用这个通道弹提示，不再各自直连 toast 内部状态。
+// ⚠️ 必须放在 showToast 的 `const` **之后**：`provide(...)` 是在 setup 执行期同步求值的，
+// 写到前面会撞上 TDZ，直接抛 ReferenceError 让整个 App 挂不起来（构建期发现不了，只有真机运行才暴露）。
+provide('appToast', showToast);
+
+// ⚠️ R3 删除了 `handleToastFromChild`（`({message,type}) => showToast(...)` 的拆包壳）。
+// 它的两个消费者 `UserManagement` / `RegistrationAudit` 的 `@toast` 已随各自正文
+// 搬到 `views/admin/AdminUsersPage.vue` / `views/admin/AdminAuditPage.vue`，那两处各有
+// 一份同形态的 `onToast`（拆包逻辑相同，只是走本组件 provide 出去的 `appToast`）。
+// 与 `openRecommendedPractice` 同类：**迁移的直接后果**，不是 R6 要清的既存死代码。
+
 
 // ================================================================
 // 题库管理
 // ================================================================
-const list = ref([]);
-const total = ref(0);
-const page = ref(1);
-const pageSize = ref(20);
-const loading = ref(false);
-const selectedIds = ref([]);
-const importVisible = ref(false);
-const aiVisible = ref(false);
-const imageRecognitionVisible = ref(false);
-const stats = ref(null);
-
-const filters = reactive({
-  id: '',
-  关键词: '',
-  题型: '',
-  难度: '',
-  章节: '',
-  出题人: '',
-  科目: '',
-});
-
-const dialogVisible = ref(false);
-const isEdit = ref(false);
-const formData = ref({});
-const viewVisible = ref(false);
-const viewData = ref({});
-
-watch(page, () => {
-  selectedIds.value = [];
-});
-
-watch(currentView, (val) => {
-  if (val === 'main' && currentUser.value?.role === 'student') {
-    currentView.value = 'papers';
-  }
-});
-
-const loadData = async () => {
-  loading.value = true;
-  try {
-    const params = {
-      page: page.value,
-      pageSize: pageSize.value,
-    };
-    if (filters.id) params.id = filters.id;
-    if (filters.关键词) params.关键词 = filters.关键词;
-    if (filters.题型) params.题型 = filters.题型;
-    if (filters.难度) params.难度 = filters.难度;
-    if (filters.章节) params.章节 = filters.章节;
-    if (filters.出题人) params.出题人 = filters.出题人;
-    if (filters.科目) params.科目 = filters.科目;
-
-    const data = await getQuestions(params);
-    list.value = data.list;
-    total.value = data.total;
-  } catch (error) {
-    showToast(error.message || '加载数据失败', 'error');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const loadStats = async () => {
-  try {
-    stats.value = await getStatistics();
-  } catch (e) {
-    console.warn('统计加载失败:', e);
-  }
-};
-
-const handleSearch = (newFilters) => {
-  Object.assign(filters, newFilters);
-  page.value = 1;
-  loadData();
-};
-
-const handleReset = () => {
-  filters.id = '';
-  filters.关键词 = '';
-  filters.题型 = '';
-  filters.难度 = '';
-  filters.章节 = '';
-  filters.出题人 = '';
-  filters.科目 = '';
-  page.value = 1;
-  loadData();
-};
-
-const handlePageChange = ({ page: newPage, pageSize: newSize }) => {
-  page.value = newPage;
-  pageSize.value = newSize;
-  loadData();
-};
-
-const generateId = () => {
-  const maxId = list.value.reduce((max, item) => {
-    const num = parseInt(item.id.replace(/\D/g, ''), 10);
-    return num > max ? num : max;
-  }, 0);
-  return `Q${String(maxId + 1).padStart(3, '0')}`;
-};
-
-const openAddDialog = () => {
-  isEdit.value = false;
-  const teacherSubjects = currentUser.value?.subjects || [];
-  const defaultSubject = teacherSubjects.length === 1 ? teacherSubjects[0] : '';
-  formData.value = {
-    id: generateId(),
-    章节: '',
-    题型: 2,
-    序号: 0,
-    题目: '',
-    选项: '',
-    答案: '',
-    解析: '',
-    难度: '',
-    知识点: '',
-    使用频率: '',
-    出题人: '',
-    科目: defaultSubject,
-  };
-  dialogVisible.value = true;
-};
-
-const openEditDialog = (item) => {
-  isEdit.value = true;
-  formData.value = { ...item };
-  dialogVisible.value = true;
-};
-
-const openViewDialog = (item) => {
-  viewData.value = { ...item };
-  viewVisible.value = true;
-};
-
-const handleSubmit = async (payload) => {
-  try {
-    if (isEdit.value) {
-      await updateQuestion(payload.id, payload);
-      showToast('✅ 修改成功', 'success');
-    } else {
-      await addQuestion(payload);
-      showToast('✅ 新增成功', 'success');
-    }
-    dialogVisible.value = false;
-    loadData();
-    loadStats();
-  } catch (error) {
-    showToast(error.message || '操作失败', 'error');
-  }
-};
-
-const handleDelete = async (item) => {
-  if (!window.confirm(`确定要删除题目「${item.题目?.substring(0, 20)}${item.题目?.length > 20 ? '...' : ''}」吗？`)) {
-    return;
-  }
-  try {
-    await deleteQuestion(item.id);
-    showToast('✅ 删除成功', 'success');
-    if (list.value.length === 1 && page.value > 1) {
-      page.value--;
-    }
-    loadData();
-    loadStats();
-  } catch (error) {
-    showToast(error.message || '删除失败', 'error');
-  }
-};
-
-const handleBatchDelete = async () => {
-  if (selectedIds.value.length === 0) return;
-  if (!window.confirm(`确定要批量删除选中的 ${selectedIds.value.length} 条题目吗？`)) return;
-
-  loading.value = true;
-  try {
-    const result = await batchDeleteQuestions(selectedIds.value);
-    const deleted = result?.deleted ?? selectedIds.value.length;
-    showToast(`✅ 批量删除成功，共删除 ${deleted} 条`, 'success');
-    selectedIds.value = [];
-    const remainingInPage = list.value.length - deleted;
-    if (remainingInPage <= 0 && page.value > 1) {
-      page.value--;
-    }
-    await loadData();
-    await loadStats();
-  } catch (error) {
-    showToast(error.message || '批量删除失败', 'error');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const handleImportSuccess = (result) => {
-  const { inserted = 0, skipped = 0, invalid = 0 } = result || {};
-  const msg = `导入完成：成功 ${inserted} 条，跳过 ${skipped} 条，无效 ${invalid} 条`;
-  if (inserted > 0) {
-    loadData();
-    loadStats();
-  }
-  if (invalid > 0 || skipped > 0) {
-    showToast(msg, 'warning');
-  } else {
-    showToast(msg, 'success');
-  }
-};
-
-const handleAiSuccess = (result) => {
-  const { inserted = 0, skipped = 0 } = result || {};
-  const msg = `AI 出题入库完成：成功 ${inserted} 条，跳过 ${skipped} 条`;
-  if (inserted > 0) {
-    loadData();
-    loadStats();
-  }
-  if (skipped > 0) {
-    showToast(msg, 'warning');
-  } else {
-    showToast(msg, 'success');
-  }
-  aiVisible.value = false;
-};
-
-// ================================================================
-// 浏览器历史记录管理（返回键回到登录页）
-// ================================================================
-let isNavigatingBack = false;
-
-const getViewState = () => ({
-  view: currentView.value,
-  practiceView: practiceView.value,
-  loggedIn: !!currentUser.value,
-});
-
-const applyViewState = (state) => {
-  if (!state) return false;
-  if (state.loggedIn === false || !state.view) {
-    currentUser.value = null;
-    sidebarOpen.value = false;
-    return true;
-  }
-  const validViews = ['main', 'users', 'audit', 'feedback', 'profile', 'practice', 'papers'];
-  if (!validViews.includes(state.view)) return false;
-  currentView.value = state.view;
-  if (state.view === 'practice' && state.practiceView) {
-    practiceView.value = state.practiceView;
-  }
-  sidebarOpen.value = false;
-  return true;
-};
-
-const handlePopState = (event) => {
-  if (isNavigatingBack) return;
-  isNavigatingBack = true;
-  const restored = event.state && (event.state.view || event.state.loggedIn === false)
-    ? applyViewState(event.state)
-    : false;
-  if (!restored) {
-    window.history.pushState(getViewState(), '');
-  }
-  nextTick(() => {
-    isNavigatingBack = false;
-  });
-};
-
-watch([currentView, practiceView], () => {
-  if (!isNavigatingBack && currentUser.value) {
-    window.history.pushState(getViewState(), '');
-  }
-  if (currentView.value === 'practice' && practiceView.value === 'generate') {
-    generateExamMounted.value = true;
-  }
-}, { flush: 'post' });
+// ⚠️ R3：整段移除。原 `App.vue` 的这一节（状态 21 项 / `loadData` / `loadStats` /
+// `handleSearch` / `handleReset` / `handlePageChange` / `generateId` / `openAddDialog` /
+// `openEditDialog` / `openViewDialog` / `handleSubmit` / `handleDelete` / `handleBatchDelete` /
+// `handleImportSuccess` / `handleAiSuccess`，以及两个 watcher）**逐字搬到了**
+// `views/manage/QuestionBankPage.vue`（命名路由 `manage.questions`）。
+// 搬移前后的一致性核对见 `docs/R3 验收报告.md`「机械搬移一致性」一节。
+//
+// 两个 watcher 的去向不同，都不是「顺手删」：
+//   - `watch(page, …清空勾选)` → 随 `selectedIds` 一起搬进新视图（原样保留）；
+//   - `watch(currentView, …把学生的 main 纠正回 papers)` → **删除**。它纠正的是一个
+//     学生根本不该到达的状态（题库管理是 teacher/admin 页面），R3 之后 `meta.roles`
+//     在守卫里**事前拒绝**，比组件内事后纠正更强。
+//
+// 因此 `reactive` / `watch` 两个 import 也随之不再需要（本文件已无其他消费方）。
 
 // ================================================================
 // 生命周期
 // ================================================================
 onMounted(() => {
-  restoreSession();
+  // 会话在 router/session.js 模块初始化时已恢复，这里不再重复恢复，也不改写地址
+  //
+  // ⚠️ 迁移前这里还有 `loadData()` / `loadStats()`（题库列表 + 统计），对**任意已登录角色**
+  // 都会发请求（学生、以及根本不看题库页的管理员也照发）。它们现在挂在
+  // `views/manage/QuestionBankPage.vue` 的 `onMounted`，只在真正进入题库管理时执行。
+  // 这是「正文不再挂在根组件上」的必然结果，方向是**减少**无谓请求；逐条副作用对账见验收报告。
+  //
+  // `loadPendingCount()` **留在原处**：它刷新侧栏「注册审核」角标，与在哪一页无关。
   if (currentUser.value) {
-    loadData();
-    loadStats();
     loadPendingCount();
   }
   document.addEventListener('click', handleClickOutside);
   window.addEventListener('auth-expired', handleAuthExpired);
-  window.addEventListener('popstate', handlePopState);
-  window.history.replaceState(getViewState(), '');
+  window.addEventListener('iq-toast', handleToastEvent);
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
   window.removeEventListener('auth-expired', handleAuthExpired);
-  window.removeEventListener('popstate', handlePopState);
+  window.removeEventListener('iq-toast', handleToastEvent);
 });
 </script>
 
@@ -1832,14 +1456,6 @@ onUnmounted(() => {
   color: #1E293B;
   font-weight: 500;
 }
-.breadcrumb-link {
-  color: #94A3B8;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-.breadcrumb-link:hover {
-  color: #6366F1;
-}
 
 .iq-header-right {
   display: flex;
@@ -1903,6 +1519,24 @@ onUnmounted(() => {
   min-height: 100vh;
   background: #F8FAFC;
 }
+
+/* ============================================================================
+   ⚠️ R3 说明：以下直到「子导航」结束的这一段（`.question-bank-page` / `.iq-stat-*` /
+   `.iq-subject-summary*` / `.iq-page-hero` / `.hero-*` / `.hero-actions` / `.iq-btn*` /
+   `.iq-practice-subnav` / `.iq-subnav-btn`）**在 App.vue 的模板里已经没有消费者** ——
+   题库管理正文已搬进 `views/manage/QuestionBankPage.vue`（自带一份逐字相同的 scoped 副本），
+   出卷管理的子导航已搬进 `views/manage/ManageExamsPage.vue`（同样自带副本）。
+
+   **本轮故意不删除它们**，两个理由：
+     1. 本轮对样式的要求是「只允许机械搬移，禁止顺手重写」——删除是**逆**方向的改动，
+        同样需要逐类核对「是否有本文件的元素仍在用」，而这份核对的价值远低于误删的风险；
+     2. `<style scoped>` 的作用域规则是「本模板的元素 + 直接子组件的根元素」，
+        而 `<router-view>` 渲染出的视图是否继承 App.vue 的 scope id 需要实测才能下结论
+        （验收报告里记录了这次实测的结果）。在结论落地之前删除属于**拿不准就改**。
+
+   因此这段按「与本次迁移无关的既存代码」对待，与 `isOnMigratedRoute` 一起列为
+   R6（死代码清理）的候选删除项。**它们不会影响任何页面**：本模板已无对应 class。
+   ============================================================================ */
 
 /* ===== 题库管理页面容器（与学情分析宽度一致） ===== */
 .question-bank-page {

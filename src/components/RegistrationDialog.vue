@@ -1,11 +1,15 @@
 <template>
   <Teleport to="body">
     <Transition name="modal-fade">
-      <div v-if="visible" class="iq-modal-overlay" @click.self="$emit('close')">
-        <div class="iq-modal iq-modal-md">
+      <div v-if="visible" class="iq-modal-overlay registration-overlay" @click.self="$emit('close')">
+        <div class="iq-modal iq-modal-md registration-dialog" role="dialog" aria-modal="true" aria-labelledby="registration-title">
           <div class="iq-modal-header">
-            <h3 class="iq-modal-title">注册申请</h3>
-            <button class="iq-modal-close" @click="$emit('close')">
+            <div>
+              <span class="registration-eyebrow">智能题库 · 新用户</span>
+              <h3 id="registration-title" class="iq-modal-title">注册申请</h3>
+              <p class="registration-subtitle">选择你的身份，填写信息，开启智慧学习与教学</p>
+            </div>
+            <button class="iq-modal-close" aria-label="关闭注册窗口" @click="$emit('close')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -23,13 +27,14 @@
               提交注册申请后，需等待管理员审核通过方可登录使用
             </div>
 
-            <div class="iq-form-field">
+            <div class="iq-form-field registration-wide">
               <label class="iq-form-label">申请角色 <span class="iq-form-required">*</span></label>
               <div class="iq-role-selector">
                 <button
                   type="button"
                   class="iq-role-option"
                   :class="{ active: form.role === 'student' }"
+                  :aria-pressed="form.role === 'student'"
                   @click="form.role = 'student'"
                 >
                   <span class="iq-role-icon">🎓</span>
@@ -39,6 +44,7 @@
                   type="button"
                   class="iq-role-option"
                   :class="{ active: form.role === 'teacher' }"
+                  :aria-pressed="form.role === 'teacher'"
                   @click="form.role = 'teacher'"
                 >
                   <span class="iq-role-icon">👨‍🏫</span>
@@ -47,6 +53,7 @@
               </div>
             </div>
 
+            <h4 class="registration-section">账号信息</h4>
             <div class="iq-form-field">
               <label class="iq-form-label">用户名 <span class="iq-form-required">*</span></label>
               <input v-model="form.username" type="text" class="iq-input" placeholder="请输入用户名" />
@@ -67,6 +74,7 @@
               <input v-model="form.confirmPassword" type="password" class="iq-input" placeholder="再次输入密码" />
             </div>
 
+            <h4 class="registration-section">{{ form.role === 'student' ? '学籍信息' : '教学信息' }}</h4>
             <!-- 学生专属字段 -->
             <template v-if="form.role === 'student'">
               <div class="iq-form-field">
@@ -83,7 +91,7 @@
                   <option v-for="m in majorOptions" :key="m" :value="m">{{ m }}</option>
                 </select>
               </div>
-              <div class="iq-form-field">
+              <div class="iq-form-field registration-wide">
                 <label class="iq-form-label">学号 <span class="iq-form-required">*</span></label>
                 <input v-model="form.student_no" type="text" class="iq-input" placeholder="请输入学号" maxlength="20" />
                 <span class="iq-text-xs iq-text-muted">学号将用于注册后自动匹配对应年级/专业的必修班级；选修班级由任课教师在「班级管理」中添加</span>
@@ -103,7 +111,7 @@
                   <option v-for="c in collegeOptions" :key="c" :value="c">{{ c }}</option>
                 </select>
               </div>
-              <div class="iq-form-field">
+              <div class="iq-form-field registration-wide">
                 <label class="iq-form-label">所教科目 <span class="iq-form-required">*</span></label>
                 <el-select v-model="form.subjects" multiple filterable allow-create default-first-option
                            placeholder="搜索或输入新科目后回车" style="width:100%">
@@ -113,7 +121,7 @@
               </div>
             </template>
 
-            <div v-if="errorMsg" class="iq-form-alert-error">
+            <div v-if="errorMsg" class="iq-form-alert-error" role="alert">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"></circle>
                 <line x1="12" y1="8" x2="12" y2="12"></line>
@@ -457,4 +465,37 @@ const handleSubmit = async () => {
 }
 .iq-text-xs { font-size: 12px; }
 .iq-text-muted { color: var(--iq-neutral-500); }
+
+/* 独立注册样式，不影响其他业务弹窗。 */
+.registration-overlay { padding: 24px; background: rgb(15 23 42 / 48%); backdrop-filter: blur(5px); }
+.registration-dialog { width: 100%; max-width: 680px; max-height: calc(100dvh - 48px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgb(255 255 255 / 70%); border-radius: 24px; box-shadow: 0 24px 80px rgb(15 23 42 / 24%); }
+.registration-dialog .iq-modal-header { flex: none; align-items: flex-start; padding: 24px 28px 20px; background: linear-gradient(135deg, #eff6ff, #f8fafc 70%); }
+.registration-eyebrow { display: block; margin-bottom: 8px; color: #2563eb; font-size: 12px; font-weight: 600; letter-spacing: 1px; }
+.registration-dialog .iq-modal-title { font-size: 24px; letter-spacing: -.5px; }
+.registration-subtitle { margin: 8px 0 0; color: #64748b; font-size: 13px; line-height: 1.6; }
+.registration-dialog .iq-modal-close { background: white; border: 1px solid #e2e8f0; color: #64748b; flex: none; }
+.registration-dialog .iq-modal-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px 20px; margin: 0; padding: 20px 28px 0; overflow-y: auto; min-height: 0; }
+.registration-wide, .registration-section, .registration-dialog .iq-form-tip, .registration-dialog .iq-form-alert-error, .registration-dialog .iq-modal-footer { grid-column: 1 / -1; }
+.registration-dialog .iq-form-tip { margin: 0; border: 0; background: #eff6ff; color: #475569; font-size: 12px; }
+.registration-section { margin: 4px 0 -4px; display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; color: #334155; }
+.registration-section::after { content: ''; height: 1px; flex: 1; background: #e2e8f0; }
+.registration-dialog .iq-form-field { min-width: 0; margin-bottom: 0; gap: 8px; }
+.registration-dialog .iq-role-option { flex-direction: row; justify-content: center; gap: 10px; padding: 12px; border-width: 1px; border-radius: 12px; }
+.registration-dialog .iq-role-option.active { border-color: #3b82f6; box-shadow: 0 0 0 2px rgb(59 130 246 / 10%); }
+.registration-dialog .iq-role-name { font-size: 14px; font-weight: 600; }
+.registration-dialog .iq-input, .registration-dialog .iq-select { width: 100%; min-height: 42px; border-radius: 10px; background: #f8fafc; }
+.registration-dialog .iq-input:focus, .registration-dialog .iq-select:focus { background: white; outline: 2px solid rgb(59 130 246 / 18%); outline-offset: 1px; }
+.registration-dialog :deep(.el-select__wrapper) { min-height: 42px; border-radius: 10px; background: #f8fafc; }
+.registration-dialog .iq-text-muted { line-height: 1.6; }
+.registration-dialog .iq-form-alert-error { margin: 0; }
+.registration-dialog .iq-modal-footer { position: sticky; bottom: 0; margin: 0 -28px; padding: 16px 28px; background: rgb(255 255 255 / 98%); border-top: 1px solid #e2e8f0; z-index: 1; }
+.registration-dialog .iq-modal-footer .iq-btn { min-width: 100px; border-radius: 10px; }
+@media (max-width: 560px) {
+  .registration-overlay { padding: 12px; }
+  .registration-dialog { max-height: calc(100dvh - 24px); border-radius: 18px; }
+  .registration-dialog .iq-modal-header { padding: 20px; }
+  .registration-dialog .iq-modal-title { font-size: 22px; }
+  .registration-dialog .iq-modal-body { grid-template-columns: minmax(0, 1fr); padding: 16px 20px 0; gap: 14px; }
+  .registration-dialog .iq-modal-footer { margin: 0 -20px; padding: 14px 20px; }
+}
 </style>

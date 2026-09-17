@@ -99,7 +99,8 @@
     </div>
 
     <el-dialog v-model="subjectVisible" title="修改所教科目" width="560px" destroy-on-close>
-      <el-select v-model="subjectForm" multiple filterable allow-create default-first-option
+      <el-select ref="subjectSelect" v-model="subjectForm" multiple filterable allow-create default-first-option
+                 @change="closeSubjectDropdown"
                  placeholder="搜索或输入新科目后回车" style="width:100%">
         <el-option v-for="item in subjectOptions" :key="item" :label="item" :value="item" />
       </el-select>
@@ -196,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import { getStudentProfile, updateProfile } from '@/api/student';
 import { changePassword } from '@/api/auth';
@@ -274,6 +275,8 @@ const subjectVisible = ref(false);
 const subjectLoading = ref(false);
 const subjectOptions = ref([]);
 const subjectForm = ref([]);
+const subjectSelect = ref(null);
+const closeSubjectDropdown = () => nextTick(() => subjectSelect.value?.blur());
 const editForm = ref({
   username: '',
   role: '',

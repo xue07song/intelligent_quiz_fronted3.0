@@ -201,20 +201,6 @@
         </div>
         <div v-if="confirmedExamIds.length" class="step-actions" style="justify-content:center"><button type="button" class="iq-btn iq-btn-primary" @click="startNewExam">完成</button></div>
       </template>
-      <template v-else>
-      <div class="result-head"><div><h3>{{ aiResult ? '辅助组卷成功' : '组卷成功' }}</h3><p>{{ result.title }} · 共 {{ result.total }} 题 · 客观题 {{ result.objectiveCount }} 题</p></div><div class="result-actions"><button type="button" class="iq-btn iq-btn-secondary" @click="builderStep = 4">上一步</button><button type="button" class="iq-btn iq-btn-secondary" @click="startNewExam">继续组卷</button><button v-if="!aiResult" class="iq-btn iq-btn-secondary" :disabled="loading" @click="handleRegenerate">{{ loading ? '正在重新生成...' : '条件不变，换一套题' }}</button><button v-if="result.examId" class="iq-btn iq-btn-secondary" @click="exportVisible = true">导出试卷</button><button class="iq-btn iq-btn-primary" @click="emit('start-exam', result.examId)">开始答题</button></div></div>
-      <div v-if="!aiResult" class="info-note">如果对本次题目不满意，可以按相同章节、题型、难度和知识点要求重新抽取；新试卷会保留在试卷列表中。</div>
-      <template v-if="result.report">
-        <div class="report-grid">
-          <div><h4>题型：目标 / 实际</h4><p v-for="type in typeOptions" :key="type.value">{{ type.label }}：{{ result.report.targetTypeDistribution[type.value] || 0 }} / {{ result.report.actualTypeDistribution[type.value] || 0 }}</p></div>
-          <div><h4>难度：目标 / 实际</h4><p v-for="level in 5" :key="level">难度{{ level }}：{{ result.report.targetDifficultyDistribution[level] || 0 }} / {{ result.report.actualDifficultyDistribution[level] || 0 }}</p></div>
-          <div><h4>知识点覆盖</h4><div class="point-list"><span v-for="point in result.report.knowledgePoints" :key="point">{{ point }}</span></div><p>首次进入试卷的题目：{{ result.report.unusedQuestionCount }} 道</p></div>
-        </div>
-        <div v-if="result.report.warnings.length" class="warning-note"><b>调整说明</b><span v-for="warning in result.report.warnings" :key="warning">{{ warning }}</span></div>
-        <div v-else class="success-note">全部组卷约束均已满足。</div>
-      </template>
-      <div v-else-if="result.strategy" class="strategy-note">{{ result.strategy }}</div>
-      </template>
     </section>
 
     <ExamExportDialog
@@ -248,7 +234,7 @@ const props = defineProps({
   role: { type: String, default: 'teacher' },
   subjects: { type: Array, default: () => [] },
 });
-const emit = defineEmits(['start-exam', 'toast']);
+const emit = defineEmits(['toast']);
 const typeOptions = TYPE_OPTIONS;
 const difficultyNames = { 1: '入门', 2: '简单', 3: '中等', 4: '困难', 5: '挑战' };
 const templates = [{ key: 'basic', label: '基础练习' }, { key: 'standard', label: '标准练习' }, { key: 'advanced', label: '提升练习' }];
@@ -272,7 +258,7 @@ const paperPresets = [
 ];
 const form = reactive({ title: '', chapters: [], knowledgePoints: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classIds: [], durationMinutes: '', endAt: '', maxAttempts: '', examNature: { university: '', yearStart: '', yearEnd: '', semester: '秋季', examPrefix: '计算机导论', paperType: 'A', examMethod: '闭卷' } });
 const builderStep = ref(1);
-const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), planGenerating = ref(false), result = ref(null), aiResult = ref(false), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref(''), activePaperPreset = ref(''), activePaperVariant = ref('');
+const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), planGenerating = ref(false), result = ref(null), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref(''), activePaperPreset = ref(''), activePaperVariant = ref('');
 const assistPlans = ref([]);
 const generatedExams = ref([]);
 const selectedExamIds = ref([]);
@@ -424,10 +410,9 @@ const buildRulePayload = () => ({
 });
 const subjectOptions = computed(() => {
   // 教师：限自己所教科目；管理员：全部科目
-  if (props.role === 'teacher' && props.subjects?.length > 0) {
-    const filtered = props.subjects.filter(item => allSubjects.value.includes(item));
-    // 如果教师存储的科目与当前题库不匹配（如科目已迁移），fallback 到全部有题目的科目
-    return filtered.length > 0 ? filtered : allSubjects.value;
+  if (props.role === 'teacher') {
+    // 科目迁移后旧会话不匹配时也不能放宽到全部科目；更新所教科目后再选择。
+    return (props.subjects || []).filter(item => allSubjects.value.includes(item));
   }
   return allSubjects.value;
 });
@@ -449,13 +434,13 @@ onMounted(async () => {
       const clsData = await getClasses();
       classList.value = Array.isArray(clsData) ? clsData : (clsData.list || []);
     } catch { /* ignore */ }
-    // 教师只有一个科目时默认选中；或旧 session 科目不匹配时自动选唯一可用科目
+    // 仅在当前角色可用科目范围内默认选择。
     if (props.role === 'teacher' && props.subjects?.length === 1 && allSubjects.value.includes(props.subjects[0])) {
       form.subject = props.subjects[0];
       chapterOptions.value = await getSubjectChapters(form.subject);
       knowledgeOptions.value = await getSubjectKnowledgePoints(form.subject);
-    } else if (allSubjects.value.length === 1) {
-      form.subject = allSubjects.value[0];
+    } else if (subjectOptions.value.length === 1) {
+      form.subject = subjectOptions.value[0];
       chapterOptions.value = await getSubjectChapters(form.subject);
       knowledgeOptions.value = await getSubjectKnowledgePoints(form.subject);
     }
@@ -535,7 +520,6 @@ const setAlternativePlan = (plan, keepPreset = false) => {
 const applyAlternativePlan = (plan) => { presetNotice.value = ''; setAlternativePlan(plan, !!activePaperPreset.value); };
 const startNewExam = () => {
   result.value = null;
-  aiResult.value = false;
   assistPlans.value = [];
   generatedExams.value = [];
   selectedExamIds.value = [];
@@ -545,21 +529,6 @@ const startNewExam = () => {
   builderStep.value = 1;
 };
 const handleGenerate = async () => { errorMsg.value=validate(); if(errorMsg.value)return; if(!preview.value?.feasible){errorMsg.value='当前设置未通过题型与难度组合检查，请先调整后再生成';return;} await generateFiveFromPlan({ id: 'current-config', title: form.title || '组卷方案', typeDistribution: { ...form.typeDistribution }, difficultyDistribution: { ...form.difficultyDistribution }, minKnowledgePoints: form.minKnowledgePoints }); };
-const handleRegenerate = async () => {
-  if (!preview.value?.feasible || loading.value) return;
-  loading.value = true;
-  errorMsg.value = '';
-  try {
-    const payload = buildRulePayload();
-    const baseTitle = String(form.title || result.value?.title || '智能试卷').replace(/-重组-\d{6}$/, '');
-    const stamp = new Date().toTimeString().slice(0,8).replace(/:/g,'');
-    payload.title = `${baseTitle}-重组-${stamp}`;
-    result.value = await generateRuleExam(payload);
-    aiResult.value = false;
-    emit('toast',{message:'已按相同条件重新生成一套试卷',type:'success'});
-  } catch (err) { errorMsg.value=err.message||'重新生成失败'; schedulePreview(); }
-  finally { loading.value=false; }
-};
 const buildAssistPlans = () => {
   if (preview.value?.alternativePlans?.length) return preview.value.alternativePlans;
   const availablePoints = form.knowledgePoints.length || inventory.value?.knowledgePoints?.length || 0;
@@ -680,7 +649,6 @@ const generateFiveFromPlan = async (plan) => {
     selectedExamIds.value = [];
     confirmedExamIds.value = [];
     result.value = exams[0];
-    aiResult.value = false;
     assistPlans.value = [];
     builderStep.value = 6;
     emit('toast', { message: '已生成 5 套不同试卷', type: 'success' });
@@ -749,20 +717,14 @@ const handleSmartExam = async () => {
 .distribution-item b{font-size:12px;color:var(--iq-neutral-500)}
 .sum-ok,.ok{color:#059669!important}
 .sum-bad,.bad{color:#dc2626!important}
-.info-note,.error-note,.warning-note,.success-note,.strategy-note{padding:11px 13px;border-radius:8px;margin-top:12px;font-size:13px}
+.info-note,.error-note,.success-note{padding:11px 13px;border-radius:8px;margin-top:12px;font-size:13px}
 .info-note{background:#eff6ff;color:#1d4ed8}
 .error-note{background:#fef2f2;color:#b91c1c}
 .success-note{background:#ecfdf5;color:#047857}
-.warning-note{background:#fffbeb;color:#92400e;display:flex;flex-direction:column;gap:4px}
 .check-list{display:flex;flex-wrap:wrap;gap:18px;font-size:13px}
 .ai-btn{background:#7c3aed;color:#fff;border-color:#7c3aed}
 .result-card{border-left:4px solid #10b981}
 .result-head h3{margin:0}
-.report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-.report-grid h4{margin:0 0 10px}
-.report-grid p{margin:5px 0;font-size:13px}
-.point-list{display:flex;flex-wrap:wrap;gap:5px}
-.point-list span{background:var(--iq-primary-50);color:var(--iq-primary-700);padding:3px 8px;border-radius:15px;font-size:12px}
 
 .chapter-selector{margin-top:20px;padding:18px;border:1px solid #dbe3f0;border-radius:12px;background:#f8fafc}
 .chapter-selector-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
@@ -907,7 +869,7 @@ const handleSmartExam = async () => {
 .iq-btn-sm { padding: 6px 12px; font-size: 13px; }
 
 @media(max-width:900px){.chapter-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.difficulty-grid{grid-template-columns:repeat(3,1fr)}.assistant-plan-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:800px){.base-grid,.distribution-grid,.report-grid,.alternative-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.base-grid,.distribution-grid,.difficulty-grid,.report-grid,.paper-presets,.alternative-grid,.variant-grid,.assistant-plan-grid{grid-template-columns:1fr}.chapter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-selector-head,.alternative-heading,.variant-panel-head,.result-head{flex-direction:column}.chapter-actions{width:100%}.chapter-action{flex:1}.result-actions,.step-actions{width:100%;flex-direction:column}.step-actions .iq-btn{justify-content:center}.assistant-plan-footer{flex-direction:column;align-items:stretch}.assistant-plan-footer .iq-btn{justify-content:center}.editor-two-col{grid-template-columns:1fr}}
+@media(max-width:800px){.base-grid,.distribution-grid,.alternative-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.base-grid,.distribution-grid,.difficulty-grid,.paper-presets,.alternative-grid,.variant-grid,.assistant-plan-grid{grid-template-columns:1fr}.chapter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chapter-selector-head,.alternative-heading,.variant-panel-head,.result-head{flex-direction:column}.chapter-actions{width:100%}.chapter-action{flex:1}.result-actions,.step-actions{width:100%;flex-direction:column}.step-actions .iq-btn{justify-content:center}.assistant-plan-footer{flex-direction:column;align-items:stretch}.assistant-plan-footer .iq-btn{justify-content:center}.editor-two-col{grid-template-columns:1fr}}
 .chapter-chip{grid-template-columns:24px minmax(0,1fr);min-height:78px}.chapter-name{display:grid;gap:2px;min-width:0}.chapter-name b{font-size:13px}.chapter-name em{font-size:12px;line-height:1.35;font-style:normal;font-weight:500;color:#475569;overflow-wrap:anywhere}.chapter-chip.active .chapter-name em{color:#4338ca}.selected-summary>div{min-width:0}.selected-summary small{line-height:1.6}
 </style>

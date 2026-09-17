@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="modal-fade">
-      <div v-if="visible" class="iq-modal-overlay" @click.self="$emit('close')">
+      <div v-if="visible" class="iq-modal-overlay" @click.self="handleClose">
         <div class="iq-modal iq-modal-xl">
           <div class="iq-modal-header">
             <div class="iq-modal-title-wrap">
@@ -19,7 +19,7 @@
                 <p class="iq-modal-subtitle">{{ isEdit ? '修改题目信息后点击确认保存' : '填写题目信息后点击确认创建' }}</p>
               </div>
             </div>
-            <button class="iq-modal-close" @click="$emit('close')">
+            <button class="iq-modal-close" @click="handleClose">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -97,7 +97,7 @@
             </div>
 
             <div class="iq-modal-footer">
-              <button type="button" class="iq-btn iq-btn-secondary" @click="$emit('close')">取消</button>
+              <button type="button" class="iq-btn iq-btn-secondary" @click="handleClose">取消</button>
               <button type="submit" class="iq-btn iq-btn-primary" :disabled="submitting.value">
                 <span v-if="submitting.value" class="iq-btn-spinner"></span>
                 {{ submitting.value ? '提交中...' : (isEdit ? '确认修改' : '确认新增') }}
@@ -112,6 +112,7 @@
 
 <script setup>
 import { reactive, watch, ref, onMounted, computed } from 'vue';
+import { confirmQuestionChange } from './questionSafety';
 import { TYPE_OPTIONS, DIFFICULTY_OPTIONS } from '@/utils/constants';
 import { getSubjects } from '@/api/subject';
 
@@ -154,6 +155,17 @@ const defaultForm = () => ({
 });
 
 const form = reactive(defaultForm());
+const originalForm = ref({});
+const changedFields = () => Object.keys(defaultForm()).filter(key => String(form[key] ?? '') !== String(originalForm.value[key] ?? ''));
+let confirming = false;
+const handleClose = async () => {
+  if (confirming) return;
+  confirming = true;
+  try {
+    if (changedFields().length && !await confirmQuestionChange('表单有未保存修改，确定放弃并关闭吗？', '未保存修改')) return;
+    emit('close');
+  } finally { confirming = false; }
+};
 const submitting = reactive({ value: false });
 
 watch(
@@ -162,6 +174,7 @@ watch(
     if (props.visible) {
       Object.assign(form, defaultForm(), props.data);
       if (!form.题型) form.题型 = 2;
+      originalForm.value = { ...form };
     }
   },
   { immediate: true }
@@ -216,10 +229,17 @@ const validateForm = () => {
 };
 
 const handleSubmit = async () => {
+  if (confirming || submitting.value) return;
   const errorMsg = validateForm();
   if (errorMsg) {
     alert(errorMsg);
     return;
+  }
+  if (props.isEdit) {
+    confirming = true;
+    try {
+      if (!await confirmQuestionChange(`题目 ID：${form.id}\n题干摘要：${String(form.题目).slice(0, 80)}\n变化字段：${changedFields().join('、') || '无'}`, '确认修改题目')) return;
+    } finally { confirming = false; }
   }
   submitting.value = true;
   try {

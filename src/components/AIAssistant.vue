@@ -184,20 +184,27 @@ import request from '@/utils/request';
 import { TYPE_OPTIONS, DIFFICULTY_OPTIONS, getTypeName } from '@/utils/constants';
 import { askTutor as askTutorApi, getWeakness, smartExam } from '@/api/ai';
 import { createWrongExam } from '@/api/practice';
+// R1：助手的跳转一律走统一导航入口，不再直写父组件的导航状态
+import { goAiBusiness } from '@/router/nav';
 
 const emit = defineEmits(['start-exam']);
 
 const assistantState = inject('assistantState', {
-  currentView: ref('practice'),
-  practiceView: ref('exams'),
+  // ⚠️ R3：这个兜底对象里**只剩下路由派生值与题目/试卷上下文**。
+  // 原来还有 `currentView: ref('practice')` / `practiceView: ref('exams')` 两个默认 ref ——
+  // 它们兜的是「没有 provider 时也要能算 contextMode/currentPage」。遗留状态删除后
+  // 根组件不再 provide 这两个键，留着默认值只会让「没有 provider」和「有 provider 但值为空」
+  // 两种情况看起来一样，掩盖真正的接线错误。**没有第二个 default 就等于没有第二种语义。**
+  //
+  // 已迁移页面的上下文（由 `route.meta.context` 派生，只读）；没有 provider 时为 null。
+  migratedView: ref(null),
   currentQuestionId: ref(null),
   currentQuestion: ref(null),
   currentExamId: ref(null),
   currentUser: ref(null),
 });
 
-const currentView = assistantState.currentView;
-const practiceView = assistantState.practiceView;
+const migratedView = assistantState.migratedView;
 const currentQuestionId = assistantState.currentQuestionId;
 const currentQuestion = assistantState.currentQuestion;
 const currentExamId = assistantState.currentExamId;
@@ -218,20 +225,51 @@ const examForm = ref({
   count: 10,
 });
 
-const isAnswerPage = computed(() => currentView.value === 'practice' && practiceView.value === 'practice');
+/**
+ * ⚠️ 恒为 `false`，**R2B 起就是 false，R3 只是把「为什么是 false」写准并把表达式钉死**。
+ *
+ * 迁移前它要求 `practiceView === 'practice'`，而那个值只在 `App.vue` 的 `startExam()`
+ * **非学生**分支里被写过 —— 教师/管理员点「开始答题」走的是 `ExamList` 的预览弹窗
+ * `openPreview`，根本不进答题页，所以那条分支**没有任何调用点**（死代码）；
+ * 学生分支只设 `currentView='practice'`，`practiceView` 保持初值 `'exams'` ⇒ 学生答题页上
+ * 这个条件也不成立。**R3 之后 `practiceView` 这个 ref 本身已经不存在了。**
+ *
+ * 它只影响悬浮球的**位置与透明度**（`defaultBallPos` 往上挪 104px、`opacity: 0.9`），
+ * 也就是**样式**。R2B / R3 的边界都明确包括「不改前端样式」，而答题页的**行为**识别
+ * 已经由 `meta.context: 'practice/exam'` 完成了（它同时喂给后端 `currentPage`）。
+ *
+ * 所以这里写成字面 `false` 而不是继续写一个恒假的表达式：判定条件的两端都已消失，
+ * 保留表达式只会让人以为「还有一条为真的路径」。**前后行为完全一致** ——
+ * 迁移前是 false，迁移后还是 false，悬浮球位置与透明度一字未变。
+ * （早先的注释在这里写错过，声称答题页的悬浮球会从高位掉回默认位置；实测不成立，已纠正。）
+ */
+const isAnswerPage = computed(() => false);
 
-const currentPage = computed(() => {
-  if (currentView.value === 'practice') {
-    return practiceView.value === 'practice' ? 'practice/exam' : `practice/${practiceView.value}`;
-  }
-  return currentView.value;
-});
+/**
+ * 上下文判定：**路由是唯一来源**（R3）。
+ *
+ * 迁移前这里是「`migratedView` 优先，否则回落到 `currentView` / `practiceView` 拼串」。
+ * 两者都不是「查表」而是「拼出后端认识的字面量」，其中 `practice/exam` 还是后端
+ * `aiAssistantService.js` 判定 `inExam` 的那个键。R3 之后 5 个学生路由 + 10 个 staff 路由
+ * **每一条都在 `meta.context` 里写好了自己的键**，回落分支永远取不到有效值。
+ *
+ * `?? 'main'` 兜的是四条**地址标记路由**（`login` / `root` / `unknown` / `legacy`）——
+ * 它们没有 `meta.context`，而守卫会在同一帧内把它们重定向走，所以这个值只会存在一瞬。
+ * 取 `'main'` 而不是 `null`：`CONTEXT_META` 里 `main` 是「需要帮忙？告诉我你想练习什么」
+ * 这条与任何具体页面无关的通用文案，正是「还不知道用户在哪一页」时该说的话。
+ */
+const currentPage = computed(() => migratedView?.value ?? 'main');
 
-const contextMode = computed(() => {
-  if (currentView.value !== 'practice') return currentView.value;
-  const p = practiceView.value;
-  return p === 'practice' ? 'exam' : p;
-});
+/**
+ * 悬浮球文案/动作的场景键。与 `currentPage` 同源同值 —— 保留两个 computed 是因为它们
+ * 语义不同（一个发给后端、一个喂 `CONTEXT_META`），合并会让人以为可以分别改。
+ *
+ * ⚠️ 历史上两者**曾经不同值**：迁移前 `currentPage` 是 `` `practice/${practiceView}` ``，
+ * 而 `contextMode` 把 `'practice'` 归一成 `'exam'`。R3 起两者都由 `meta.context` 直接给出，
+ * 不再有归一化步骤 —— 学生答题页的 `meta.context` 就是 `'practice/exam'`，
+ * 而 `CONTEXT_META` 里为它单独写了一条（见该条目的长注释）。
+ */
+const contextMode = computed(() => migratedView?.value ?? 'main');
 
 const CONTEXT_META = {
   exam: {
@@ -311,6 +349,40 @@ const CONTEXT_META = {
       { key: 'smart-exam', label: 'AI 智能组卷' },
       { key: 'weakness', label: '分析薄弱点' },
       { key: 'wrong-exam', label: '错题重练' },
+    ],
+  },
+  /**
+   * 答题页（R2B）。键名来自路由的 `meta.context`，取值 `practice/exam` ——
+   * 它同时是后端 `aiAssistantService.js` 判定 `inExam` 的那个字面量
+   * （探针实测：`practice/exam`+examId ⇒ inExam=true；`exam` / `exam-practice` ⇒ false）。
+   *
+   * ⚠️ **迁移前学生答题页走的不是这个键**（早先的注释在这里写错过，已纠正）：
+   * 那时 `startExam()` 的学生分支只设 `currentView='practice'`、不设 `practiceView`
+   * （初值 `ref('exams')`），于是 `contextMode = 'exams'` —— 悬浮球显示的是**上面那条
+   * `exams`（教师试卷列表）的文案**「试卷列表」已就绪…，`currentPage` 也是 `'practice/exams'`
+   * ⇒ `inExam = false`。也就是说：那是一句**串到答题页上的错文案**，且答题过程中的功能拦截
+   * 当时**并未生效**。
+   *
+   * 所以这条不是「照抄迁移前」，而是**为答题页新写的一份**，并带来两处有意变化
+   * （详见 `routes.js` 同名字面量上的说明与本轮报告）：
+   *   · 文案：换成与答题页相符的一句；
+   *   · `inExam`：false → **true**，方向是**收紧**（只拦不给）。
+   *
+   * 这份内容与上面的 `exam` 条目**逐字相同，只少了两个动作**：
+   * `hint`（看思路）与 `similar`（找同类题）。它们从来就没真正可用过 ——
+   *   · `hint` 依赖 `currentQuestion`，而迁移前 `App.vue` 根本没监听答题页的
+   *     `update-question`，`currentQuestion` 恒为 null，点了只会得到
+   *     「请先进入答题页并选中一道题」；
+   *   · `similar` 依赖后端 `currentPage === 'practice/exam'` 那条分支（`aiAssistantService.js:306`）。
+   *     迁移前学生答题页发的是 `'practice/exams'`，匹配不上 ⇒ 不可达；
+   *     迁移后虽然匹配上了，但 `inExam` 分支（`:260`）**拦在它前面** ⇒ 仍然不可达。
+   * R2B 把答题页搬到真实路由上，不该顺手把这两个按钮摆出来 —— 这是本轮 red line。
+   * 于是 `tip` 也不再承诺「看思路」。
+   */
+  'practice/exam': {
+    tip: '答题中，交卷后可以继续使用完整助手',
+    actions: [
+      { key: 'smart-exam', label: '生成练习卷' },
     ],
   },
   generate: {
@@ -548,9 +620,25 @@ const openAndRun = (key) => {
   runAction(key);
 };
 
-const navigateTo = (view) => {
-  currentView.value = 'practice';
-  practiceView.value = view;
+/**
+ * AI 助手的**唯一**跳转入口（R1，计划书 §4.3）。
+ *
+ * 原来这里直写 `currentView` / `practiceView`——那是经 provide/inject 改父组件的导航状态，
+ * 也就是「导航状态的第二个写入者」（风险 R-1）。R1 起：
+ * - 父组件把这两个 ref 以 `readonly` 提供，直写只会触发告警且不生效；
+ * - 跳转一律交给统一入口 `goAiBusiness`（它在 nav.js 里维护映射表）；
+ * - 映射不到真实页面、或当前角色没有该页面时，返回 `{ok:false, message}`，
+ *   **在助手面板里把原因说清楚，绝不跳到一个相近但不对的页面**；
+ *   这种情况下面板保持打开（`openAndRun` 与消息气泡两条入口都已在面板内）。
+ */
+const navigateTo = (key) => {
+  const result = goAiBusiness(key, currentUser.value?.role);
+  if (!result.ok) {
+    open.value = true;
+    hintVisible.value = false;
+    pushAssistant({ type: 'text', content: result.message });
+    return;
+  }
   closePanel();
 };
 
@@ -633,6 +721,15 @@ const startWrongExam = async () => {
   }
 };
 
+/**
+ * 动作分发。前 5 个是「面板内动作」（不导航），后面 6 个是**跳转键**。
+ *
+ * 跳转键统一走 `navigateTo` → `goAiBusiness`，**不在这里各自写一份映射**：
+ * 入口只有一个，才不会出现「两处映射表说法不一致」。
+ * 这 6 个键里 `adaptive-progress` / `stats` / `wrong-book` / `records` 目前**不在任何
+ * CONTEXT_META.actions 数组里**（无法从上下文按钮触发），保留分支只是为了不改变行为，
+ * 真正可达的是 `learning-analysis`（多个 context + 消息气泡）与 `adaptive`。
+ */
 const runAction = (key) => {
   if (key === 'hint') return askCurrentQuestion();
   if (key === 'similar') return sendMessage('帮我找同类题');
