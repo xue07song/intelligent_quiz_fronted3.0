@@ -134,15 +134,10 @@ const handleExport = async () => {
 </script>
 
 <style scoped>
-.export-modal {
-  width: 460px;
-  max-width: calc(100vw - 32px);
-}
-
 .export-modal-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   background: #eef2ff;
   color: #4f46e5;
   display: inline-flex;
@@ -152,70 +147,84 @@ const handleExport = async () => {
 }
 
 .export-modal-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
 .export-field {
-  margin-bottom: 18px;
+  margin-bottom: 22px;
 }
 
 .export-label {
   display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: #475569;
-  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 10px;
 }
 
 .export-options {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .export-option {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 12px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
   background: #f8fafc;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   color: #334155;
+  transition: all 0.2s;
 }
 
 .export-option:hover {
-  border-color: #a5b4fc;
+  border-color: #818cf8;
   background: #eef2ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
+}
+
+.export-option:has(input:checked) {
+  border-color: #4f46e5;
+  background: #eef2ff;
+  color: #4f46e5;
 }
 
 .export-option input {
   accent-color: #4f46e5;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .export-error {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   background: #fef2f2;
   color: #b91c1c;
   border: 1px solid #fecaca;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
 }
 
 .export-spinner {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.4);
   border-top-color: #fff;
   border-radius: 50%;
   animation: export-spin 0.7s linear infinite;
-  margin-right: 6px;
+  margin-right: 8px;
   flex-shrink: 0;
 }
 
@@ -223,5 +232,33 @@ const handleExport = async () => {
   to {
     transform: rotate(360deg);
   }
+}
+</style>
+
+<style>
+.export-modal {
+  width: 560px !important;
+  max-width: calc(100vw - 48px);
+}
+
+.export-modal .iq-modal-footer {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 32px !important;
+  padding: 16px 28px 20px !important;
+}
+
+.export-modal .iq-modal-footer .iq-btn {
+  min-width: 120px;
+}
+
+.export-modal .iq-modal-header {
+  padding: 20px 28px !important;
+}
+
+.export-modal .iq-modal-body {
+  padding: 24px 28px !important;
 }
 </style>
