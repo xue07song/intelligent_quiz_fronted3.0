@@ -125,21 +125,31 @@
         </div>
         <div v-if="previewLoading" class="preview-loading">正在读取试卷题目...</div>
         <div v-else class="preview-body">
-          <div v-for="(q, index) in previewExam.questions" :key="q.id" class="preview-question">
-            <div class="preview-number">{{ index + 1 }}</div>
-            <div>
-              <div class="preview-meta">
-                <span>{{ getTypeName(q.题型) }}</span>
-                <span>难度 {{ q.难度 }}</span>
-                <span>{{ q.知识点 || '未标注知识点' }}</span>
+          <div v-if="previewExam.examNature" class="preview-cover">
+            <h1>{{ previewExam.examNature.university || 'XXXX大学' }}</h1>
+            <h2 v-if="previewExam.examNature.yearStart && previewExam.examNature.yearEnd">{{ previewExam.examNature.yearStart }}—{{ previewExam.examNature.yearEnd }}学年{{ previewExam.examNature.semester || '秋季' }}学期</h2>
+            <h1>《{{ previewExam.examNature.examPrefix || '计算机导论' }}》期末考试试卷</h1>
+            <p>（{{ previewExam.examNature.paperType || 'A' }}卷）</p>
+            <p>考试方式：{{ previewExam.examNature.examMethod || '闭卷' }}</p>
+          </div>
+          <div v-for="group in previewGroups" :key="group.name" class="preview-group">
+            <h3 class="preview-group-title">{{ group.name }}</h3>
+            <div v-for="(q, index) in group.questions" :key="q.id || index" class="preview-question">
+              <div class="preview-number">{{ index + 1 }}</div>
+              <div>
+                <div class="preview-meta">
+                  <span>{{ getTypeName(q.题型) }}</span>
+                  <span>难度 {{ q.难度 }}</span>
+                  <span>{{ q.知识点 || '未标注知识点' }}</span>
+                </div>
+                <h4>{{ q.题目 }}</h4>
+                <p v-if="q.选项" class="preview-options">{{ q.选项 }}</p>
+                <details class="preview-details">
+                  <summary>查看答案与解析</summary>
+                  <p><b>答案：</b>{{ q.答案 }}</p>
+                  <p v-if="q.解析"><b>解析：</b>{{ q.解析 }}</p>
+                </details>
               </div>
-              <h4>{{ q.题目 }}</h4>
-              <p v-if="q.选项" class="preview-options">{{ q.选项 }}</p>
-              <details class="preview-details">
-                <summary>查看答案与解析</summary>
-                <p><b>答案：</b>{{ q.答案 }}</p>
-                <p v-if="q.解析"><b>解析：</b>{{ q.解析 }}</p>
-              </details>
             </div>
           </div>
         </div>
@@ -158,7 +168,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { getExams, getExam, updateExamStatusApi, deleteExamApi } from '@/api/practice';
 import { getTypeName, getDifficultyLabel } from '@/utils/constants';
 import { formatTime } from '@/utils/format';
@@ -275,6 +285,24 @@ const closePreview = () => {
   previewVisible.value = false;
   previewExam.value = { questions: [] };
 };
+
+const TYPE_ORDER = { 1: '一、判断题', 2: '二、单选题', 3: '三、多选题', 4: '四、填空题', 5: '五、简答题', 6: '六、程序论述题' };
+const SCORE_RULES = { 1: 1, 2: 1, 3: 2, 4: 1, 5: 5, 6: 10 };
+
+const previewGroups = computed(() => {
+  const questions = previewExam.value.questions || [];
+  const grouped = {};
+  questions.forEach(q => {
+    const type = Number(q.题型 || q.question_type || 0);
+    if (!grouped[type]) grouped[type] = [];
+    grouped[type].push(q);
+  });
+  return [1, 2, 3, 4, 5, 6].filter(t => grouped[t]?.length).map(t => {
+    const count = grouped[t].length;
+    const score = SCORE_RULES[t] || 1;
+    return { name: `${TYPE_ORDER[t]}（共${count}题，每题${score}分，共${count * score}分）`, questions: grouped[t] };
+  });
+});
 
 const isOpenAll = (exam) => {
   const hasLegacy = exam.class_id != null || exam.classId != null;
@@ -632,6 +660,12 @@ defineExpose({ loadExams });
   padding: 20px 26px;
 }
 .preview-loading { padding: 70px 0; text-align: center; color: #94A3B8; }
+.preview-cover { text-align: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #E2E8F0; }
+.preview-cover h1 { font-size: 20px; margin: 8px 0; }
+.preview-cover h2 { font-size: 16px; margin: 6px 0; color: #475569; }
+.preview-cover p { margin: 4px 0; font-size: 14px; color: #64748B; }
+.preview-group { margin-bottom: 24px; }
+.preview-group-title { font-size: 16px; font-weight: 700; margin: 0 0 12px; padding: 8px 12px; background: #F1F5F9; border-left: 4px solid #7C3AED; border-radius: 4px; }
 .preview-question {
   display: grid;
   grid-template-columns: 36px 1fr;
