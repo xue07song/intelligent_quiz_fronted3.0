@@ -1,6 +1,8 @@
 <template>
   <div class="exam-practice-page">
     <!-- ===== 顶部横幅（答题中） ===== -->
+    <!-- `phase === 'error'` 时横幅整体不渲染：它的「✕ 退出」会把人从错误态带出去，
+         而错误态的出口是下面卡片里那个**带明确语义**的「返回」。 -->
     <div v-if="phase === 'exam'" class="exam-header-banner">
       <div class="banner-left">
         <div class="banner-icon">📝</div>
@@ -22,6 +24,30 @@
         <button class="btn-exit" @click="handleExit">
           ✕ 退出
         </button>
+      </div>
+    </div>
+
+    <!--
+      ===== 明确结果（非法地址 / 404 / 403 / 可见但不可作答 / 其它失败）=====
+      这四类以前一律走「toast + 立刻 emit('exit')」—— 用户看到的只是被弹回上一页，
+      既不知道发生了什么，深链进来时更是**当场被送回**而不知道原因。
+      现在每一类都在正文里给出**自己的标题与说明**，并且都有明确出口（重试 / 返回）。
+      样式复用结果卡的类，不新增任何 CSS。
+    -->
+    <!-- 注意用 `v-if` 而不是 `v-else-if`：横幅那支是独立的 `v-if`，
+         而 loading / 答题 / 结果三支是**另一条** v-if/v-else-if 链（见下）。
+         把错误分支接进任何一条链都会把该链后面的正文整支吃掉。 -->
+    <div v-if="phase === 'error'" class="result-phase">
+      <div class="result-card">
+        <div class="result-emoji">{{ errorState.emoji }}</div>
+        <h2>{{ errorState.title }}</h2>
+        <p class="result-sub">{{ errorState.message }}</p>
+        <div class="result-actions">
+          <button v-if="errorState.canRetry" class="btn-primary" @click="loadExam">重试</button>
+          <button :class="errorState.canRetry ? 'btn-secondary' : 'btn-primary'" @click="handleExit">
+            返回
+          </button>
+        </div>
       </div>
     </div>
 
@@ -283,9 +309,22 @@ const props = defineProps({
   examId: { type: [Number, String], required: true },
 });
 
-const emit = defineEmits(['exit', 'view-record', 'update-question-id', 'update-question', 'update-exam-id', 'toast']);
+// `update-exam-id` 在 R2B 去掉了：AI 助手需要的 exam 上下文现在由**路由派生**
+// （`App.vue` 的 `currentExamId` computed 读 `#/exam/:examId`），不再由本组件上报。
+// 留着它会出现「两个写入方」——R2A 就是被同一份导航状态的第二个写入方坑过一次。
+const emit = defineEmits(['exit', 'view-record', 'update-question-id', 'update-question', 'toast']);
 
 const OBJECTIVE_TYPES = [1, 2, 3, 4];
+
+/**
+ * **本次实例负责的试卷身份**：进入时固定，之后永不改变。
+ *
+ * 草稿的读写键、服务端草稿保存、开始作答、提交、AI 答疑全部以它为准。
+ * 好处是「A 的草稿只可能写回 A」成为**结构性**保证，而不是依赖调用时机正确 ——
+ * 即使将来有人把这个组件塞进一个不换 key 的父容器、把 `props.examId` 改成 B，
+ * 这个实例也仍然只会操作 A（B 由新实例接管）。
+ */
+const examId = String(props.examId);
 
 // ===== 状态 =====
 const loading = ref(true);
@@ -304,8 +343,29 @@ const startedAt = ref(null);
 const elapsedSeconds = ref(0);
 const remainingSeconds = ref(null);
 const expired = ref(false);
+/**
+ * 明确的失败结果。`null` = 没有错误。
+ * `{ kind, emoji, title, message, canRetry }`，`kind` 取值：
+ *   `invalid` 地址里的 id 不是正整数（**不发请求**）
+ *   `not-found` 404 试卷不存在
+ *   `forbidden` 403 无权查看（含未发布/已关闭）
+ *   `not-answerable` 卷可见、`/start` 被服务端拒（已截止 / 未开始 / 次数用尽）
+ *   `error` 其它（网络、5xx）
+ * 分桶依据是**实测的真实响应**（见 R2B 报告 §探针），不是猜的。
+ */
+const errorState = ref(null);
+
 let timer = null;
 let draftTimer = null;
+
+/**
+ * 失效保护（两道，**不能靠父组件的 `:key` 重建替代**）：
+ * - `disposed`：本实例已卸载 → 任何在飞的回包都不得再写状态、不得再创建计时器/定时器；
+ * - `loadToken`：每次加载自增，回包落地前比对；旧加载（A）不得覆盖新加载（B）。
+ * 两者都在 `onUnmounted` 里立即生效，所以「卸载后重新创建计时器」在结构上不可能发生。
+ */
+let disposed = false;
+let loadToken = 0;
 
 // ===== AI 答疑 =====
 const tutorOpen = reactive({});
@@ -460,10 +520,46 @@ function scrollToQuestion(qidRaw) {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ===== 计时器 =====
+/** 停表。幂等：重复调用不会留下第二个 interval。 */
+const stopTimer = () => {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+};
+
+/** 起表。**先停再起** —— 同一实例里重复加载（例如错误态点「重试」）不会叠出两个计时器。 */
+const startTimer = () => {
+  stopTimer();
+  timer = setInterval(() => {
+    elapsedSeconds.value = Math.floor((Date.now() - startedAt.value.getTime()) / 1000);
+    if (remainingSeconds.value !== null) {
+      remainingSeconds.value = Math.max(0, remainingSeconds.value - 1);
+      if (remainingSeconds.value <= 0) expired.value = true;
+    }
+  }, 1000);
+};
+
+/** 清掉那次 400ms 防抖的草稿保存。提交成功时必须调，否则它会把已清除的草稿**写回来**。 */
+const clearDraftTimer = () => {
+  if (draftTimer) {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+  }
+};
+
 // ===== 草稿 =====
-const draftKey = () => `iq_exam_draft_${props.examId}`;
+const draftKey = () => `iq_exam_draft_${examId}`;
 
 const saveDraft = () => {
+  /**
+   * 只在**答题中**写草稿。这一条同时挡掉两种「写完又活过来」：
+   *   1. 提交成功后 phase 已是 'result'，此时任何一次迟到的防抖定时器、或卸载时的收尾保存
+   *      都不该再落盘 —— 服务端已收卷，本地草稿必须保持清除状态；
+   *   2. 错误 / 加载失败时没有题目，本来也无需保存。
+   */
+  if (phase.value !== 'exam') return;
   if (!exam.value.questions?.length || answeredCount.value === 0) return;
   const payload = {
     answers: { ...answers },
@@ -473,7 +569,7 @@ const saveDraft = () => {
     savedAt: Date.now(),
   };
   localStorage.setItem(draftKey(), JSON.stringify(payload));
-  saveExamDraftApi(props.examId, {
+  saveExamDraftApi(examId, {
     answers: { ...answers },
     durationSeconds: Math.floor(elapsedSeconds.value),
   }).catch(() => { /* 服务端草稿保存失败不影响本地答题 */ });
@@ -482,7 +578,7 @@ const saveDraft = () => {
 
 const normalizeQuestionKey = (raw) => String(raw ?? '');
 
-const restoreDraft = (loadedExam, serverDraft = null) => {
+const restoreDraft = (loadedExam, serverDraft = null, serverStartedAt = null) => {
   let draft = null;
   if (serverDraft?.answers && Object.keys(serverDraft.answers).length) {
     draft = { answers: serverDraft.answers, elapsedSeconds: serverDraft.duration_seconds ?? serverDraft.durationSeconds };
@@ -525,7 +621,15 @@ const restoreDraft = (loadedExam, serverDraft = null) => {
         if (answers[k] !== '' && answers[k] !== null && answers[k] !== undefined) restoredAny = true;
       }
     });
-    if (draft.startedAt) {
+    /**
+     * 草稿里的 `startedAt` **只在服务端没给的时候**采用。
+     *
+     * 时限以服务端 attempt 为准（`/start` 返回的 `startedAt` + `remainingSeconds`），
+     * 而草稿是本地的、可能来自更早的一次作答。让本地值覆盖服务端值，会让「用时」显示错，
+     * 并且提交时把这个偏掉的时间回传给后端 —— 刷新后「时间不重置」就无从谈起。
+     * `loadExam` 里服务端的值是先写的，这里判断一下就不会被覆盖。
+     */
+    if (draft.startedAt && !serverStartedAt) {
       const start = new Date(draft.startedAt);
       if (!isNaN(start.getTime())) startedAt.value = start;
     }
@@ -539,13 +643,18 @@ const restoreDraft = (loadedExam, serverDraft = null) => {
 };
 
 // ===== 收藏 =====
-const loadFavorites = async () => {
+/**
+ * `isStale` 由 `loadExam` 传入（同一份 `loadToken` 判定）：收藏列表要翻多页，
+ * 是这里**最慢**的请求 —— 不加这道判定，A 的收藏会在切到 B 之后覆盖 B 的高亮状态。
+ */
+const loadFavorites = async (isStale = () => false) => {
   try {
     const ids = new Set();
     let page = 1;
     let guard = 0;
     while (guard++ < 20) {
       const data = await getFavorites({ page, size: 100 });
+      if (isStale()) return;
       // 兼容后端返回的多种字段名
       const rows = Array.isArray(data) ? data : (data?.list || data?.rows || data?.items || []);
       rows.forEach((f) => {
@@ -556,6 +665,7 @@ const loadFavorites = async () => {
       if (rows.length === 0 || ids.size >= total) break;
       page += 1;
     }
+    if (isStale()) return;
     favoriteSet.value = ids;
   } catch (e) {
     // ignore
@@ -573,18 +683,21 @@ const toggleFavorite = async (q) => {
   try {
     if (favoriteSet.value.has(qidStr)) {
       await removeFavorite(qidStr);
+      if (disposed) return; // 已离开答题页：不再回填高亮、不再提示
       const next = new Set(favoriteSet.value);
       next.delete(qidStr);
       favoriteSet.value = next;
       emit('toast', { message: '已取消收藏', type: 'success' });
     } else {
       await addFavorite(qidStr);
+      if (disposed) return;
       const next = new Set(favoriteSet.value);
       next.add(qidStr);
       favoriteSet.value = next;
       emit('toast', { message: '已收藏', type: 'success' });
     }
   } catch (err) {
+    if (disposed) return;
     emit('toast', { message: err.message || '收藏操作失败', type: 'error' });
   } finally {
     favoriteLoading[qidStr] = false;
@@ -614,10 +727,12 @@ const askTutor = async (q) => {
       questionType: Number(q.题型),
       userQuestion: inputText,
       userAnswer: answers[k] || '',
-      examId: props.examId,
+      examId,
     });
+    if (disposed) return;
     tutorHistory[k].push({ role: 'ai', content: data.reply || '（AI 未返回内容）' });
   } catch (err) {
+    if (disposed) return;
     tutorHistory[k].push({ role: 'ai', content: `❌ ${err.message || 'AI 调用失败'}` });
   } finally {
     tutorLoading[k] = false;
@@ -625,23 +740,95 @@ const askTutor = async (q) => {
 };
 
 // ===== 加载试卷 =====
+/** 合法的试卷编号：正整数。`abc` / `0` / `-1` / `1.5` 一律**不发请求**（后端对它们都回 404，分不出「写错了」）。 */
+const isValidExamId = (v) => /^\d+$/.test(String(v)) && Number(v) > 0;
+
+/**
+ * 把真实响应分桶。依据是**实测**（`GET /exams/99999`→404/40401、`GET /exams/6`→403/40301、
+ * `POST /exams/18/start`→403/40301「考试已截止」）。
+ *
+ * 关键点：**403 有两种，靠「哪个阶段失败」区分**，不能靠状态码 ——
+ *   · 加载阶段 403 = 无权查看（未发布 / 不在课程范围）；
+ *   · 开始作答阶段 403 = 卷子看得见但当前不可作答（已截止 / 未开始 / 次数用尽）。
+ * 服务端给的中文 message 一律**原样展示**，不做二次加工，避免前端改写服务端口径。
+ */
+const bucketError = (err, stage) => {
+  const status = err?.status;
+  const message = err?.message || '加载试卷失败';
+  if (status === 404) {
+    return { kind: 'not-found', emoji: '🔍', title: '试卷不存在', message, canRetry: false };
+  }
+  if (status === 403 && stage === 'start') {
+    return { kind: 'not-answerable', emoji: '⛔', title: '当前无法作答这份试卷', message, canRetry: false };
+  }
+  if (status === 403) {
+    return { kind: 'forbidden', emoji: '🔒', title: '无法查看这份试卷', message, canRetry: false };
+  }
+  return { kind: 'error', emoji: '⚠️', title: '试卷加载失败', message, canRetry: true };
+};
+
 const loadExam = async () => {
+  const token = ++loadToken;
+  /** 本次加载是否已作废：实例已卸载，或又发起了新一次加载。 */
+  const isStale = () => disposed || token !== loadToken;
+
   loading.value = true;
+  errorState.value = null;
+  phase.value = 'exam';
+
+  if (!isValidExamId(examId)) {
+    errorState.value = {
+      kind: 'invalid',
+      emoji: '🚫',
+      title: '试卷地址无效',
+      message: `「${examId}」不是合法的试卷编号，请从试卷列表重新进入。`,
+      canRetry: false,
+    };
+    phase.value = 'error';
+    loading.value = false;
+    return;
+  }
+
   try {
-    const data = await getExam(props.examId);
+    const data = await getExam(examId);
+    if (isStale()) return;
     exam.value = data;
     examMode.value = Boolean(data.duration_minutes || data.end_at || data.max_attempts || data.status === 'draft' || data.status === 'closed');
-    const started = await startExamApi(props.examId);
+
+    /**
+     * 开始/继续作答。刷新时这一步**没有业务副作用**（已实测：同一份未提交的作答，
+     * 重复调用返回同一个 `attemptNo` 与 `startedAt`，不新增次数、不重置时限）——
+     * 所以「刷新仍停留同一试卷、时间不重置」不需要任何额外补偿逻辑。
+     * 服务端的拒绝（已截止 / 未开始 / 次数用尽）在这一步发生，归入 `not-answerable`。
+     */
+    let started = null;
+    try {
+      started = await startExamApi(examId);
+    } catch (err) {
+      if (isStale()) return;
+      errorState.value = bucketError(err, 'start');
+      phase.value = 'error';
+      return;
+    }
+    if (isStale()) return;
+
+    let serverStartedAt = null;
     if (started?.startedAt) {
       const serverStart = new Date(started.startedAt);
-      if (!isNaN(serverStart.getTime())) startedAt.value = serverStart;
+      if (!isNaN(serverStart.getTime())) {
+        serverStartedAt = serverStart;
+        startedAt.value = serverStart;
+      }
     }
     remainingSeconds.value = started?.remainingSeconds ?? null;
     expired.value = remainingSeconds.value === 0;
+
     let serverDraft = null;
     try {
-      serverDraft = await getExamDraftApi(props.examId);
+      serverDraft = await getExamDraftApi(examId);
     } catch { /* 无服务端草稿 */ }
+    if (isStale()) return;
+
     // 先清空旧状态（防止组件复用）
     Object.keys(answers).forEach((k) => delete answers[k]);
     Object.keys(multiAnswers).forEach((k) => delete multiAnswers[k]);
@@ -658,31 +845,34 @@ const loadExam = async () => {
       activeQuestionId.value = firstKey;
       emit('update-question-id', firstKey);
       emit('update-question', data.questions[0]);
-      emit('update-exam-id', props.examId);
     }
-    const restored = restoreDraft(data, serverDraft);
+    const restored = restoreDraft(data, serverDraft, serverStartedAt);
     if (!startedAt.value) startedAt.value = new Date();
     if (restored) {
       emit('toast', { message: '已恢复上次答题草稿', type: 'info' });
     }
-    loadFavorites();
-    timer = setInterval(() => {
-      elapsedSeconds.value = Math.floor((Date.now() - startedAt.value.getTime()) / 1000);
-      if (remainingSeconds.value !== null) {
-        remainingSeconds.value = Math.max(0, remainingSeconds.value - 1);
-        if (remainingSeconds.value <= 0) expired.value = true;
-      }
-    }, 1000);
+    loadFavorites(isStale);
+    /**
+     * 起表放在**所有** stale 检查之后：卸载之后绝不可能再创建计时器。
+     */
+    startTimer();
   } catch (err) {
-    emit('toast', { message: err.message || '加载试卷失败', type: 'error' });
-    emit('exit');
+    if (isStale()) return;
+    errorState.value = bucketError(err, 'load');
+    phase.value = 'error';
   } finally {
-    loading.value = false;
+    if (!isStale()) loading.value = false;
   }
 };
 
 // ===== 提交 =====
 const handleSubmit = async () => {
+  /**
+   * 快速连点提交**只发一次请求**：`submitting` 在第一次进入时同步置位（`await` 之前），
+   * 所以第二次点击在 `submitting.value` 上就被挡住了，不会走到 `submitExam`。
+   * `phase !== 'exam'` 是第二道闸：结果页/错误态下这个按钮本就不该有提交语义。
+   */
+  if (submitting.value || phase.value !== 'exam') return;
   if (expired.value) {
     emit('toast', { message: '答题时间已到，无法提交', type: 'error' });
     return;
@@ -708,20 +898,33 @@ const handleSubmit = async () => {
         userAnswer: ua,
       };
     });
-    const data = await submitExam(props.examId, {
+    const data = await submitExam(examId, {
       answers: answersArr,
       startedAt: startedAt.value.toISOString(),
     });
+    /**
+     * —— 收卷之后的两件事必须在**任何 `disposed` 判断之前**做 ——
+     *
+     * 服务端已经收卷了，这是既成事实，与「用户是否已经离开这一页」无关。所以：
+     *   1. `clearDraftTimer()`：那枚 400ms 防抖定时器如果还挂着，会在下面 `removeItem`
+     *      **之后**触发 `saveDraft`，把刚清掉的草稿原样写回来（刷新后又能"恢复"出一份
+     *      已经交过的答案）。必须先杀掉它。
+     *   2. `removeItem(draftKey())`：本地草稿清掉。
+     * 顺序不能反 —— 先清定时器再清存储。
+     */
+    clearDraftTimer();
+    localStorage.removeItem(draftKey());
+    /** 已离页：状态、toast、emit 全部不再需要（父组件可能已经不在了）。 */
+    if (disposed) return;
     result.value = data;
     phase.value = 'result';
-    if (timer) clearInterval(timer);
+    stopTimer();
     emit('update-question-id', null);
     emit('update-question', null);
-    emit('update-exam-id', null);
-    localStorage.removeItem(draftKey());
     draftSaved.value = false;
     emit('toast', { message: `提交成功！得分 ${data.score} 分`, type: 'success' });
   } catch (err) {
+    if (disposed) return;
     emit('toast', { message: err.message || '提交失败', type: 'error' });
   } finally {
     submitting.value = false;
@@ -729,19 +932,27 @@ const handleSubmit = async () => {
 };
 
 const handleExit = () => {
+  /**
+   * 提交请求在飞时**不退出**：此刻退出，用户无从知道这次提交成没成 ——
+   * 与其让他猜，不如明确挡住并给出可见提示（"提交中离页行为明确"）。
+   * 提交完成后本函数恢复正常；离页清理（计时器 / 草稿）由 `onUnmounted` 统一兜底。
+   */
+  if (submitting.value) {
+    emit('toast', { message: '正在提交试卷，请稍候…', type: 'info' });
+    return;
+  }
   if (answeredCount.value > 0) {
     if (!window.confirm('答题进度已保存，确定退出吗？')) return;
   }
   emit('update-question-id', null);
   emit('update-question', null);
-  emit('update-exam-id', null);
   emit('exit');
 };
 
 // ===== 监听 =====
 watch([answers, multiAnswers], () => {
   if (!exam.value.questions?.length) return;
-  clearTimeout(draftTimer);
+  clearDraftTimer();
   draftTimer = setTimeout(saveDraft, 400);
 }, { deep: true });
 
@@ -750,10 +961,24 @@ onMounted(() => {
   loadExam();
 });
 
+/**
+ * 卸载 = 这个实例彻底作废。三件事，缺一不可：
+ *
+ * 1. **先置 `disposed`**：所有在飞的 `await`（加载、收藏、AI、提交）回来时都会在
+ *    `if (disposed) return` 处丢弃 —— 这是「旧请求不回填新页面」的**权威防护**。
+ *    `:key` 重建只是父组件侧换了个实例，**管不住已经在飞的回包**，两者不能互相替代。
+ * 2. `clearDraftTimer()` + 收尾保存：防抖定时器必须杀掉，否则它会在组件已经卸载之后
+ *    触发 `saveDraft` —— **在 A 的卸载里用 A 的 examId 写草稿**（目标仍正确，但时机已晚，
+ *    且若那次点击是「提交」就会与提交的清草稿打架）。收尾保存只针对**未提交**的答题。
+ * 3. `stopTimer()`：清掉 interval。之后的任何一次 tick 都不存在了。
+ *    （`clearDraftTimer` / `stopTimer` 都幂等，`onUnmounted` 里不会重复清理。）
+ */
 onUnmounted(() => {
-  clearTimeout(draftTimer);
+  disposed = true;
+  loadToken += 1;
+  clearDraftTimer();
   if (phase.value === 'exam' && exam.value.questions?.length && answeredCount.value > 0) saveDraft();
-  if (timer) clearInterval(timer);
+  stopTimer();
 });
 </script>
 

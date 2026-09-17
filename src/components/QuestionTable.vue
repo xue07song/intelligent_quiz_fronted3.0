@@ -117,7 +117,19 @@ const props = defineProps({
 
 const emit = defineEmits(['view', 'edit', 'delete', 'update:modelValue', 'selection-change']);
 
-const canEdit = computed(() => props.role === 'admin' || props.role === 'teacher');
+/**
+ * 写入口（勾选列 + 编辑 + 删除）**仅管理员**。
+ *
+ * 迁移前这里是 `role === 'admin' || role === 'teacher'`；按经用户确认的权限裁决
+ * 「教师只能查看自己所教科目的题库，所有题库写能力仅管理员可用」收成仅管理员。
+ *
+ * 教师仍然完整保留**查看**能力：`查看` 按钮不受这个开关影响，列表、筛选、
+ * 分页、详情也都不受影响 —— 教师看到的是同一张表，只是没有勾选框与编辑/删除列。
+ *
+ * ⚠️ 这只是 UI 层。真正的拦截在服务端（`routes/question.js` 的 7 条写路由已收成
+ * `requireRoles('admin')`）；把这些按钮藏起来**不能**当作权限已生效的证据。
+ */
+const canEdit = computed(() => props.role === 'admin');
 
 const emptyColspan = computed(() => {
   let cols = 8; // base: id + chapter + subject + type + title + diff + kp + act

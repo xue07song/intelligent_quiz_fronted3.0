@@ -53,7 +53,7 @@ const serveStatic = (req, res) => {
     if (urlPath === '/') urlPath = '/index.html';
 
     const filePath = path.join(DIST_DIR, urlPath);
-    
+
     // 防止目录穿越
     if (!filePath.startsWith(DIST_DIR)) {
         res.writeHead(403);
