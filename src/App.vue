@@ -264,8 +264,11 @@
           </button>
           <nav class="iq-breadcrumb">
             <span class="breadcrumb-home" @click="goHome">首页</span>
-            <span class="crumb-sep">/</span>
-            <span class="breadcrumb-current">{{ currentBreadcrumb }}</span>
+            <template v-for="(crumb, idx) in breadcrumbItems" :key="idx">
+              <span class="crumb-sep">/</span>
+              <span v-if="crumb.clickable" class="breadcrumb-link" @click="handleBreadcrumbClick(crumb.target)">{{ crumb.label }}</span>
+              <span v-else class="breadcrumb-current">{{ crumb.label }}</span>
+            </template>
           </nav>
         </div>
         <!-- 右上角只保留头像和姓名，功能移至左下角下拉菜单 -->
@@ -394,14 +397,6 @@
               @toast="handleToastFromChild"
           />
 
-          <GenerateExam
-              v-if="practiceView === 'generate' && currentUser.role === 'teacher'"
-              :role="currentUser.role"
-              :subjects="currentUser.subjects || []"
-              @start-exam="startExam"
-              @toast="handleToastFromChild"
-          />
-
           <ClassManagement
               v-if="practiceView === 'classes'"
               :role="currentUser.role"
@@ -433,6 +428,16 @@
               @toast="handleToastFromChild"
           />
         </template>
+
+        <!-- ===== GenerateExam 独立挂载（v-show 保持状态不销毁） ===== -->
+        <GenerateExam
+            v-if="generateExamMounted"
+            v-show="currentView === 'practice' && practiceView === 'generate' && currentUser?.role === 'teacher'"
+            :role="currentUser?.role"
+            :subjects="currentUser?.subjects || []"
+            @start-exam="startExam"
+            @toast="handleToastFromChild"
+        />
       </main>
 
       <!-- ===== 弹窗层 ===== -->
@@ -493,7 +498,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, provide, onMounted, onUnmounted, watch } from 'vue';
+import { ref, reactive, computed, provide, onMounted, onUnmounted, watch, nextTick } from 'vue';
 
 // ===== 组件导入 =====
 import Login from '@/components/Login.vue';
@@ -568,6 +573,7 @@ const pwdVisible = ref(false);
 // ================================================================
 // admin-records 已加入独立视图列表，试卷分析不显示子导航
 const practiceView = ref('exams');
+const generateExamMounted = ref(false);
 const standalonePracticeViews = ['adaptive', 'adaptive-progress', 'learning-analysis', 'adaptive-overview', 'adaptive-review', 'classes', 'admin-records'];
 const activeExamId = ref(null);
 const activeRecordId = ref(null);
@@ -723,14 +729,20 @@ const avatarChar = computed(() => {
   return name.charAt(0).toUpperCase();
 });
 
-const currentBreadcrumb = computed(() => {
-  if (currentView.value === 'main') return '题库管理';
-  if (currentView.value === 'users') return '用户管理';
-  if (currentView.value === 'audit') return '注册审核';
-  if (currentView.value === 'feedback') return '用户反馈';
-  if (currentView.value === 'profile') return '个人中心';
-  if (currentView.value === 'practice') {
-    const map = {
+const breadcrumbItems = computed(() => {
+  const items = [];
+  if (currentView.value === 'main') {
+    items.push({ label: '题库管理' });
+  } else if (currentView.value === 'users') {
+    items.push({ label: '用户管理' });
+  } else if (currentView.value === 'audit') {
+    items.push({ label: '注册审核' });
+  } else if (currentView.value === 'feedback') {
+    items.push({ label: '用户反馈' });
+  } else if (currentView.value === 'profile') {
+    items.push({ label: '个人中心' });
+  } else if (currentView.value === 'practice') {
+    const subMap = {
       exams: '试卷列表',
       generate: '智能组卷',
       'wrong-book': '错题本',
@@ -746,10 +758,30 @@ const currentBreadcrumb = computed(() => {
       'admin-records': '试卷分析',
       classes: '班级管理',
     };
-    return '出卷与学生管理 / ' + (map[practiceView.value] || '');
+    const examViews = ['exams', 'generate', 'classes', 'wrong-book', 'practice', 'records', 'record-detail', 'stats'];
+    const dataViews = ['admin-records', 'learning-analysis', 'adaptive-overview', 'adaptive-review', 'adaptive-progress'];
+    if (examViews.includes(practiceView.value)) {
+      items.push({ label: '出卷与学生管理', clickable: true, target: 'exam-management' });
+    } else if (dataViews.includes(practiceView.value)) {
+      items.push({ label: '教学数据', clickable: true, target: 'data-analysis' });
+    }
+    if (practiceView.value === 'record-detail') {
+      items.push({ label: '答题记录', clickable: true, target: 'records' });
+    }
+    items.push({ label: subMap[practiceView.value] || '' });
   }
-  return '';
+  return items;
 });
+const handleBreadcrumbClick = (target) => {
+  if (target === 'exam-management') {
+    openPracticeView(currentUser.value.role === 'admin' ? 'exams' : 'generate');
+  } else if (target === 'data-analysis') {
+    openPracticeView('admin-records');
+  } else if (target === 'records') {
+    openPracticeView('records');
+  }
+  sidebarOpen.value = false;
+};
 
 const pageTitle = computed(() => {
   const map = {
@@ -857,6 +889,7 @@ const restoreSession = () => {
 };
 
 const handleLoginSuccess = (user) => {
+  isNavigatingBack = true;
   currentUser.value = user;
   const requested = pendingFeature.value;
   pendingFeature.value = '';
@@ -884,6 +917,10 @@ const handleLoginSuccess = (user) => {
   } else {
     currentView.value = 'main';
   }
+  window.history.pushState(getViewState(), '');
+  nextTick(() => {
+    isNavigatingBack = false;
+  });
   loadData();
   loadStats();
   loadPendingCount();
@@ -1170,6 +1207,57 @@ const handleAiSuccess = (result) => {
 };
 
 // ================================================================
+// 浏览器历史记录管理（返回键回到登录页）
+// ================================================================
+let isNavigatingBack = false;
+
+const getViewState = () => ({
+  view: currentView.value,
+  practiceView: practiceView.value,
+  loggedIn: !!currentUser.value,
+});
+
+const applyViewState = (state) => {
+  if (!state) return false;
+  if (state.loggedIn === false || !state.view) {
+    currentUser.value = null;
+    sidebarOpen.value = false;
+    return true;
+  }
+  const validViews = ['main', 'users', 'audit', 'feedback', 'profile', 'practice', 'papers'];
+  if (!validViews.includes(state.view)) return false;
+  currentView.value = state.view;
+  if (state.view === 'practice' && state.practiceView) {
+    practiceView.value = state.practiceView;
+  }
+  sidebarOpen.value = false;
+  return true;
+};
+
+const handlePopState = (event) => {
+  if (isNavigatingBack) return;
+  isNavigatingBack = true;
+  const restored = event.state && (event.state.view || event.state.loggedIn === false)
+    ? applyViewState(event.state)
+    : false;
+  if (!restored) {
+    window.history.pushState(getViewState(), '');
+  }
+  nextTick(() => {
+    isNavigatingBack = false;
+  });
+};
+
+watch([currentView, practiceView], () => {
+  if (!isNavigatingBack && currentUser.value) {
+    window.history.pushState(getViewState(), '');
+  }
+  if (currentView.value === 'practice' && practiceView.value === 'generate') {
+    generateExamMounted.value = true;
+  }
+}, { flush: 'post' });
+
+// ================================================================
 // 生命周期
 // ================================================================
 onMounted(() => {
@@ -1181,11 +1269,14 @@ onMounted(() => {
   }
   document.addEventListener('click', handleClickOutside);
   window.addEventListener('auth-expired', handleAuthExpired);
+  window.addEventListener('popstate', handlePopState);
+  window.history.replaceState(getViewState(), '');
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside);
   window.removeEventListener('auth-expired', handleAuthExpired);
+  window.removeEventListener('popstate', handlePopState);
 });
 </script>
 
@@ -1740,6 +1831,14 @@ onUnmounted(() => {
 .breadcrumb-current {
   color: #1E293B;
   font-weight: 500;
+}
+.breadcrumb-link {
+  color: #94A3B8;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.breadcrumb-link:hover {
+  color: #6366F1;
 }
 
 .iq-header-right {

@@ -107,8 +107,8 @@ import { login } from '@/api/auth';
 const emit = defineEmits(['success', 'open-register', 'feature']);
 
 const form = reactive({
-  username: '',
-  password: '',
+  username: sessionStorage.getItem('login_username') || '',
+  password: sessionStorage.getItem('login_password') || '',
 });
 
 const loading = ref(false);
@@ -127,6 +127,8 @@ const handleLogin = async () => {
 
   try {
     const data = await login({ username: form.username, password: form.password });
+    sessionStorage.setItem('login_username', form.username);
+    sessionStorage.setItem('login_password', form.password);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
     if (rememberMe.value) {
