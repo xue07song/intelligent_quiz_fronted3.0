@@ -37,6 +37,9 @@ import GenerateExam from '@/components/practice/GenerateExam.vue';
 import ExamManagementTabs from '@/components/practice/ExamManagementTabs.vue';
 import { currentUser } from '@/router/session';
 
+// KeepAlive 的 include 按组件名匹配；显式命名，避免构建工具改变文件名推导规则后缓存失效。
+defineOptions({ name: 'ManageGeneratePage' });
+
 const appToast = inject('appToast', null);
 
 const role = computed(() => currentUser.value?.role || 'student');

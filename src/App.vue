@@ -269,8 +269,17 @@
           （见 `guard.js`），所以这里不会停在一条「有地址但没正文」的路由上。
           唯一会短暂经过的是「登录成功 → 守卫 replace 到角色首页」之间的那一瞬，
           此时渲染空组件 —— 与迁移前那一瞬的空白正文**视觉一致**（旧代码在那一刻也没有匹配分支）。
+
+          智能组卷是唯一需要跨页面保留草稿状态的页面。main 曾用 `v-show` 永久挂载
+          `GenerateExam`；路由迁移后改成只缓存 `ManageGeneratePage`，避免切到题库管理时销毁
+          组卷步骤、表单和生成进度，同时不把其他管理页面一并缓存。退出登录会卸载整个 staff
+          布局，因此缓存不会带到下一个账号。
         -->
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <KeepAlive include="ManageGeneratePage">
+            <component :is="Component" />
+          </KeepAlive>
+        </router-view>
       </main>
 
       <!-- ===== 弹窗层 ===== -->

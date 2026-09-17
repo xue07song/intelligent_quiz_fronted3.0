@@ -844,12 +844,21 @@ check('静态断言：session.js 不再导出任何 legacy 相关的东西（导
 
 const appSrc = readSrc('App.vue');
 check('静态断言：App.vue 的正文渲染是无条件的（不再按 migrated 分派）',
-  /<main class="iq-layout-main">[\s\S]*?<router-view\s*\/>/.test(appSrc), true);
+  /<main class="iq-layout-main">[\s\S]*?<router-view(?:\s[^>]*)?(?:\s*\/>|>[\s\S]*?<\/router-view>)/.test(appSrc), true);
 check('静态断言：App.vue 里没有遗留分派用的 v-if / v-else 三元',
   /inMigrated|v-if="currentView|practiceView/.test(appSrc), false);
 check('静态断言：App.vue 仍把 appToast / appNavigate / appStaff 三个通道 provide 出去',
   ['appToast', 'appNavigate', 'appStaff'].map((k) => appSrc.includes(`provide('${k}'`)),
   [true, true, true]);
+
+const manageGenerateSrc = readSrc(join('views', 'manage', 'ManageGeneratePage.vue'));
+check('静态断言：staff 路由只缓存智能组卷页面（不恢复全局 v-show 常驻）',
+  [
+    /<KeepAlive\s+include="ManageGeneratePage">[\s\S]*?<component\s+:is="Component"\s*\/>[\s\S]*?<\/KeepAlive>/.test(appSrc),
+    /defineOptions\(\{\s*name:\s*'ManageGeneratePage'\s*\}\)/.test(manageGenerateSrc),
+    /generateExamMounted|v-show="[^\"]*manageGenerate|v-show="[^\"]*generate/.test(appSrc),
+  ],
+  [true, true, false]);
 
 const aiSrc = readSrc(join('components', 'AIAssistant.vue'));
 check('静态断言：AIAssistant 的 assistantState 兜底里没有遗留状态键（没有第二个默认语义）',
