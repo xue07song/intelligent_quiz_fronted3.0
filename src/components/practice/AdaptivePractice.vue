@@ -305,7 +305,7 @@ const form = ref({
   chapters: props.initialFilters.chapters || [],
   knowledgeKeyword: props.initialFilters.knowledgeKeyword || '',
   questionCount: 10,
-  questionTypes: [1, 2, 3, 4, 5, 6],
+  questionTypes: [1, 2, 3, 4, 5, 6, 7],
 });
 const subjects = ref([]), chapterOptions = ref([]);
 const loadChapters = async () => { form.value.chapters=[]; chapterOptions.value=form.value.subject ? await getSubjectChapters(form.value.subject) : []; report.value=null; };

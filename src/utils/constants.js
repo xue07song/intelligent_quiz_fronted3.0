@@ -5,6 +5,7 @@ const TYPE_MAP = {
   4: '填空题',
   5: '简答题',
   6: '程序论述题',
+  7: '组合题',
 };
 
 const DIFFICULTY_MAP = {
