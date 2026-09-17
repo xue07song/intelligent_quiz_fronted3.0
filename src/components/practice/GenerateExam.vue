@@ -5,7 +5,7 @@
       <div class="hero-content">
         <span class="hero-badge">📝 出卷管理</span>
         <h1 class="hero-title">智能组卷</h1>
-        <p class="hero-desc">按照章节、六种题型、五级难度和知识点要求生成结构合理的试卷</p>
+        <p class="hero-desc">按照章节、七种题型、五级难度和知识点要求生成结构合理的试卷</p>
       </div>
     </header>
 
@@ -100,7 +100,7 @@
     <section v-if="builderStep === 4" class="iq-card section-card">
       <div class="section-title"><b>4. 题型结构</b><span :class="sumClass(typeSum)">已分配 {{ typeSum }}/{{ form.count }} 题</span></div>
       <div class="distribution-grid">
-        <label v-for="type in typeOptions" :key="type.value" class="distribution-item">
+        <label v-for="type in structureTypeOptions" :key="type.value" class="distribution-item">
           <span>{{ type.label }} <small>{{ type.value <= 4 ? '自动判分' : '人工查看' }}</small></span>
           <b>库存 {{ inventory?.byType?.[type.value] || 0 }}</b>
           <input v-model.number="form.typeDistribution[type.value]" type="number" min="0" :max="inventory?.byType?.[type.value] || 0" class="iq-input" :disabled="isLockedPlan" @input="markTypeCustom" />
@@ -214,7 +214,7 @@
       <section class="editor-dialog">
         <div v-if="editorMode === 'edit'" class="editor-head"><div><h2>手动自定义试卷</h2><p>可直接在卷面中修改题干、选项、答案和解析；保存只影响这一份试卷。</p></div><button type="button" @click="editorVisible = false">×</button></div><button v-else type="button" class="viewer-close" aria-label="关闭预览" @click="editorVisible = false">×</button>
         <template v-if="editorMode === 'edit'"><label class="editor-title"><span>试卷标题</span><input v-model="editableExam.title" class="iq-input" /></label><article v-for="question in editableExam.questions" :key="question.sort_order" class="editor-question"><b>第 {{ question.sort_order }} 题</b><textarea v-model="question.题目" rows="3" class="iq-input"></textarea><textarea v-model="question.选项" rows="2" class="iq-input" placeholder="选项"></textarea><div class="editor-two-col"><input v-model="question.答案" class="iq-input" placeholder="答案" /><input v-model="question.解析" class="iq-input" placeholder="解析" /></div></article><div class="editor-actions"><button type="button" class="iq-btn iq-btn-secondary" @click="editorVisible = false">取消</button><button type="button" class="iq-btn iq-btn-primary" :disabled="editorSaving" @click="saveExamEditor">{{ editorSaving ? '正在保存...' : '保存修改' }}</button></div></template>
-        <template v-else><article class="paper-preview"><h1>{{ editableExam.examNature?.university || 'XXXX大学' }}</h1><h2>{{ editableExam.examNature?.yearStart && editableExam.examNature?.yearEnd ? `${editableExam.examNature.yearStart}—${editableExam.examNature.yearEnd}学年${editableExam.examNature.semester || '秋季'}学期` : 'XXXX—XXXX学年XX学期' }}</h2><h1>《{{ editableExam.examNature?.examPrefix || '计算机导论' }}》期末考试试卷</h1><p>（{{ editableExam.examNature?.paperType || 'A' }}卷）</p><p>考试方式：{{ editableExam.examNature?.examMethod || '闭卷' }}</p><p>班级：______________　姓名：______________　学号：______________</p><table><tbody><tr><th>题号</th><th>一</th><th>二</th><th>三</th><th>四</th><th>五</th><th>总分</th></tr><tr><th>得分</th><td></td><td></td><td></td><td></td><td></td><td></td></tr></tbody></table><section v-for="group in previewQuestionGroups" :key="group.name"><h3>{{ group.name }}</h3><article v-for="(question, index) in group.questions" :key="question.sort_order"><b>{{ index + 1 }}. {{ question.题目 }}</b><p v-for="line in optionLines(question.选项)" :key="line">{{ line }}</p></article></section></article><div class="editor-actions"><button type="button" class="iq-btn iq-btn-primary" @click="editorVisible = false">返回</button></div></template>
+        <template v-else><article class="paper-preview"><h1>{{ editableExam.examNature?.university || 'XXXX大学' }}</h1><h2>{{ editableExam.examNature?.yearStart && editableExam.examNature?.yearEnd ? `${editableExam.examNature.yearStart}—${editableExam.examNature.yearEnd}学年${editableExam.examNature.semester || '秋季'}学期` : 'XXXX—XXXX学年XX学期' }}</h2><h1>《{{ editableExam.examNature?.examPrefix || '计算机导论' }}》期末考试试卷</h1><p>（{{ editableExam.examNature?.paperType || 'A' }}卷）</p><p>考试方式：{{ editableExam.examNature?.examMethod || '闭卷' }}</p><p>班级：______________　姓名：______________　学号：______________</p><table><tbody><tr><th>题号</th><th v-for="group in previewQuestionGroups" :key="'h' + group.numeral">{{ group.numeral }}</th><th>总分</th></tr><tr><th>得分</th><td v-for="group in previewQuestionGroups" :key="'s' + group.numeral"></td><td></td></tr></tbody></table><section v-for="group in previewQuestionGroups" :key="group.name"><h3>{{ group.name }}</h3><article v-for="(question, index) in group.questions" :key="question.sort_order"><b>{{ index + 1 }}. {{ question.题目 }}</b><p v-for="line in optionLines(question.选项)" :key="line">{{ line }}</p></article></section></article><div class="editor-actions"><button type="button" class="iq-btn iq-btn-primary" @click="editorVisible = false">返回</button></div></template>
       </section>
     </div>
   </div>
@@ -236,27 +236,28 @@ const props = defineProps({
 });
 const emit = defineEmits(['toast']);
 const typeOptions = TYPE_OPTIONS;
+const structureTypeOptions = [1, 2, 3, 4, 5, 7, 6].map(v => TYPE_OPTIONS.find(t => t.value === v));
 const difficultyNames = { 1: '入门', 2: '简单', 3: '中等', 4: '困难', 5: '挑战' };
 const templates = [{ key: 'basic', label: '基础练习' }, { key: 'standard', label: '标准练习' }, { key: 'advanced', label: '提升练习' }];
 const weights = { basic: [35,30,20,10,5], standard: [20,20,25,25,10], advanced: [5,10,25,35,25] };
 const paperPresets = [
   { key:'foundation', name:'基础巩固卷', tag:'适合复习', description:'基础题为主，客观题占比高', detail:'提供基础均衡、客观强化和章节复习三套方案', variants:[
-      { key:'foundation-balanced', name:'基础均衡', scene:'日常复习', description:'兼顾四类客观题，少量简答题', count:20, knowledge:4, typeWeights:[25,40,15,15,5,0], difficultyWeights:[40,30,20,10,0] },
-      { key:'foundation-objective', name:'客观强化', scene:'快速检测', description:'判断和单选占比较高，全部自动判分', count:20, knowledge:4, typeWeights:[30,45,15,10,0,0], difficultyWeights:[35,30,20,10,5] },
-      { key:'foundation-review', name:'章节复习', scene:'单章回顾', description:'题型更完整，保留少量主观题', count:20, knowledge:5, typeWeights:[20,40,15,15,10,0], difficultyWeights:[30,30,25,10,5] },
+      { key:'foundation-balanced', name:'基础均衡', scene:'日常复习', description:'兼顾四类客观题，少量简答题', count:20, knowledge:4, typeWeights:[25,40,15,15,5,0,0], difficultyWeights:[40,30,20,10,0] },
+      { key:'foundation-objective', name:'客观强化', scene:'快速检测', description:'判断和单选占比较高，全部自动判分', count:20, knowledge:4, typeWeights:[30,45,15,10,0,0,0], difficultyWeights:[35,30,20,10,5] },
+      { key:'foundation-review', name:'章节复习', scene:'单章回顾', description:'题型更完整，保留少量主观题', count:20, knowledge:5, typeWeights:[20,40,15,15,10,0,0], difficultyWeights:[30,30,25,10,5] },
     ]},
   { key:'final', name:'期末卷', tag:'期末考查', description:'覆盖题型与难度，适合阶段或期末测验', detail:'提供综合均衡、客观测验、主客观结合和手动自定义', variants:[
-      { key:'final-balanced', name:'主客观综合', scene:'期末测验', description:'按课程期末规格设置 45 题、100 分，包含组合题与程序题', count:45, knowledge:5, fixedTypeDistribution:{1:10,2:10,3:10,4:10,5:3,6:2}, fixedDifficultyDistribution:{1:8,2:9,3:12,4:10,5:6}, typeWeights:[10,30,20,15,15,10], difficultyWeights:[10,15,30,25,20] },
-      { key:'final-objective', name:'客观测验', scene:'自动判分', description:'全部使用可自动判分题型', count:20, knowledge:5, typeWeights:[25,40,20,15,0,0], difficultyWeights:[20,25,25,20,10] },
-      { key:'final-mixed', name:'主客观结合', scene:'综合考查', description:'保留一定比例简答题', count:20, knowledge:5, typeWeights:[20,35,15,15,15,0], difficultyWeights:[15,20,30,25,10] },
+      { key:'final-balanced', name:'主客观综合', scene:'期末测验', description:'按课程期末规格设置 45 题、100 分，包含组合题与程序题', count:45, knowledge:5, fixedTypeDistribution:{1:10,2:10,3:10,4:10,5:2,6:1,7:2}, fixedDifficultyDistribution:{1:8,2:9,3:12,4:10,5:6}, typeWeights:[10,30,20,15,10,5,10], difficultyWeights:[10,15,30,25,20] },
+      { key:'final-objective', name:'客观测验', scene:'自动判分', description:'全部使用可自动判分题型', count:20, knowledge:5, typeWeights:[25,40,20,15,0,0,0], difficultyWeights:[20,25,25,20,10] },
+      { key:'final-mixed', name:'主客观结合', scene:'综合考查', description:'保留一定比例简答题', count:20, knowledge:5, typeWeights:[20,35,15,15,15,0,0], difficultyWeights:[15,20,30,25,10] },
     ]},
   { key:'advanced', name:'难点提升卷', tag:'查漏补缺', description:'增加多选、简答和高难度题', detail:'提供难题突破、思维强化和综合挑战三套方案', variants:[
-      { key:'advanced-breakthrough', name:'难题突破', scene:'专项提高', description:'困难题为主，并纳入程序论述题', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[5,10,25,35,25] },
-      { key:'advanced-thinking', name:'思维强化', scene:'能力训练', description:'提高多选、简答和程序论述题占比', count:20, knowledge:6, typeWeights:[10,25,25,10,20,10], difficultyWeights:[5,10,25,35,25] },
-      { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10], difficultyWeights:[10,15,25,30,20] },
+      { key:'advanced-breakthrough', name:'难题突破', scene:'专项提高', description:'困难题为主，并纳入程序论述题', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10,0], difficultyWeights:[5,10,25,35,25] },
+      { key:'advanced-thinking', name:'思维强化', scene:'能力训练', description:'提高多选、简答和程序论述题占比', count:20, knowledge:6, typeWeights:[10,25,25,10,20,10,0], difficultyWeights:[5,10,25,35,25] },
+      { key:'advanced-comprehensive', name:'综合挑战', scene:'阶段测试', description:'覆盖六种题型并保持高难度', count:20, knowledge:6, typeWeights:[10,30,20,10,20,10,0], difficultyWeights:[10,15,25,30,20] },
     ]},
 ];
-const form = reactive({ title: '', chapters: [], knowledgePoints: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classIds: [], durationMinutes: '', endAt: '', maxAttempts: '', examNature: { university: '', yearStart: '', yearEnd: '', semester: '秋季', examPrefix: '计算机导论', paperType: 'A', examMethod: '闭卷' } });
+const form = reactive({ title: '', chapters: [], knowledgePoints: [], count: 20, minKnowledgePoints: 5, typeDistribution: {1:4,2:8,3:3,4:3,5:2,6:0,7:0}, difficultyDistribution: {1:4,2:4,3:5,4:5,5:2}, subject: '', classIds: [], durationMinutes: '', endAt: '', maxAttempts: '', examNature: { university: '', yearStart: '', yearEnd: '', semester: '秋季', examPrefix: '计算机导论', paperType: 'A', examMethod: '闭卷' } });
 const builderStep = ref(1);
 const inventory = ref(null), inventoryLoading = ref(false), preview = ref(null), previewLoading = ref(false), loading = ref(false), aiLoading = ref(false), planGenerating = ref(false), result = ref(null), errorMsg = ref(''), presetNotice = ref(''), activeTemplate = ref(''), activePaperPreset = ref(''), activePaperVariant = ref('');
 const assistPlans = ref([]);
@@ -287,7 +288,7 @@ const chapterCounts = computed(() => {
 });
 const typeSum = computed(() => Object.values(form.typeDistribution).reduce((s,v)=>s+(Number(v)||0),0));
 const difficultySum = computed(() => Object.values(form.difficultyDistribution).reduce((s,v)=>s+(Number(v)||0),0));
-const subjectiveCount = computed(() => (Number(form.typeDistribution[5])||0)+(Number(form.typeDistribution[6])||0));
+const subjectiveCount = computed(() => (Number(form.typeDistribution[5])||0)+(Number(form.typeDistribution[6])||0)+(Number(form.typeDistribution[7])||0));
 const combinationCheckClass = computed(() => previewLoading.value ? '' : preview.value?.feasible ? 'ok' : 'bad');
 const combinationCheckIcon = computed(() => previewLoading.value ? '…' : preview.value?.feasible ? '✓' : '!');
 const canGenerate = computed(() => builderStep.value === 4 && !loading.value && !inventoryLoading.value && !previewLoading.value && preview.value?.feasible === true && !!activePaperVariant.value);
@@ -371,7 +372,7 @@ const applyPaperVariant = async (preset, variant) => {
   form.count = variant.count;
   const typeDistribution = variantTypeDistribution(variant);
   const difficultyDistribution = variantDifficultyDistribution(variant);
-  [1,2,3,4,5,6].forEach(type => { form.typeDistribution[type] = typeDistribution[type] || 0; });
+  [1,2,3,4,5,6,7].forEach(type => { form.typeDistribution[type] = typeDistribution[type] || 0; });
   [1,2,3,4,5].forEach(level => { form.difficultyDistribution[level] = difficultyDistribution[level] || 0; });
   form.minKnowledgePoints = Math.min(variant.knowledge, inventory.value?.knowledgePoints.length || variant.knowledge);
   builderStep.value = 3;
@@ -508,11 +509,11 @@ const validate = () => {
   const subErr = validateSubject();
   if (subErr) return subErr;
   if(!Number.isInteger(form.count)||form.count<1||form.count>100)return '总题数需为1-100之间的整数'; if(typeSum.value!==form.count)return `题型合计为${typeSum.value}，应为${form.count}`; if(difficultySum.value!==form.count)return `难度合计为${difficultySum.value}，应为${form.count}`; if(form.count>(inventory.value?.total||0))return '当前章节范围题目库存不足'; if(form.minKnowledgePoints>(inventory.value?.knowledgePoints.length||0))return '知识点覆盖要求超过当前库存'; return ''; };
-const formatReason = (reason) => reason.replace(/题型1/g, '判断题').replace(/题型2/g, '单选题').replace(/题型3/g, '多选题').replace(/题型4/g, '填空题').replace(/题型5/g, '简答题').replace(/题型6/g, '程序论述题');
+const formatReason = (reason) => reason.replace(/题型1/g, '判断题').replace(/题型2/g, '单选题').replace(/题型3/g, '多选题').replace(/题型4/g, '填空题').replace(/题型5/g, '简答题').replace(/题型6/g, '程序论述题').replace(/题型7/g, '组合题');
 const typeDistributionText = (distribution) => typeOptions.map(type => `${type.label}${Number(distribution?.[type.value]) || 0}题`).join('、');
 const difficultyDistributionText = (distribution) => [1,2,3,4,5].map(level => `${level}级${Number(distribution?.[level]) || 0}题`).join('、');
 const setAlternativePlan = (plan, keepPreset = false) => {
-  [1,2,3,4,5,6].forEach(type => { form.typeDistribution[type] = Number(plan.typeDistribution?.[type]) || 0; });
+  [1,2,3,4,5,6,7].forEach(type => { form.typeDistribution[type] = Number(plan.typeDistribution?.[type]) || 0; });
   [1,2,3,4,5].forEach(level => { form.difficultyDistribution[level] = Number(plan.difficultyDistribution?.[level]) || 0; });
   activeTemplate.value = '';
   if (!keepPreset) { activePaperPreset.value = ''; activePaperVariant.value = ''; }
@@ -589,23 +590,20 @@ const openExamViewer = async (exam) => {
 };
 const optionLines = (options) => String(options || '').split(/\r?\n/).filter(Boolean);
 const previewQuestionGroups = computed(() => {
-  const rules = { 1: ['一', '判断题', 1], 2: ['二', '单选题', 1], 3: ['三', '多选题', 2], 4: ['四', '填空题', 1], 5: ['五', '问答题', 10] };
+  const rules = { 1: ['判断题', 1], 2: ['单选题', 1], 3: ['多选题', 2], 4: ['填空题', 1], 5: ['问答题', 10], 7: ['组合题', 10], 6: ['程序题', 10] };
+  const numerals = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
   const grouped = (editableExam.value.questions || []).reduce((groups, question) => {
     const type = Number(question.题型 || question.question_type || 0);
     if (!groups[type]) groups[type] = [];
     groups[type].push(question);
     return groups;
   }, {});
-  const groups = [1, 2, 3, 4, 5].filter(type => grouped[type]?.length).map((type) => {
-    const [numeral, name, score] = rules[type];
+  const groups = [1, 2, 3, 4, 5, 7, 6].filter(type => grouped[type]?.length).map((type, index) => {
+    const [name, score] = rules[type] || ['未知题型', 0];
     const count = grouped[type].length;
-    return { name: `${numeral}、${name}（共${count}题，每题${score}分，共${count * score}分）`, questions: grouped[type] };
+    const numeral = numerals[index] || String(index + 1);
+    return { numeral, name: `${numeral}、${name}（共${count}题，每题${score}分，共${count * score}分）`, questions: grouped[type] };
   });
-  const programQuestions = grouped[6] || [];
-  if (String(form.subject || '').replace(/\s/g, '').includes('人工智能基础') && programQuestions.length >= 2) {
-    groups.push({ name: '六、组合题（10分）', questions: [programQuestions[0]] });
-    groups.push({ name: programQuestions.length === 2 ? '七、程序题（10分）' : `七、程序题（共${programQuestions.length - 1}题，每题10分，共${(programQuestions.length - 1) * 10}分）`, questions: programQuestions.slice(1) });
-  } else if (programQuestions.length) groups.push({ name: `七、程序题（共${programQuestions.length}题，每题10分，共${programQuestions.length * 10}分）`, questions: programQuestions });
   return groups;
 });
 const saveExamEditor = async () => {

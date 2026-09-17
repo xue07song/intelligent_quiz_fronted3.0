@@ -286,8 +286,8 @@ const closePreview = () => {
   previewExam.value = { questions: [] };
 };
 
-const TYPE_ORDER = { 1: '一、判断题', 2: '二、单选题', 3: '三、多选题', 4: '四、填空题', 5: '五、简答题', 6: '六、程序论述题' };
-const SCORE_RULES = { 1: 1, 2: 1, 3: 2, 4: 1, 5: 5, 6: 10 };
+const TYPE_ORDER = { 1: '一、判断题', 2: '二、单选题', 3: '三、多选题', 4: '四、填空题', 5: '五、简答题', 7: '六、组合题', 6: '七、程序论述题' };
+const SCORE_RULES = { 1: 1, 2: 1, 3: 2, 4: 1, 5: 5, 6: 10, 7: 10 };
 
 const previewGroups = computed(() => {
   const questions = previewExam.value.questions || [];
@@ -297,7 +297,7 @@ const previewGroups = computed(() => {
     if (!grouped[type]) grouped[type] = [];
     grouped[type].push(q);
   });
-  return [1, 2, 3, 4, 5, 6].filter(t => grouped[t]?.length).map(t => {
+  return [1, 2, 3, 4, 5, 7, 6].filter(t => grouped[t]?.length).map(t => {
     const count = grouped[t].length;
     const score = SCORE_RULES[t] || 1;
     return { name: `${TYPE_ORDER[t]}（共${count}题，每题${score}分，共${count * score}分）`, questions: grouped[t] };
